@@ -14,11 +14,13 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityOptionsCompat
 import androidx.core.util.Pair
 import androidx.core.view.ViewCompat
+import androidx.core.view.isVisible
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.GridLayoutManager
@@ -50,9 +52,6 @@ class MainActivity : AppCompatActivity(){
         setContentView(binding.root)
 
         Paper.init(this)
-
-//        val retrofitService = MovieService.getInstance()
-//        movieRepository = MovieRepository(retrofitService)
 
         imageViewNoInternet = findViewById(R.id.imgNoInternet)
         tvViewNoInternet = findViewById(R.id.tvNoInternet)
@@ -103,51 +102,6 @@ class MainActivity : AppCompatActivity(){
             Log.d("TAG", item.title)
             showDetails(item)
         }
-
-//        val retrofitService = MovieService.getInstance()
-//        val mainRepository = MovieRepository(retrofitService)
-//        binding.rvMovies.adapter = movieAdapter
-
-//        viewModel = ViewModelProvider(this, MovieViewModelFactory(mainRepository)).get(MovieViewModel::class.java)
-//        viewModel.observeMovieLiveData().observe(this, {
-//            movieAdapter.setMovieList(it)
-//        })
-//
-//        viewModel.errorMessage.observe(this, {
-//            Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
-//        })
-//
-//        viewModel.loading.observe(this, Observer {
-//            if (it) {
-//                binding.progressDialog.visibility = View.VISIBLE
-//            } else {
-//                binding.progressDialog.visibility = View.GONE
-//            }
-//        })
-//
-//        viewModel.getAllUsers()
-
-//        userViewModel.getUsers().observe(this,
-//            Observer {
-//                when(it){
-//                    is UserRepository.ResponseResult.Success<*> -> {
-//                        val users = it.data
-//                        // notify recyclerView
-//                    }
-//                    is UserRepository.ResponseResult.Failure -> {
-//                        val error = it.error
-//                        // some error happened
-//                    }
-//                    is UserRepository.ResponseResult.Pending-> {
-//                        // start | in progress
-//                        // show Loading...
-//                    }
-//                    is UserRepository.ResponseResult.Complete-> {
-//                        // call ended | completed
-//                        // hide Loading...
-//                    }
-//                }
-//            });
     }
 
     fun showDetails(item: Movie){
@@ -157,8 +111,6 @@ class MainActivity : AppCompatActivity(){
         intent.putExtra("title", item.title)
         intent.putExtra("img", item.poster_path)
         intent.putExtra("release_date", item.release_date)
-//            intent.putExtra("source",  article.getSource().getName());
-//            intent.putExtra("author",  article.getAuthor());
         intent.putExtra("description", item.overview)
         intent.putExtra("genre_ids", item.genre_ids.toString())
 
@@ -178,11 +130,6 @@ class MainActivity : AppCompatActivity(){
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-//        Paper.book().destroy();
-    }
-
     fun updateUI(flag: Boolean){
         if(flag){
             imageViewShadow.isVisible = true
@@ -200,12 +147,6 @@ class MainActivity : AppCompatActivity(){
             tvViewNoInternet.isVisible = true
         }
     }
-
-//    // Function to update last viewed movie
-//    private suspend fun updateLastViewedMovie() {
-//        val movie = LastViewedMovie(id = 1, title = "Last Movie", description = "Description", date = "2023-04-16", genre = "20,14", image = "test")
-//        viewModel.insertOrUpdateLastViewedMovie(movie)
-//    }
 
     @RequiresApi(Build.VERSION_CODES.M)
     fun isOnline(context: Context): Boolean {
@@ -284,12 +225,4 @@ class MainActivity : AppCompatActivity(){
             adapter = movieAdapter
         }
     }
-
-    fun initDb(): AppDatabase {
-        return Room.databaseBuilder(
-            applicationContext,
-            AppDatabase::class.java, "user-db"
-        ).build()
-    }
-
 }

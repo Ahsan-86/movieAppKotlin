@@ -4,22 +4,16 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.liveData
-import com.ahsan.kotlinpractice.LastViewedMovie
 import com.ahsan.kotlinpractice.interfaces.MovieService
-import com.ahsan.kotlinpractice.interfaces.UsersService
-import com.ahsan.kotlinpractice.repositories.MovieRepository
-import com.ahsan.kotlinpractice.repositories.UserRepository
-import kotlinx.coroutines.*
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
-import javax.inject.Inject
 
 class MovieViewModel constructor(
 //    private val movieRepository: MovieRepository
 ) : ViewModel() {
     private var movieLiveData = MutableLiveData<List<Movie>>()
+
 //    val lastViewedMovie: LiveData<LastViewedMovie?> = movieRepository.lastViewedMovie
 
 //    // Function to get user data by ID

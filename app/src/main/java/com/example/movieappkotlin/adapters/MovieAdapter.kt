@@ -6,9 +6,9 @@ import android.view.ViewGroup
 import android.widget.Filter
 import androidx.recyclerview.widget.RecyclerView
 import com.ahsan.kotlinpractice.Utilities.Utils
-import com.ahsan.kotlinpractice.databinding.MovieLayoutBinding
 import com.ahsan.kotlinpractice.models.Movie
 import com.bumptech.glide.Glide
+import com.example.movieappkotlin.databinding.MovieLayoutBinding
 import java.util.*
 
 class MovieAdapter : RecyclerView.Adapter<MovieAdapter.ViewHolder>() {

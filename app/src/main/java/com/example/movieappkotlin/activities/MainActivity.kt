@@ -59,13 +59,23 @@ class MainActivity : AppCompatActivity(){
         recyclerView = findViewById(R.id.rv_movies)
         tvViewNoInternet.setOnClickListener(object : View.OnClickListener {
             override fun onClick(view: View) {
-                Log.d("MainActivity", "data "+ Paper.book().read("lastViewData", null))
-                if(Paper.book().read("lastViewData", null) != null) {
-                    Log.d("MainActivity", "data true")
-                    showDetails(Paper.book().read("lastViewData", null) as Movie)
-                }else{
-                    Log.d("MainActivity", "data false")
-                    Toast.makeText(this@MainActivity, "Sorry, no information saved last time", Toast.LENGTH_SHORT).show()
+                try {
+                    Log.d("MainActivity", "data " + Paper.book().read<Movie>("lastViewData", null))
+                    val movie: Movie? = Paper.book().read<Movie>("lastViewData", null)
+                    if (movie != null) {
+                        Log.d("MainActivity", "data true")
+                        showDetails(movie)
+                    } else {
+                        Log.d("MainActivity", "data false")
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Sorry, no information saved last time",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }catch (e: Exception) {
+                    Log.e("MainActivity", "Error reading saved data: ${e.message}")
+                    Toast.makeText(this@MainActivity, "Error loading saved data", Toast.LENGTH_SHORT).show()
                 }
             }
         })
@@ -85,22 +95,45 @@ class MainActivity : AppCompatActivity(){
 //            }
 //        })
 
-        if(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                !isOnline(this)
+        val hasInternet = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                isOnline(this)
             } else {
-                TODO("VERSION.SDK_INT < M")
+                isNetworkAvailableLegacy(this)
             }
-        ){
-            //no internet
-            updateUI(false)
-        }else{
-            updateUI(true)
+        } catch (e: Exception) {
+            false // Assume no internet if check fails
         }
+
+        updateUI(hasInternet)
+
+//        if(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                !isOnline(this)
+//            } else {
+//                isNetworkAvailableLegacy(this)
+//            }
+//        ){
+//            //no internet
+//            updateUI(false)
+//        }else{
+//            updateUI(true)
+//        }
 
         prepareRecyclerView()
         movieAdapter.onItemClick = { item ->
             Log.d("TAG", item.title)
             showDetails(item)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isNetworkAvailableLegacy(context: Context): Boolean {
+        return try {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val networkInfo = connectivityManager.activeNetworkInfo
+            networkInfo != null && networkInfo.isConnected
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -114,6 +147,7 @@ class MainActivity : AppCompatActivity(){
         intent.putExtra("description", item.overview)
         intent.putExtra("genre_ids", item.genre_ids.toString())
 
+        //Paper.book().delete("lastViewData");
         Paper.book().write("lastViewData", item);
 
         val pair: Pair<View, String> =

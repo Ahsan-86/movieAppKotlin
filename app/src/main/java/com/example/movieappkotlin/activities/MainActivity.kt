@@ -148,7 +148,7 @@ class MainActivity : AppCompatActivity(){
         intent.putExtra("genre_ids", item.genre_ids.toString())
 
         //Paper.book().delete("lastViewData");
-        Paper.book().write("lastViewData", item);
+        Paper.book().write("lastViewData", item)
 
         val pair: Pair<View, String> =
             Pair.create(imageView as View, ViewCompat.getTransitionName(imageView))
@@ -208,7 +208,7 @@ class MainActivity : AppCompatActivity(){
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val inflater = menuInflater
         inflater.inflate(R.menu.menu_main, menu)
-        val menuItem = menu?.findItem(R.id.action_search)
+        //val menuItem = menu?.findItem(R.id.action_search)
 
         val searchManager = getSystemService(Context.SEARCH_SERVICE) as SearchManager
         val searchView: SearchView? = menu.findItem(R.id.action_search).actionView as SearchView?

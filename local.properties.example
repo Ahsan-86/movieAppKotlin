@@ -1,0 +1,9 @@
+# Copy this file to "local.properties" (already gitignored) and fill in your own values.
+# local.properties is never committed to git, so your keys stay off GitHub.
+
+# --- Android SDK path (Android Studio usually fills this in automatically) ---
+#sdk.dir=/path/to/Android/sdk
+
+# --- TMDB API key ---
+# Get a free key at: https://www.themoviedb.org/settings/api  (use the "API Key (v3 auth)" value)
+TMDB_API_KEY=your_tmdb_api_key_here

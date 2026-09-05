@@ -1,3 +1,56 @@
 <resources>
     <string name="app_name">Movie App</string>
+
+    <!-- Navigation -->
+    <string name="nav_explore">Explore</string>
+    <string name="nav_trending">Trending</string>
+    <string name="nav_favorites">Favorites</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_account">Account</string>
+
+    <!-- Home / Explore -->
+    <string name="section_trending_today">Trending Today</string>
+    <string name="section_popular">Popular</string>
+    <string name="section_top_rated">Top Rated</string>
+    <string name="section_now_playing">Now Playing</string>
+    <string name="section_upcoming">Upcoming</string>
+    <string name="section_for_you">For You</string>
+    <string name="see_all">See all</string>
+
+    <!-- Offline -->
+    <string name="offline_banner">You\'re offline — showing saved movies</string>
+    <string name="offline_empty_title">Nothing saved yet</string>
+    <string name="offline_empty_body">Connect to the internet at least once so we can save movies for offline browsing.</string>
+
+    <!-- Search -->
+    <string name="search_hint">Search movies, cast, anything…</string>
+    <string name="search_empty">No results for \"%1$s\"</string>
+    <string name="search_section_movies">Movies</string>
+    <string name="search_section_people">Cast &amp; Crew</string>
+
+    <!-- Detail -->
+    <string name="cast_title">Cast</string>
+    <string name="similar_title">More Like This</string>
+    <string name="add_to_favorites">Add to favorites</string>
+    <string name="remove_from_favorites">Remove from favorites</string>
+    <string name="overview_title">Overview</string>
+
+    <!-- Favorites -->
+    <string name="favorites_empty_title">No favorites yet</string>
+    <string name="favorites_empty_body">Tap the heart on any movie to save it here — even offline.</string>
+
+    <!-- Auth -->
+    <string name="continue_as_guest">Continue as Guest</string>
+    <string name="log_in">Log In</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="log_out">Log Out</string>
+    <string name="guest_mode_notice">You\'re browsing as a guest. Log in to sync your favorites.</string>
+
+    <!-- Generic -->
+    <string name="retry">Retry</string>
+    <string name="error_generic">Something went wrong</string>
+    <string name="loading">Loading…</string>
 </resources>

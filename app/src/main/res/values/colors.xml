@@ -1,31 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-
-    <color name="dark_blue">#1E3C72</color>
-    <color name="light_gray">#EDEDED</color>
-    <color name="dark_gray">#333333</color>
-
-    <color name="dark_slate_gray">#2F4F4F</color>
-    <color name="light_steel_blue">#B0C4DE</color>
-    <color name="snow">#FFFAFA</color>
-    <color name="dim_gray">#696969</color>
-
-    <color name="royal_blue">#4169E1</color>
-    <color name="ivory">#FFFFF0</color>
-    <color name="pale_green">#98FB98</color>
-    <color name="dark_olive_green">#556B2F</color>
-    <color name="lavender_blush">#FFF0F5</color>
-    <color name="dark_slate_blue">#483D8B</color>
-
-
-    <color name="colorBackground">#f9f9fa</color>
-    <color name="colorTextSubtitle">#4e4e4e</color>
-    <color name="colorTextTitle">#262626</color>
+    <!-- Used only for the launch/splash window background before Compose takes over. -->
+    <color name="splash_background">#0B0D14</color>
 </resources>

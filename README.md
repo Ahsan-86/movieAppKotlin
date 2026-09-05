@@ -1,13 +1,95 @@
-# movieAppKotlin
-It is movie browsing application with a search feature and collapsing movie details screen.
+# Movie App
 
-I have used the below concepts using Kotlin for Android Development
+A movie browsing app built on TMDB, being rewritten from the ground up onto modern Android:
+Jetpack Compose, Kotlin Coroutines/Flow, Hilt, Room, Retrofit, WorkManager and Navigation-Compose.
 
-- MVVM Architecture
-- ViewModel
-- Views
-- Binding
-- Android Kotlin fundamental ( Lazy keyword, lateinit keyword, nullable data type, dataclass)
-- Retrofit (for API calls)
-- Gson (for data parsing)
-- PaperDb (for storing last viewed information)
+The rewrite is being delivered in phases. This branch (`feature/compose-rewrite-phase1`)
+contains **Phase 1**.
+
+## Phase 1 — what's in this branch
+
+- **Full architecture migration**: Gradle Kotlin DSL + version catalog, Hilt DI, Room, Retrofit,
+  Coroutines/Flow, Navigation-Compose, Coil, DataStore, WorkManager. The old View/XML/data-binding
+  code, the old `MovieViewModel`/`MovieService` singletons, and PaperDb are all gone.
+- **Seamless offline functionality**: every screen reads from a Room database, not the network
+  directly. TMDB responses are cached into Room; the UI shows cached data instantly and updates
+  live when a network refresh completes. A `WorkManager` job refreshes the cache every 6 hours in
+  the background, and an offline banner appears automatically (no crash, no blank screen) when
+  there's no connection.
+- **New navigation shell**: bottom navigation with **Explore / Trending / Favorites**, plus
+  **Search** and **Account** in the top bar, as requested.
+- **New overhauled Explore/home screen**: multiple horizontally-scrolling carousels — Trending
+  Today, Popular, For You (personalized from your favorite genres), Now Playing, Top Rated,
+  Upcoming — replacing the old single vertical list.
+- **Favorites**: tap the heart on any poster (works fully offline; favorites are just a Room table).
+- **Guest mode**: the app opens with a Guest / Log In / Sign Up chooser. Guest mode is fully wired
+  up now. Log In / Sign Up are visible but disabled — they're wired to real Firebase Authentication
+  in Phase 4 (see below).
+- **Basic search**: search movies by title (debounced, live results). Searching by cast/description
+  and clickable cast → filmography drill-down lands in Phase 2.
+- **Basic movie detail screen**: backdrop, poster, rating, genres, overview, favorite toggle. The
+  full cascaded redesign with cast list and "More Like This" lands in Phase 3.
+
+## What's coming
+
+- **Phase 2** — Search by cast, description, or anything; tapping a cast/person result shows their
+  filmography.
+- **Phase 3** — Movie detail screen overhaul: cascaded cast list (clickable), similar movies row.
+- **Phase 4** — Real Firebase Authentication (guest/signup/login), final polish.
+
+## Setup
+
+### 1. TMDB API key
+
+The previous version of this app had a TMDB API key hardcoded directly in source, and that file
+was public on GitHub — treat that old key as compromised. This rewrite never hardcodes it:
+
+1. Get a free key at <https://www.themoviedb.org/settings/api> (the "API Key (v3 auth)" value).
+2. Copy `local.properties.example` to `local.properties` (already gitignored — it will never be
+   committed).
+3. Set `TMDB_API_KEY=your_key_here` in `local.properties`.
+4. If you were using the old exposed key anywhere, rotate/regenerate it on TMDB's site.
+
+### 2. Open in Android Studio
+
+This project now requires **Android Studio Ladybug (2024.2) or newer** and JDK 17 (bundled with
+recent Android Studio). Open the project root, let Gradle sync, add your TMDB key as above, then
+Run. Minimum SDK is 24 (Android 7.0); target/compile SDK is 35.
+
+### 3. Firebase (needed starting Phase 4, not required yet)
+
+Real sign-in/sign-up will use Firebase Authentication. When that phase lands you'll need to:
+1. Create a free project at <https://console.firebase.google.com>.
+2. Add an Android app to it with application ID `com.ahsan.movieapp`.
+3. Download the generated `google-services.json` and place it in `app/`.
+Nothing in Phase 1–3 depends on this.
+
+## Architecture at a glance
+
+```
+data/
+  remote/      TMDB Retrofit API + DTOs
+  local/       Room database, entities, DAOs (the offline source of truth)
+  mapper/      DTO <-> Entity <-> domain model conversions
+  repository/  MovieRepository (offline-first, network-bound-resource pattern), PreferencesRepository (DataStore session)
+domain/
+  model/       UI-facing models (Movie, MovieDetails, CastMember, Person)
+di/            Hilt modules (network, database, preferences, repository bindings)
+work/          WorkManager background sync
+ui/
+  theme/       Material 3 theme (dark-first cinematic palette, dynamic color on Android 12+)
+  navigation/  NavHost, bottom nav, routes
+  components/  Reusable composables (poster card, carousel section, loading/error/offline states)
+  home/ trending/ favorites/ search/ detail/ account/   One package per screen: Screen + ViewModel
+```
+
+Every screen's ViewModel talks only to `MovieRepository`/`PreferencesRepository` — never directly
+to Retrofit or Firebase — so swapping or extending the backend in later phases doesn't touch the UI.
+
+## A note on this being an AI-assisted rewrite
+
+This phase was generated by Claude without access to the Android SDK, an emulator, or network
+access to Maven/Google's repositories in its sandbox — so it could not run an actual
+`./gradlew build`. The code was written carefully and given an independent static review pass to
+catch import/type/DI mistakes, but a real Gradle sync in Android Studio is still the first thing to
+do, and any build errors it surfaces should be reported back so they can be fixed.

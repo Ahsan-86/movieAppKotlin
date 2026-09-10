@@ -1,5 +1,6 @@
 package com.ahsan.movieapp.ui.person
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,6 +67,10 @@ import com.ahsan.movieapp.ui.components.MovieListRow
  * of what's showing underneath (a bright poster, or the plain background during loading/error).
  */
 @OptIn(ExperimentalMaterial3Api::class)
+// contentWindowInsets is deliberately (0,0,0,0) below (see the comment on that param) — the
+// Scaffold's content-padding parameter really has nothing to apply, so it's discarded as `_`.
+// The lint check can't tell "deliberately unused" from "forgot to apply it", hence the suppress.
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun PersonScreen(
     onBack: () -> Unit,

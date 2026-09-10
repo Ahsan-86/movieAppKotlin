@@ -1,12 +1,16 @@
 package com.ahsan.movieapp.data.remote
 
+import com.ahsan.movieapp.data.remote.dto.CollectionDetailsDto
+import com.ahsan.movieapp.data.remote.dto.CombinedCreditsDto
 import com.ahsan.movieapp.data.remote.dto.CreditsDto
 import com.ahsan.movieapp.data.remote.dto.GenreListDto
 import com.ahsan.movieapp.data.remote.dto.MovieDetailsDto
 import com.ahsan.movieapp.data.remote.dto.MovieDto
+import com.ahsan.movieapp.data.remote.dto.MultiSearchResultDto
 import com.ahsan.movieapp.data.remote.dto.PagedResponseDto
-import com.ahsan.movieapp.data.remote.dto.PersonDto
-import com.ahsan.movieapp.data.remote.dto.PersonMovieCreditsDto
+import com.ahsan.movieapp.data.remote.dto.PersonDetailsDto
+import com.ahsan.movieapp.data.remote.dto.TvShowDto
+import com.ahsan.movieapp.data.remote.dto.WatchProvidersResponseDto
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -24,6 +28,10 @@ interface TmdbApi {
     @GET("3/movie/popular")
     suspend fun getPopular(@Query("page") page: Int = 1): PagedResponseDto<MovieDto>
 
+    /** Backs the Explore screen's "Popular TV Shows" carousel — network-only, same as [discoverTvByGenres]. */
+    @GET("3/tv/popular")
+    suspend fun getPopularTv(@Query("page") page: Int = 1): PagedResponseDto<TvShowDto>
+
     @GET("3/movie/top_rated")
     suspend fun getTopRated(@Query("page") page: Int = 1): PagedResponseDto<MovieDto>
 
@@ -40,15 +48,31 @@ interface TmdbApi {
         @Query("page") page: Int = 1
     ): PagedResponseDto<MovieDto>
 
+    @GET("3/genre/movie/list")
+    suspend fun getGenres(): GenreListDto
+
+    /**
+     * Backs the search screen's collapsible filter panel (Phase 2.5) — every param is optional so
+     * Retrofit omits whatever the user hasn't picked, letting one endpoint cover any combination
+     * of genre/year/language/rating instead of needing a variant per filter.
+     */
     @GET("3/discover/movie")
-    suspend fun discoverByCast(
-        @Query("with_cast") personId: Int,
+    suspend fun discoverMovies(
+        @Query("with_genres") genreIds: String? = null,
+        @Query("primary_release_year") year: Int? = null,
+        @Query("with_original_language") language: String? = null,
+        @Query("vote_average.gte") minRating: Float? = null,
         @Query("sort_by") sortBy: String = "popularity.desc",
         @Query("page") page: Int = 1
     ): PagedResponseDto<MovieDto>
 
-    @GET("3/genre/movie/list")
-    suspend fun getGenres(): GenreListDto
+    /** TV counterpart of [discoverByGenres] — backs the genre screen's TV tab. */
+    @GET("3/discover/tv")
+    suspend fun discoverTvByGenres(
+        @Query("with_genres") genreIds: String,
+        @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("page") page: Int = 1
+    ): PagedResponseDto<TvShowDto>
 
     @GET("3/movie/{id}")
     suspend fun getMovieDetails(@Path("id") movieId: Int): MovieDetailsDto
@@ -59,12 +83,49 @@ interface TmdbApi {
     @GET("3/movie/{id}/similar")
     suspend fun getSimilarMovies(@Path("id") movieId: Int, @Query("page") page: Int = 1): PagedResponseDto<MovieDto>
 
-    @GET("3/search/movie")
-    suspend fun searchMovies(@Query("query") query: String, @Query("page") page: Int = 1): PagedResponseDto<MovieDto>
+    /**
+     * A separate TMDB algorithm from [getSimilarMovies] (genre/keyword similarity vs. TMDB's own
+     * recommendation model) — the Detail screen's Similar and Recommendations sections are
+     * deliberately not deduped against each other, per Ahsan's request, since they're different
+     * data.
+     */
+    @GET("3/movie/{id}/recommendations")
+    suspend fun getMovieRecommendations(@Path("id") movieId: Int, @Query("page") page: Int = 1): PagedResponseDto<MovieDto>
 
-    @GET("3/search/person")
-    suspend fun searchPeople(@Query("query") query: String, @Query("page") page: Int = 1): PagedResponseDto<PersonDto>
+    /**
+     * Backs the Detail screen's collection teaser (Phase 3 Round B) — every movie belonging to a
+     * TMDB "collection" (franchise), plus the collection's own overview/poster/backdrop. The
+     * teaser itself needs no separate call (see [getMovieDetails]'s `belongs_to_collection`); this
+     * is only fetched once the teaser is tapped.
+     */
+    @GET("3/collection/{id}")
+    suspend fun getCollectionDetails(@Path("id") collectionId: Int): CollectionDetailsDto
 
-    @GET("3/person/{id}/movie_credits")
-    suspend fun getPersonMovieCredits(@Path("id") personId: Int): PersonMovieCreditsDto
+    /**
+     * Backs the Detail screen's streaming-availability section (Phase 3 Round C) — powered by
+     * JustWatch. No query params: TMDB returns every region in one response (see
+     * [WatchProvidersResponseDto]), so the region dropdown filters client-side instead of
+     * re-fetching per region.
+     */
+    @GET("3/movie/{id}/watch/providers")
+    suspend fun getWatchProviders(@Path("id") movieId: Int): WatchProvidersResponseDto
+
+    /**
+     * Single call covering movies, TV, and people — replaces the old separate
+     * `/search/movie` + `/search/person` calls so one settled query is one network request,
+     * not two in parallel. The repository filters by `media_type` and drops TV results.
+     */
+    @GET("3/search/multi")
+    suspend fun searchMulti(@Query("query") query: String, @Query("page") page: Int = 1): PagedResponseDto<MultiSearchResultDto>
+
+    @GET("3/person/{id}")
+    suspend fun getPersonDetails(@Path("id") personId: Int): PersonDetailsDto
+
+    /**
+     * Movie + TV credits in one call, split into `cast` (acting) and `crew` (director, writer,
+     * etc. — filter by `job`) with each item tagged `media_type`. Replaces the old
+     * discover-by-cast approach, which could only ever surface acting credits in movies.
+     */
+    @GET("3/person/{id}/combined_credits")
+    suspend fun getPersonCombinedCredits(@Path("id") personId: Int): CombinedCreditsDto
 }

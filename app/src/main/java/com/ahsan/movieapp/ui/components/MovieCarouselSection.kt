@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +38,8 @@ fun MovieCarouselSection(
     onToggleFavorite: ((Movie) -> Unit)? = null,
     onSeeAll: (() -> Unit)? = null,
     isLoading: Boolean = false,
+    errorMessage: String? = null,
+    onRetry: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -42,15 +47,17 @@ fun MovieCarouselSection(
 
         Spacer4()
 
-        if (isLoading && movies.isEmpty()) {
-            LazyRow(
+        when {
+            isLoading && movies.isEmpty() -> LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(6) { PosterSkeleton() }
             }
-        } else {
-            LazyRow(
+            // Nothing cached yet AND the refresh failed (first launch with no/bad connection) —
+            // show why instead of a silent, confusing blank row under a title with nothing in it.
+            movies.isEmpty() && errorMessage != null -> CarouselErrorRow(message = errorMessage, onRetry = onRetry)
+            else -> LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -62,6 +69,33 @@ fun MovieCarouselSection(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CarouselErrorRow(message: String, onRetry: (() -> Unit)?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.CloudOff,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.height(18.dp)
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        if (onRetry != null) {
+            TextButton(onClick = onRetry) { Text("Retry") }
         }
     }
 }

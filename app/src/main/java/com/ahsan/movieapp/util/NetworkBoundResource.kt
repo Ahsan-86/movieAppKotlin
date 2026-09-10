@@ -31,7 +31,7 @@ inline fun <ResultType, RequestType> networkBoundResource(
             emitAll(query().map { Resource.Success(it) })
         } catch (throwable: Throwable) {
             emitAll(query().map {
-                Resource.Error(throwable.message ?: "Network error — showing saved data", it)
+                Resource.Error(throwable.toUserMessage(), it)
             })
         }
     } else {

@@ -2,54 +2,109 @@ package com.ahsan.movieapp.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.ahsan.movieapp.domain.model.GenreChip
 import com.ahsan.movieapp.domain.model.Movie
+import com.ahsan.movieapp.ui.components.HeroMovieCarousel
 import com.ahsan.movieapp.ui.components.MovieCarouselSection
 import com.ahsan.movieapp.ui.components.OfflineBanner
+import kotlinx.coroutines.flow.Flow
 
 /**
- * The new "Explore" home: a stack of themed, horizontally-scrolling carousels (Trending,
- * Popular, For You, Now Playing, Top Rated, Upcoming) — replacing the old app's single
- * vertical list of popular movies.
+ * The "Explore" home: a hero banner of the top popular movies, a text-only genre chips row, then
+ * a stack of themed, horizontally-scrolling carousels (Popular, For You, Now Playing, Top Rated,
+ * Upcoming, Popular TV Shows). No heading text of its own — the persistent "Movie App" top bar
+ * covers that, so this screen's whole content area is the hero-first layout described above.
  */
 @Composable
 fun HomeScreen(
     onMovieClick: (Movie) -> Unit,
+    onGenreClick: (GenreChip) -> Unit,
+    // Fires when the user re-taps the already-selected Explore tab — scrolls back to top instead
+    // of doing nothing, matching Instagram/YouTube-style tab-reselect behavior.
+    scrollToTopEvents: Flow<Unit>? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(scrollToTopEvents) {
+        scrollToTopEvents?.collect { listState.animateScrollToItem(0) }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         OfflineBanner(visible = state.isOffline)
 
-        Text(
-            text = "Explore",
-            style = MaterialTheme.typography.displaySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
-        )
-
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            item(key = "hero") {
+                HeroMovieCarousel(
+                    movies = state.heroMovies,
+                    onMovieClick = onMovieClick,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
+
+            item(key = "genre_chips") {
+                ExploreGenreChipsRow(genres = state.genreChips, onGenreClick = onGenreClick)
+            }
+
             items(state.sections, key = { it.title }) { section ->
                 MovieCarouselSection(
                     title = section.title,
                     movies = section.movies,
                     isLoading = section.isLoading,
+                    errorMessage = section.errorMessage.takeIf { section.movies.isEmpty() },
+                    onRetry = viewModel::retry,
                     onMovieClick = onMovieClick,
-                    onToggleFavorite = { viewModel.toggleFavorite(it) }
+                    onToggleFavorite = if (section.allowFavoriting) { { viewModel.toggleFavorite(it) } } else null
+                )
+            }
+        }
+    }
+}
+
+/** A "Categories" heading plus text-only genre chips (no icons, unlike the search screen's
+ *  image-backed genre cards) — a quicker, lower-commitment way to jump into a genre straight
+ *  from Explore. */
+@Composable
+private fun ExploreGenreChipsRow(genres: List<GenreChip>, onGenreClick: (GenreChip) -> Unit) {
+    if (genres.isEmpty()) return
+    Column {
+        androidx.compose.material3.Text(
+            text = "Categories",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(genres, key = { it.navId }) { genre ->
+                AssistChip(
+                    onClick = { onGenreClick(genre) },
+                    label = { androidx.compose.material3.Text(genre.name) }
                 )
             }
         }

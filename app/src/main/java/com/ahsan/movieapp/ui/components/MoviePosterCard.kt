@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,12 +44,14 @@ fun MoviePosterCard(
     movie: Movie,
     onClick: () -> Unit,
     onToggleFavorite: (() -> Unit)? = null,
-    width: androidx.compose.ui.unit.Dp = 128.dp,
+    // Null means "fill whatever container I'm in" (e.g. a grid cell) rather than an exact width —
+    // used by the search screen's dense 4-up grid mode where cell width varies by screen size.
+    width: androidx.compose.ui.unit.Dp? = 128.dp,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
-            .width(width)
+            .let { if (width != null) it.width(width) else it.fillMaxWidth() }
             .clickable(onClick = onClick)
     ) {
         Box(

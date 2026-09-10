@@ -29,6 +29,10 @@ interface FavoriteDao {
     )
     fun observeFavoriteMovies(): Flow<List<MovieEntity>>
 
+    // Returns the raw, comma-joined genreIds column (not List<Int>) on purpose: Room's KSP
+    // processor can't resolve a TypeConverter chain when the per-row converted type is itself a
+    // generic collection wrapped in an outer List (i.e. List<List<Int>>). Parsing happens in the
+    // repository instead.
     @Query("SELECT genreIds FROM movies INNER JOIN favorites ON movies.id = favorites.movieId")
-    suspend fun getFavoriteGenreIdLists(): List<List<Int>>
+    suspend fun getFavoriteGenreIdsRaw(): List<String>
 }

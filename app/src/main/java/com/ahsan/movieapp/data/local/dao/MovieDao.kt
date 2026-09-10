@@ -83,4 +83,20 @@ interface MovieDao {
         """
     )
     fun observeIsFavoriteMovie(movieId: Int): Flow<MovieEntity?>
+
+    /**
+     * Offline fallback for search: a capped match against whatever's already cached. [limit]
+     * exists specifically so one query can never return an unbounded row count regardless of how
+     * many movies happen to be cached — this is what caused the Phase 2 slowdown last time,
+     * combined with a non-lazy results grid (now fixed on the UI side).
+     */
+    @Query(
+        """
+        SELECT * FROM movies
+        WHERE title LIKE :likeQuery OR overview LIKE :likeQuery
+        ORDER BY voteAverage DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchLocalMovies(likeQuery: String, limit: Int): List<MovieEntity>
 }

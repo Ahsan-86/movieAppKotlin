@@ -24,6 +24,7 @@ class PreferencesRepository @Inject constructor(
         val IS_GUEST = booleanPreferencesKey("is_guest")
         val USER_ID = stringPreferencesKey("user_id")
         val HAS_ONBOARDED = booleanPreferencesKey("has_onboarded")
+        val SEARCH_VIEW_MODE = stringPreferencesKey("search_view_mode")
     }
 
     val sessionState: Flow<SessionState> = dataStore.data.map { prefs ->
@@ -33,6 +34,15 @@ class PreferencesRepository @Inject constructor(
             prefs[Keys.IS_GUEST].orFalse() -> SessionState.Guest
             else -> SessionState.SignedOut
         }
+    }
+
+    /** Remembers the user's last-picked search results layout across app restarts. */
+    val searchViewMode: Flow<SearchViewMode> = dataStore.data.map { prefs ->
+        SearchViewMode.entries.find { it.name == prefs[Keys.SEARCH_VIEW_MODE] } ?: SearchViewMode.GRID
+    }
+
+    suspend fun setSearchViewMode(mode: SearchViewMode) {
+        dataStore.edit { it[Keys.SEARCH_VIEW_MODE] = mode.name }
     }
 
     suspend fun continueAsGuest() {
@@ -66,3 +76,6 @@ sealed interface SessionState {
     data object Guest : SessionState
     data class SignedIn(val userId: String) : SessionState
 }
+
+/** How the search screen lays out its results — user-picked, remembered via DataStore. */
+enum class SearchViewMode { LIST, GRID, GRID_DENSE }

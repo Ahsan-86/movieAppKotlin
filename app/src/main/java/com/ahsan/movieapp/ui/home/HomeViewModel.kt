@@ -28,7 +28,12 @@ data class HomeSection(
     val errorMessage: String? = null,
     // False for the TV shows row — TV items can't be favorited yet (no schema support), same
     // one-screen exception as the genre screen's TV tab.
-    val allowFavoriting: Boolean = true
+    val allowFavoriting: Boolean = true,
+    // True only for the "Popular TV Shows" row — its items reuse the Movie model (see
+    // data/mapper/MovieMappers.kt's TvShowDto.toMovie()) but their id is a TV id, not a movie id,
+    // so HomeScreen needs to know not to route a tap through the normal onMovieClick. See
+    // util/TvNavigation.kt for the full explanation.
+    val isTv: Boolean = false
 )
 
 data class HomeUiState(
@@ -112,7 +117,8 @@ class HomeViewModel @Inject constructor(
                 movies = resource.data.orEmpty(),
                 isLoading = resource is Resource.Loading && resource.data.isNullOrEmpty(),
                 errorMessage = (resource as? Resource.Error)?.message,
-                allowFavoriting = !source.isTv
+                allowFavoriting = !source.isTv,
+                isTv = source.isTv
             )
         }
         HomeUiState(
@@ -126,7 +132,7 @@ class HomeViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HomeUiState(
             sections = sectionSources.map { source ->
-                HomeSection(source.title, emptyList(), isLoading = true, allowFavoriting = !source.isTv)
+                HomeSection(source.title, emptyList(), isLoading = true, allowFavoriting = !source.isTv, isTv = source.isTv)
             }
         )
     )

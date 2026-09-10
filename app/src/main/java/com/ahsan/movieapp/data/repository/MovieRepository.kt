@@ -1,5 +1,6 @@
 package com.ahsan.movieapp.data.repository
 
+import androidx.paging.PagingData
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
@@ -8,9 +9,9 @@ import com.ahsan.movieapp.domain.model.MovieCategory
 import com.ahsan.movieapp.domain.model.MovieCollection
 import com.ahsan.movieapp.domain.model.MovieCredits
 import com.ahsan.movieapp.domain.model.MovieDetails
+import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.PersonCredits
 import com.ahsan.movieapp.domain.model.PersonDetails
-import com.ahsan.movieapp.domain.model.SearchResults
 import com.ahsan.movieapp.domain.model.WatchProviders
 import com.ahsan.movieapp.util.Resource
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,34 @@ interface MovieRepository {
 
     /** Offline-first: emits cached movies immediately, refreshes from TMDB, re-emits on change. */
     fun getCategory(category: MovieCategory): Flow<Resource<List<Movie>>>
+
+    /**
+     * Phase 4 (pagination) — the same category, but as an infinite-scroll [PagingData] stream
+     * backed by Room + a [androidx.paging.RemoteMediator] instead of [getCategory]'s single
+     * cached snapshot. Currently only wired up for [MovieCategory.TRENDING_TODAY] (Round 1);
+     * every other category still uses [getCategory]'s single-page behavior until its own round.
+     * See [MovieRepositoryImpl.getPagedCategory].
+     */
+    fun getPagedCategory(category: MovieCategory): Flow<PagingData<Movie>>
+
+    /**
+     * Phase 4 (pagination) Round 2 — [browseGenre]'s infinite-scroll counterpart, backing the
+     * genre screen's Movies tab. Same [androidx.paging.RemoteMediator]-over-Room mechanism as
+     * [getPagedCategory], just keyed by `"genre_$genreId"` instead of a fixed [MovieCategory].
+     * The TV tab's counterpart is [getPagedGenreTv], which pages differently since this app has
+     * no offline table for TV data.
+     */
+    fun getPagedGenre(genreId: Int): Flow<PagingData<Movie>>
+
+    /**
+     * Phase 4 (pagination) Round 3 — TV equivalent of [getPagedGenre], backing the genre screen's
+     * TV tab. This app doesn't persist TV data (same one-screen exception as [getPopularTv]), so
+     * there's no Room table for a [androidx.paging.RemoteMediator] to page into: this is a plain
+     * network-only [androidx.paging.PagingSource] (see
+     * [com.ahsan.movieapp.data.paging.TvGenrePagingSource]) instead of [getPagedGenre]'s
+     * Room-backed mechanism.
+     */
+    fun getPagedGenreTv(genreId: Int): Flow<PagingData<Movie>>
 
     /** "For You" — discovers movies from the genres of the person's current favorites. */
     fun getForYou(): Flow<Resource<List<Movie>>>
@@ -29,9 +58,9 @@ interface MovieRepository {
 
     /**
      * Cast + director for the Detail screen's cast/crew section (Phase 3 Round A) and its "view
-     * all" screen — one-shot, network-only (no Room cache; same convention as [getPersonCredits],
-     * [discoverMovies], and [getPopularTv] for newer data that doesn't have its own offline table
-     * yet). Cast + director only, no other crew roles, per the round's confirmed scope.
+     * all" screen — one-shot, network-only (no Room cache; same convention as [getPersonCredits]
+     * and [getPopularTv] for newer data that doesn't have its own offline table yet). Cast +
+     * director only, no other crew roles, per the round's confirmed scope.
      */
     suspend fun getMovieCredits(movieId: Int): Result<MovieCredits>
 
@@ -39,7 +68,7 @@ interface MovieRepository {
 
     /**
      * TMDB's own "Recommendations" algorithm — a separate endpoint/model from [getSimilarMovies],
-     * deliberately not deduped against it. Offline-first via the same [cachedCategoryFlow]-style
+     * deliberately not deduped against it. Offline-first via the same cachedCategoryFlow-style
      * caching as everything else in [getCategory]'s family, keyed per movieId.
      */
     fun getRecommendedMovies(movieId: Int): Flow<Resource<List<Movie>>>
@@ -61,11 +90,23 @@ interface MovieRepository {
     suspend fun getWatchProviders(movieId: Int): Result<WatchProviders>
 
     /**
-     * One TMDB `/search/multi` call, split into movies and people (TV results are dropped).
-     * Falls back to a capped local title/overview match if the network call fails, so search
-     * never goes fully blank just because the device is offline.
+     * Phase 4 (pagination) Round 4 — the search screen's movie results, infinite-scroll over TMDB
+     * `/search/multi` filtered to movies. Network-only, no [androidx.paging.RemoteMediator] (same
+     * reasoning as [getPagedGenreTv] — arbitrary search queries have no Room cache table of their
+     * own), but still falls back to a capped local title/overview match on page 1 if the network
+     * call fails outright, so search never goes fully blank just because the device is offline. See
+     * [com.ahsan.movieapp.data.paging.SearchMoviesPagingSource].
      */
-    suspend fun search(query: String): Result<SearchResults>
+    fun getPagedSearchMovies(query: String): Flow<PagingData<Movie>>
+
+    /**
+     * The people half of a `/search/multi` query — one-shot, capped, and NOT paginated (unlike
+     * [getPagedSearchMovies]): only the first handful of people a query returns are ever shown, so
+     * there's nothing worth infinite-scrolling here, same reasoning that keeps Cast & Crew and
+     * Similar/Recommendations out of Phase 4's scope entirely. TV results are dropped, same as the
+     * movies half.
+     */
+    suspend fun searchPeople(query: String): Result<List<Person>>
 
     /** Bio, photo, and primary role for the person screen's header. */
     suspend fun getPersonDetails(personId: Int): Result<PersonDetails>
@@ -90,25 +131,21 @@ interface MovieRepository {
     fun browseGenre(genreId: Int): Flow<Resource<List<Movie>>>
 
     /**
-     * TV equivalent of [browseGenre]. Network-only, no offline cache — this app doesn't persist TV
-     * data yet (same one-screen-exception convention as [getPersonCredits]), so this is a plain
-     * suspend fetch rather than a cached Flow<Resource<...>>.
-     */
-    suspend fun browseGenreTv(genreId: Int): Result<List<Movie>>
-
-    /**
      * TV equivalent of [getCategory]'s "Popular" — backs the Explore screen's "Popular TV Shows"
-     * carousel. Network-only, no offline cache, same one-screen exception as [browseGenreTv].
+     * carousel. Network-only, no offline cache — this app doesn't persist TV data yet (same
+     * one-screen-exception convention as [getPersonCredits] and [getPagedGenreTv]).
      */
     suspend fun getPopularTv(): Result<List<Movie>>
 
     /**
-     * Network-only `/discover/movie` call driven by the search screen's filter panel (genre,
-     * year, language, minimum rating — any subset). Single page, no offline cache by combination
-     * (there are too many combinations to usefully cache each one), though every returned movie
-     * still gets upserted into the shared `movies` table like any other fetch.
+     * Phase 4 (pagination) Round 4 — infinite-scroll counterpart of the search screen's filter
+     * panel (genre/year/language/minimum rating — any subset), driven by TMDB `/discover/movie`.
+     * Network-only, no offline cache by filter combination (there are too many combinations to
+     * usefully cache each one) and so no [androidx.paging.RemoteMediator] — every returned movie
+     * still gets upserted into the shared `movies` table like any other fetch. See
+     * [com.ahsan.movieapp.data.paging.DiscoverPagingSource].
      */
-    suspend fun discoverMovies(filters: DiscoverFilters): Result<List<Movie>>
+    fun getPagedDiscoverMovies(filters: DiscoverFilters): Flow<PagingData<Movie>>
 
     fun observeFavorites(): Flow<List<Movie>>
 

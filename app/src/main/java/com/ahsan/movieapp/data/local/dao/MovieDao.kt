@@ -1,15 +1,29 @@
 package com.ahsan.movieapp.data.local.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import com.ahsan.movieapp.data.local.entity.CastMemberEntity
 import com.ahsan.movieapp.data.local.entity.CategoryMovieCrossRef
+import com.ahsan.movieapp.data.local.entity.CategoryRemoteKeys
 import com.ahsan.movieapp.data.local.entity.MovieDetailsEntity
 import com.ahsan.movieapp.data.local.entity.MovieEntity
 import kotlinx.coroutines.flow.Flow
+
+/**
+ * One row of a paginated category listing — the movie itself plus whether it's currently a
+ * favorite, computed in SQL via a `LEFT JOIN` (rather than a separate combine() step, the way
+ * [MovieDao.observeCategory]'s non-paged callers do it) so Room's own invalidation tracking
+ * re-runs the [PagingSource] whenever `favorites` changes, not just when `category_movies` does.
+ */
+data class MovieCategoryRow(
+    @Embedded val movie: MovieEntity,
+    val isFavorite: Boolean
+)
 
 @Dao
 interface MovieDao {
@@ -46,6 +60,45 @@ interface MovieDao {
 
     @Query("SELECT MIN(fetchedAt) FROM category_movies WHERE category = :category")
     suspend fun categoryFetchedAt(category: String): Long?
+
+    /**
+     * Phase 4 (pagination) — the same category listing as [observeCategory], but as a
+     * [PagingSource] for [androidx.paging.Pager] rather than a plain [Flow], and with favorite
+     * status computed inline (see [MovieCategoryRow]) so the list badge stays live without a
+     * separate `combine()`.
+     */
+    @Query(
+        """
+        SELECT movies.*, CASE WHEN favorites.movieId IS NOT NULL THEN 1 ELSE 0 END AS isFavorite
+        FROM movies
+        INNER JOIN category_movies ON movies.id = category_movies.movieId
+        LEFT JOIN favorites ON movies.id = favorites.movieId
+        WHERE category_movies.category = :category
+        ORDER BY category_movies.position ASC
+        """
+    )
+    fun pagingSourceForCategory(category: String): PagingSource<Int, MovieCategoryRow>
+
+    @Query("SELECT MAX(position) FROM category_movies WHERE category = :category")
+    suspend fun maxCategoryPosition(category: String): Int?
+
+    /** Appends a freshly-fetched page to an existing category listing (Phase 4 "load more"),
+     * rather than [replaceCategory]'s clear-and-replace, which only makes sense for a REFRESH. */
+    @Transaction
+    suspend fun appendCategory(category: String, movies: List<MovieEntity>, startPosition: Int, fetchedAt: Long) {
+        upsertMovies(movies)
+        insertCategoryRefs(
+            movies.mapIndexed { index, movie ->
+                CategoryMovieCrossRef(category = category, movieId = movie.id, position = startPosition + index, fetchedAt = fetchedAt)
+            }
+        )
+    }
+
+    @Query("SELECT * FROM category_remote_keys WHERE category = :category")
+    suspend fun remoteKeys(category: String): CategoryRemoteKeys?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRemoteKeys(keys: CategoryRemoteKeys)
 
     @Query("SELECT * FROM movies WHERE id = :movieId")
     fun observeMovie(movieId: Int): Flow<MovieEntity?>

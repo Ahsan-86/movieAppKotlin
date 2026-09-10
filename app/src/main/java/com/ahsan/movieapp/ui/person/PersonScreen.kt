@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +50,7 @@ import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MovieListRow
+import com.ahsan.movieapp.util.showTvDetailsUnavailableToast
 
 /**
  * Full screen with a real, pinned top bar — title is the person's name, a normal back arrow next
@@ -135,6 +137,7 @@ private fun PersonContent(
     onToggleFavorite: (Movie) -> Unit
 ) {
     val movies = state.displayedMovies
+    val context = LocalContext.current
 
     // No horizontal contentPadding here — the hero photo needs to run edge-to-edge (fix #4), and
     // the filmography rows use MovieListRow exactly as SearchResultsList does, unpadded. The
@@ -175,7 +178,15 @@ private fun PersonContent(
             items(movies, key = { it.id }) { movie ->
                 MovieListRow(
                     movie = movie,
-                    onClick = { onMovieClick(movie) },
+                    // TV ids aren't movie ids — see util/TvNavigation.kt for why this can't just
+                    // reuse onMovieClick the way the Movies tab does.
+                    onClick = {
+                        if (state.selectedMediaType == MediaTab.TV) {
+                            context.showTvDetailsUnavailableToast()
+                        } else {
+                            onMovieClick(movie)
+                        }
+                    },
                     // Favoriting stays movie-only for now — the app's Favorites table doesn't yet
                     // distinguish movies from TV shows, and mixing the two in there ahead of real
                     // TV support would just create bad data to clean up later.

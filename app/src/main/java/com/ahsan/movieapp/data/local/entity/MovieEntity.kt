@@ -35,3 +35,17 @@ data class FavoriteEntity(
     @PrimaryKey val movieId: Int,
     val addedAt: Long
 )
+
+/**
+ * Phase 4 (pagination) — tracks, per paginated category, which TMDB page to fetch next and when
+ * that bookkeeping was last updated. Paired with [CategoryMovieCrossRef.position], this is what
+ * lets [com.ahsan.movieapp.data.paging.CategoryRemoteMediator] resume "load more" across app
+ * restarts instead of re-fetching from page 1 every time. `nextPage == null` means TMDB has no
+ * further pages for this category (its own `total_pages` was reached).
+ */
+@Entity(tableName = "category_remote_keys")
+data class CategoryRemoteKeys(
+    @PrimaryKey val category: String,
+    val nextPage: Int?,
+    val fetchedAt: Long
+)

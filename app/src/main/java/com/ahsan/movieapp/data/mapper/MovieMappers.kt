@@ -1,5 +1,6 @@
 package com.ahsan.movieapp.data.mapper
 
+import com.ahsan.movieapp.data.local.dao.MovieCategoryRow
 import com.ahsan.movieapp.data.local.entity.CastMemberEntity
 import com.ahsan.movieapp.data.local.entity.MovieDetailsEntity
 import com.ahsan.movieapp.data.local.entity.MovieEntity
@@ -57,6 +58,11 @@ fun MovieEntity.toDomain(isFavorite: Boolean = false): Movie = Movie(
     genreIds = genreIds,
     isFavorite = isFavorite
 )
+
+/** Phase 4 (pagination) — [MovieCategoryRow] already carries its own favorite status (computed in
+ * SQL via a `LEFT JOIN`), so this just forwards it instead of a caller having to cross-reference a
+ * separate favorites list the way the non-paged category flows do. */
+fun MovieCategoryRow.toDomain(): Movie = movie.toDomain(isFavorite)
 
 fun MovieDetailsDto.toEntity(cachedAt: Long): MovieDetailsEntity = MovieDetailsEntity(
     movieId = id,

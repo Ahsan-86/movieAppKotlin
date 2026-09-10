@@ -344,6 +344,12 @@ private fun CollectionTeaser(collection: CollectionSummary, onClick: () -> Unit)
  * composable when [availableRegions] is non-empty (TMDB has data for at least one region); if the
  * currently *selected* region has none, the dropdown still shows (so the user can pick one that
  * does) with a short "not available" line in place of the provider rows.
+ *
+ * TMDB's `/watch/providers` response doesn't hand back a deep link per provider — only one
+ * `link` per region, to TMDB's own watch-providers page for this movie (which forwards through
+ * JustWatch to the actual services). So every logo in this region, plus the attribution line
+ * itself, opens that same [WatchProviderRegion.link] — that's also what TMDB's API terms require
+ * showing as a real, working link whenever this data is displayed, not just decorative text.
  */
 @Composable
 private fun WatchProvidersSection(
@@ -369,14 +375,22 @@ private fun WatchProvidersSection(
                 modifier = Modifier.padding(top = 8.dp)
             )
         } else {
-            ProviderRow(label = "Stream", providers = region.flatrate)
-            ProviderRow(label = "Rent", providers = region.rent)
-            ProviderRow(label = "Buy", providers = region.buy)
+            val uriHandler = LocalUriHandler.current
+            val onOpenProviders: (() -> Unit)? = region.link
+                ?.takeIf { it.isNotBlank() }
+                ?.let { link -> { uriHandler.openUri(link) } }
+
+            ProviderRow(label = "Stream", providers = region.flatrate, onProviderClick = onOpenProviders)
+            ProviderRow(label = "Rent", providers = region.rent, onProviderClick = onOpenProviders)
+            ProviderRow(label = "Buy", providers = region.buy, onProviderClick = onOpenProviders)
             Text(
                 text = "Streaming data provided by JustWatch.",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
+                color = if (onOpenProviders != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                textDecoration = if (onOpenProviders != null) TextDecoration.Underline else null,
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .then(if (onOpenProviders != null) Modifier.clickable(onClick = onOpenProviders) else Modifier)
             )
         }
     }
@@ -409,7 +423,7 @@ private fun RegionDropdown(selectedRegion: String, availableRegions: List<String
 
 /** One Stream/Rent/Buy row — renders nothing if this region has no providers for that category. */
 @Composable
-private fun ProviderRow(label: String, providers: List<WatchProvider>) {
+private fun ProviderRow(label: String, providers: List<WatchProvider>, onProviderClick: (() -> Unit)?) {
     if (providers.isEmpty()) return
     Column(modifier = Modifier.padding(top = 8.dp)) {
         Text(text = label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -419,19 +433,25 @@ private fun ProviderRow(label: String, providers: List<WatchProvider>) {
             modifier = Modifier.fillMaxWidth()
         ) {
             items(providers, key = { it.id }) { provider ->
-                ProviderLogo(provider)
+                ProviderLogo(provider = provider, onClick = onProviderClick)
             }
         }
     }
 }
 
+/**
+ * TMDB doesn't hand back a per-provider deep link (see [WatchProvidersSection]'s doc comment), so
+ * every logo shares the same [onClick] — the region's one TMDB watch-providers link — same
+ * nullable-callback convention as [InfoRow]/[CollectionTeaser] elsewhere on this screen.
+ */
 @Composable
-private fun ProviderLogo(provider: WatchProvider) {
+private fun ProviderLogo(provider: WatchProvider, onClick: (() -> Unit)?) {
     Box(
         modifier = Modifier
             .size(48.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         AsyncImage(
             model = provider.logoUrl,

@@ -147,12 +147,6 @@ data class Person(
     val knownFor: String? = null
 )
 
-/** Result of a single `search/multi` call, split by media type (TV results are dropped upstream). */
-data class SearchResults(
-    val movies: List<Movie>,
-    val people: List<Person>
-)
-
 /**
  * Bio/photo shown at the top of the person screen. [birthday]/[deathday] are TMDB's ISO
  * "YYYY-MM-DD" strings, both nullable — [ageText] and the header rely on them. [gender] is TMDB's

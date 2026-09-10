@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,7 +25,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,6 +75,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil.compose.AsyncImage
 import com.ahsan.movieapp.data.repository.SearchViewMode
 import com.ahsan.movieapp.domain.model.DiscoverFilters
@@ -88,6 +90,7 @@ import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MovieListRow
 import com.ahsan.movieapp.ui.components.MoviePosterCard
+import com.ahsan.movieapp.ui.components.PagingAppendFooter
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
@@ -104,6 +107,13 @@ fun SearchScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Subscribed unconditionally, same as every other paginated screen — each flow internally
+    // switches to a fresh Pager per debounced query / applied filter set (flatMapLatest, see
+    // SearchViewModel), so there's nothing to gate on state.query here; an inactive one just sits
+    // on PagingData.empty() until its query/filters are non-null.
+    val pagedSearchMovies = viewModel.pagedSearchMovies.collectAsLazyPagingItems()
+    val pagedFilteredMovies = viewModel.pagedFilteredMovies.collectAsLazyPagingItems()
 
     // One state per Lazy container this screen can show — only one is ever composed at a time
     // (they're mutually exclusive branches below), so it's safe to reuse each across every mode
@@ -122,7 +132,8 @@ fun SearchScreen(
                     if (state.viewMode == SearchViewMode.LIST) resultsListState.animateScrollToItem(0)
                     else resultsGridState.animateScrollToItem(0)
                 }
-                state.hasSearched && state.movies.isEmpty() && state.people.isEmpty() && !state.isSearching -> {
+                pagedSearchMovies.itemCount == 0 && state.people.isEmpty() &&
+                    pagedSearchMovies.loadState.refresh !is LoadState.Loading && !state.isSearchingPeople -> {
                     // EmptyState — a centered message, nothing scrollable to reset.
                 }
                 state.viewMode == SearchViewMode.LIST -> resultsListState.animateScrollToItem(0)
@@ -141,7 +152,10 @@ fun SearchScreen(
             placeholder = { Text("Search movies, cast, anything…") },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
-                if (state.isSearching) {
+                // The movie grid has its own loadState-driven loading UI (FullScreenLoading /
+                // PagingAppendFooter); this spinner just reflects the one-shot people fetch, the
+                // last "single Result call per debounced query" left on this screen.
+                if (state.isSearchingPeople) {
                     CircularProgressIndicator(modifier = Modifier
                         .padding(8.dp)
                         .size(20.dp), strokeWidth = 2.dp)
@@ -158,11 +172,14 @@ fun SearchScreen(
         when {
             state.query.isBlank() && state.isFilterApplied -> Column(modifier = Modifier.fillMaxSize()) {
                 FilterSummaryBar(filters = state.filters, onEdit = viewModel::onEditFilters, onClear = viewModel::onClearFilters)
+                val refreshState = pagedFilteredMovies.loadState.refresh
                 when {
-                    state.isLoadingFilteredResults -> FullScreenLoading()
-                    state.filterErrorMessage != null && state.filteredMovies.isEmpty() ->
-                        FullScreenError(message = state.filterErrorMessage ?: "Couldn't load results", onRetry = viewModel::onApplyFilters)
-                    state.filteredMovies.isEmpty() -> EmptyState(
+                    refreshState is LoadState.Loading && pagedFilteredMovies.itemCount == 0 -> FullScreenLoading()
+                    refreshState is LoadState.Error && pagedFilteredMovies.itemCount == 0 -> FullScreenError(
+                        message = refreshState.error.message ?: "Couldn't load results",
+                        onRetry = { pagedFilteredMovies.retry() }
+                    )
+                    pagedFilteredMovies.itemCount == 0 -> EmptyState(
                         title = "No matches",
                         body = "Nothing matched that combination of filters."
                     )
@@ -170,7 +187,7 @@ fun SearchScreen(
                         ViewModeRow(selected = state.viewMode, onSelected = viewModel::onViewModeSelected)
                         when (state.viewMode) {
                             SearchViewMode.LIST -> SearchResultsList(
-                                movies = state.filteredMovies,
+                                movies = pagedFilteredMovies,
                                 people = emptyList(),
                                 onMovieClick = onMovieClick,
                                 onPersonClick = onPersonClick,
@@ -178,7 +195,7 @@ fun SearchScreen(
                                 listState = resultsListState
                             )
                             else -> SearchResultsGrid(
-                                movies = state.filteredMovies,
+                                movies = pagedFilteredMovies,
                                 people = emptyList(),
                                 columns = if (state.viewMode == SearchViewMode.GRID_DENSE) GridCells.Fixed(4) else GridCells.Adaptive(minSize = 128.dp),
                                 posterWidth = null,
@@ -207,44 +224,55 @@ fun SearchScreen(
                 onMinRatingFilterChanged = viewModel::onMinRatingFilterChanged,
                 onApplyFilters = viewModel::onApplyFilters
             )
-            state.hasSearched && state.movies.isEmpty() && state.people.isEmpty() && !state.isSearching -> EmptyState(
-                title = "No results",
-                body = "Nothing matched \"${state.query}\"."
-            )
             else -> {
-                // The view-mode toggle only makes sense once there's something to lay out — it
-                // used to sit above the search field permanently, which showed it even on the
-                // blank first-open screen with no results to switch the layout of.
-                ViewModeRow(selected = state.viewMode, onSelected = viewModel::onViewModeSelected)
-                when (state.viewMode) {
-                    SearchViewMode.LIST -> SearchResultsList(
-                        movies = state.movies,
-                        people = state.people,
-                        onMovieClick = onMovieClick,
-                        onPersonClick = onPersonClick,
-                        onToggleFavorite = viewModel::toggleFavorite,
-                        listState = resultsListState
+                val moviesRefresh = pagedSearchMovies.loadState.refresh
+                val nothingLoadedYet = pagedSearchMovies.itemCount == 0 && state.people.isEmpty()
+                when {
+                    nothingLoadedYet && (moviesRefresh is LoadState.Loading || state.isSearchingPeople) -> FullScreenLoading()
+                    nothingLoadedYet && moviesRefresh is LoadState.Error -> FullScreenError(
+                        message = moviesRefresh.error.message ?: "Search failed",
+                        onRetry = { pagedSearchMovies.retry() }
                     )
-                    SearchViewMode.GRID -> SearchResultsGrid(
-                        movies = state.movies,
-                        people = state.people,
-                        columns = GridCells.Adaptive(minSize = 128.dp),
-                        posterWidth = null,
-                        onMovieClick = onMovieClick,
-                        onPersonClick = onPersonClick,
-                        onToggleFavorite = viewModel::toggleFavorite,
-                        gridState = resultsGridState
+                    nothingLoadedYet -> EmptyState(
+                        title = "No results",
+                        body = "Nothing matched \"${state.query}\"."
                     )
-                    SearchViewMode.GRID_DENSE -> SearchResultsGrid(
-                        movies = state.movies,
-                        people = state.people,
-                        columns = GridCells.Fixed(4),
-                        posterWidth = null,
-                        onMovieClick = onMovieClick,
-                        onPersonClick = onPersonClick,
-                        onToggleFavorite = viewModel::toggleFavorite,
-                        gridState = resultsGridState
-                    )
+                    else -> {
+                        // The view-mode toggle only makes sense once there's something to lay out —
+                        // it used to sit above the search field permanently, which showed it even on
+                        // the blank first-open screen with no results to switch the layout of.
+                        ViewModeRow(selected = state.viewMode, onSelected = viewModel::onViewModeSelected)
+                        when (state.viewMode) {
+                            SearchViewMode.LIST -> SearchResultsList(
+                                movies = pagedSearchMovies,
+                                people = state.people,
+                                onMovieClick = onMovieClick,
+                                onPersonClick = onPersonClick,
+                                onToggleFavorite = viewModel::toggleFavorite,
+                                listState = resultsListState
+                            )
+                            SearchViewMode.GRID -> SearchResultsGrid(
+                                movies = pagedSearchMovies,
+                                people = state.people,
+                                columns = GridCells.Adaptive(minSize = 128.dp),
+                                posterWidth = null,
+                                onMovieClick = onMovieClick,
+                                onPersonClick = onPersonClick,
+                                onToggleFavorite = viewModel::toggleFavorite,
+                                gridState = resultsGridState
+                            )
+                            SearchViewMode.GRID_DENSE -> SearchResultsGrid(
+                                movies = pagedSearchMovies,
+                                people = state.people,
+                                columns = GridCells.Fixed(4),
+                                posterWidth = null,
+                                onMovieClick = onMovieClick,
+                                onPersonClick = onPersonClick,
+                                onToggleFavorite = viewModel::toggleFavorite,
+                                gridState = resultsGridState
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -306,7 +334,7 @@ private fun ViewModeRow(selected: SearchViewMode, onSelected: (SearchViewMode) -
 
 @Composable
 private fun ViewModeButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     contentDescription: String,
     isSelected: Boolean,
     onClick: () -> Unit
@@ -681,10 +709,17 @@ private fun GenreChipItem(genre: GenreChip, onClick: () -> Unit, modifier: Modif
  * whereas the old FlowRow composed and loaded every result at once regardless of what was visible.
  * [columns] varies by view mode (adaptive ~2-3 up vs a fixed 4-up dense grid); [posterWidth] null
  * lets each poster fill its grid cell instead of a fixed 128dp.
+ *
+ * Phase 4 (pagination) Round 4 — [movies] is now a [LazyPagingItems] source (either
+ * [SearchViewModel.pagedSearchMovies] or [SearchViewModel.pagedFilteredMovies], depending on the
+ * caller) rather than a plain list; [people] stays a plain, small, non-paginated list either way
+ * (empty for the filter-results caller, since Discover has no people to show). A
+ * [PagingAppendFooter] closes out the movies section, same shared composable every other
+ * paginated grid in this app already uses.
  */
 @Composable
 private fun SearchResultsGrid(
-    movies: List<Movie>,
+    movies: LazyPagingItems<Movie>,
     people: List<Person>,
     columns: GridCells,
     posterWidth: androidx.compose.ui.unit.Dp?,
@@ -706,7 +741,7 @@ private fun SearchResultsGrid(
                 PeopleResultsRow(people = people, onPersonClick = onPersonClick)
             }
         }
-        if (movies.isNotEmpty()) {
+        if (movies.itemCount > 0) {
             if (people.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
@@ -716,7 +751,8 @@ private fun SearchResultsGrid(
                     )
                 }
             }
-            items(movies, key = { it.id }) { movie ->
+            items(count = movies.itemCount, key = movies.itemKey { it.id }) { index ->
+                val movie = movies[index] ?: return@items
                 MoviePosterCard(
                     movie = movie,
                     onClick = { onMovieClick(movie) },
@@ -724,14 +760,17 @@ private fun SearchResultsGrid(
                     width = posterWidth
                 )
             }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                PagingAppendFooter(pagingItems = movies)
+            }
         }
     }
 }
 
-/** List-view mode: a LazyColumn of full-width rows instead of a poster grid. */
+/** List-view mode: a LazyColumn of full-width rows instead of a poster grid. See [SearchResultsGrid]'s doc for [movies]/[people]. */
 @Composable
 private fun SearchResultsList(
-    movies: List<Movie>,
+    movies: LazyPagingItems<Movie>,
     people: List<Person>,
     onMovieClick: (Movie) -> Unit,
     onPersonClick: (Person) -> Unit,
@@ -746,7 +785,7 @@ private fun SearchResultsList(
         if (people.isNotEmpty()) {
             item { PeopleResultsRow(people = people, onPersonClick = onPersonClick) }
         }
-        if (movies.isNotEmpty()) {
+        if (movies.itemCount > 0) {
             if (people.isNotEmpty()) {
                 item {
                     Text(
@@ -756,9 +795,11 @@ private fun SearchResultsList(
                     )
                 }
             }
-            items(movies, key = { it.id }) { movie ->
+            items(count = movies.itemCount, key = movies.itemKey { it.id }) { index ->
+                val movie = movies[index] ?: return@items
                 MovieListRow(movie = movie, onClick = { onMovieClick(movie) }, onToggleFavorite = { onToggleFavorite(movie) })
             }
+            item { PagingAppendFooter(pagingItems = movies) }
         }
     }
 }

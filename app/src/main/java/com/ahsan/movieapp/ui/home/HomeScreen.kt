@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ahsan.movieapp.domain.model.GenreChip
@@ -25,6 +26,7 @@ import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.HeroMovieCarousel
 import com.ahsan.movieapp.ui.components.MovieCarouselSection
 import com.ahsan.movieapp.ui.components.OfflineBanner
+import com.ahsan.movieapp.util.showTvDetailsUnavailableToast
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -44,6 +46,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
 
     LaunchedEffect(scrollToTopEvents) {
         scrollToTopEvents?.collect { listState.animateScrollToItem(0) }
@@ -76,7 +79,9 @@ fun HomeScreen(
                     isLoading = section.isLoading,
                     errorMessage = section.errorMessage.takeIf { section.movies.isEmpty() },
                     onRetry = viewModel::retry,
-                    onMovieClick = onMovieClick,
+                    onMovieClick = if (section.isTv) {
+                        { context.showTvDetailsUnavailableToast() }
+                    } else onMovieClick,
                     onToggleFavorite = if (section.allowFavoriting) { { viewModel.toggleFavorite(it) } } else null
                 )
             }

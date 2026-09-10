@@ -1,5 +1,11 @@
 package com.ahsan.movieapp.data.repository
 
+import androidx.paging.ExperimentalPagingApi
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
+import com.ahsan.movieapp.data.local.AppDatabase
 import com.ahsan.movieapp.data.local.dao.FavoriteDao
 import com.ahsan.movieapp.data.local.dao.MovieDao
 import com.ahsan.movieapp.data.local.dao.SearchHistoryDao
@@ -10,12 +16,16 @@ import com.ahsan.movieapp.data.mapper.combineToMovieDetails
 import com.ahsan.movieapp.data.mapper.toDomain
 import com.ahsan.movieapp.data.mapper.toEntity
 import com.ahsan.movieapp.data.mapper.toMovie
-import com.ahsan.movieapp.data.mapper.toMovieDto
 import com.ahsan.movieapp.data.mapper.toMovieEntity
 import com.ahsan.movieapp.data.mapper.toPersonDto
 import com.ahsan.movieapp.data.mapper.toPerson
+import com.ahsan.movieapp.data.paging.CategoryRemoteMediator
+import com.ahsan.movieapp.data.paging.DiscoverPagingSource
+import com.ahsan.movieapp.data.paging.SearchMoviesPagingSource
+import com.ahsan.movieapp.data.paging.TvGenrePagingSource
 import com.ahsan.movieapp.data.remote.TmdbApi
 import com.ahsan.movieapp.data.remote.dto.MovieDto
+import com.ahsan.movieapp.data.remote.dto.PagedResponseDto
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
@@ -24,15 +34,13 @@ import com.ahsan.movieapp.domain.model.MovieCategory
 import com.ahsan.movieapp.domain.model.MovieCollection
 import com.ahsan.movieapp.domain.model.MovieCredits
 import com.ahsan.movieapp.domain.model.MovieDetails
+import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.PersonCredits
 import com.ahsan.movieapp.domain.model.PersonDetails
-import com.ahsan.movieapp.domain.model.SearchResults
 import com.ahsan.movieapp.domain.model.WatchProviders
 import com.ahsan.movieapp.util.Constants
 import com.ahsan.movieapp.util.Resource
 import com.ahsan.movieapp.util.networkBoundResource
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -43,6 +51,7 @@ import javax.inject.Singleton
 @Singleton
 class MovieRepositoryImpl @Inject constructor(
     private val api: TmdbApi,
+    private val database: AppDatabase,
     private val movieDao: MovieDao,
     private val favoriteDao: FavoriteDao,
     private val searchHistoryDao: SearchHistoryDao
@@ -53,6 +62,97 @@ class MovieRepositoryImpl @Inject constructor(
             storageKey = category.storageKey,
             fetch = { fetchCategoryFromNetwork(category) }
         )
+
+    /**
+     * Phase 4 (pagination) Round 1 — only [MovieCategory.TRENDING_TODAY] calls this so far (see
+     * [TrendingViewModel][com.ahsan.movieapp.ui.trending.TrendingViewModel]). Forwards to
+     * [pagedCategoryFlow], the shared plumbing every paginated category/genre listing uses.
+     */
+    override fun getPagedCategory(category: MovieCategory): Flow<PagingData<Movie>> =
+        pagedCategoryFlow(
+            storageKey = category.storageKey,
+            fetchPage = { page -> fetchCategoryFromNetworkPaged(category, page) }
+        )
+
+    /**
+     * Phase 4 (pagination) Round 2 — the genre screen's Movies tab (see
+     * [GenreViewModel][com.ahsan.movieapp.ui.genre.GenreViewModel]). [browseGenre] below is this
+     * same TMDB `with_genres` discover call's single-page counterpart, kept for anything that
+     * still wants a plain one-shot list.
+     */
+    override fun getPagedGenre(genreId: Int): Flow<PagingData<Movie>> =
+        pagedCategoryFlow(
+            storageKey = "genre_$genreId",
+            fetchPage = { page -> api.discoverByGenres(genreId.toString(), page = page) }
+        )
+
+    /**
+     * Phase 4 (pagination) Round 3 — the genre screen's TV tab. No Room table for TV data, so
+     * unlike [getPagedGenre] this [Pager] has no [androidx.paging.RemoteMediator]: just
+     * [TvGenrePagingSource] reading TMDB pages directly, one TMDB page per Paging 3 page.
+     */
+    override fun getPagedGenreTv(genreId: Int): Flow<PagingData<Movie>> =
+        Pager(
+            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
+            pagingSourceFactory = { TvGenrePagingSource(api, genreId) }
+        ).flow
+
+    /**
+     * Phase 4 (pagination) Round 4 — the search screen's movie results. Same no-`RemoteMediator`
+     * shape as [getPagedGenreTv]: [SearchMoviesPagingSource] reads TMDB pages (with a page-1-only
+     * local fallback) directly, since there's no Room cache table keyed by arbitrary search text.
+     */
+    override fun getPagedSearchMovies(query: String): Flow<PagingData<Movie>> =
+        Pager(
+            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
+            pagingSourceFactory = { SearchMoviesPagingSource(api, movieDao, favoriteDao, query) }
+        ).flow
+
+    /**
+     * The people half of a search query — one-shot, capped at [MAX_PEOPLE_RESULTS], not part of
+     * [getPagedSearchMovies]'s pager. See the interface doc for why.
+     */
+    override suspend fun searchPeople(query: String): Result<List<Person>> = runCatching {
+        api.searchMulti(query).results
+            .filter { it.mediaType == "person" }
+            .take(MAX_PEOPLE_RESULTS)
+            .map { it.toPersonDto().toDomain() }
+    }
+
+    /**
+     * Phase 4 (pagination) Round 4 — the search screen's filter-panel Discover results. Same
+     * no-`RemoteMediator` shape as [getPagedSearchMovies]/[getPagedGenreTv]: [DiscoverPagingSource]
+     * reads TMDB pages directly, since filter combinations aren't cached by key.
+     */
+    override fun getPagedDiscoverMovies(filters: DiscoverFilters): Flow<PagingData<Movie>> =
+        Pager(
+            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
+            pagingSourceFactory = { DiscoverPagingSource(api, movieDao, favoriteDao, filters) }
+        ).flow
+
+    /**
+     * Shared plumbing for every paginated "just a list of movies under some cache key" screen —
+     * the [Pager] equivalent of [cachedCategoryFlow] below. [CategoryRemoteMediator] handles the
+     * offline-first staleness check and TMDB paging; [MovieDao.pagingSourceForCategory] is what
+     * [Pager] actually reads from and re-emits on every Room change (including favorite toggles,
+     * since that query's `LEFT JOIN favorites` is part of what Room tracks for invalidation).
+     */
+    @OptIn(ExperimentalPagingApi::class)
+    private fun pagedCategoryFlow(
+        storageKey: String,
+        fetchPage: suspend (page: Int) -> PagedResponseDto<MovieDto>
+    ): Flow<PagingData<Movie>> =
+        Pager(
+            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
+            remoteMediator = CategoryRemoteMediator(
+                category = storageKey,
+                staleThresholdMs = STALE_THRESHOLD_MS,
+                fetchPage = fetchPage,
+                database = database,
+                movieDao = movieDao
+            ),
+            pagingSourceFactory = { movieDao.pagingSourceForCategory(storageKey) }
+        ).flow.map { pagingData -> pagingData.map { row -> row.toDomain() } }
 
     override fun getForYou(): Flow<Resource<List<Movie>>> =
         cachedCategoryFlow(
@@ -137,8 +237,8 @@ class MovieRepositoryImpl @Inject constructor(
      * Backs the Detail screen's collection teaser (Phase 3 Round B). One-shot, network-only — same
      * convention as [getMovieCredits] for newer data with no offline table of its own yet. Every
      * movie in the collection still gets upserted into the shared `movies` table (like
-     * [discoverMovies] does), so each one is just as available offline afterward as a movie found
-     * any other way, even though the collection listing itself isn't cached by collection id.
+     * [getPagedDiscoverMovies] does), so each one is just as available offline afterward as a movie
+     * found any other way, even though the collection listing itself isn't cached by collection id.
      */
     override suspend fun getCollectionDetails(collectionId: Int): Result<MovieCollection> = runCatching {
         val dto = api.getCollectionDetails(collectionId)
@@ -159,67 +259,6 @@ class MovieRepositoryImpl @Inject constructor(
      */
     override suspend fun getWatchProviders(movieId: Int): Result<WatchProviders> = runCatching {
         api.getWatchProviders(movieId).toDomain()
-    }
-
-    /**
-     * A single `/search/multi` call backs both the movie grid and the people row — no more
-     * parallel movie-search + person-search requests. The local `LIKE` match runs concurrently
-     * as an offline fallback (and to fill in if the network call fails entirely), capped by
-     * [LOCAL_SEARCH_LIMIT] so a broad query can never balloon the result set — that unbounded-row
-     * problem, combined with a non-lazy results grid, is exactly what made Phase 2 slow last time.
-     */
-    override suspend fun search(query: String): Result<SearchResults> {
-        val trimmed = query.trim()
-        if (trimmed.isBlank()) return Result.success(SearchResults(emptyList(), emptyList()))
-
-        return coroutineScope {
-            val localMoviesDeferred = async {
-                runCatching { movieDao.searchLocalMovies("%$trimmed%", LOCAL_SEARCH_LIMIT) }.getOrDefault(emptyList())
-            }
-            val networkResult = runCatching { api.searchMulti(trimmed).results }
-            val localMatches = localMoviesDeferred.await()
-            val favoriteIds = favoriteDao.observeFavoriteMovies().first().map { it.id }.toSet()
-
-            networkResult.fold(
-                onSuccess = { results ->
-                    val now = System.currentTimeMillis()
-                    val movieDtos = results.filter { it.mediaType == "movie" }.map { it.toMovieDto() }
-                    val people = results.filter { it.mediaType == "person" }.map { it.toPersonDto().toDomain() }
-
-                    if (movieDtos.isNotEmpty()) {
-                        movieDao.upsertMovies(movieDtos.map { it.toEntity(now) })
-                    }
-
-                    val networkMovies = movieDtos.map { it.toEntity(now).toDomain(isFavorite = it.id in favoriteIds) }
-                    val networkIds = networkMovies.map { it.id }.toSet()
-                    // Local-only matches (e.g. an overview match TMDB's own search ranked low, or
-                    // didn't return on this page) get appended behind the network's own ordering.
-                    val extraLocalMovies = localMatches
-                        .filter { it.id !in networkIds }
-                        .map { it.toDomain(isFavorite = it.id in favoriteIds) }
-
-                    Result.success(
-                        SearchResults(
-                            movies = (networkMovies + extraLocalMovies).take(MAX_MOVIE_RESULTS),
-                            people = people.take(MAX_PEOPLE_RESULTS)
-                        )
-                    )
-                },
-                onFailure = { throwable ->
-                    // Offline or TMDB is down: fall back to whatever's cached rather than a blank screen.
-                    if (localMatches.isNotEmpty()) {
-                        Result.success(
-                            SearchResults(
-                                movies = localMatches.map { it.toDomain(isFavorite = it.id in favoriteIds) },
-                                people = emptyList()
-                            )
-                        )
-                    } else {
-                        Result.failure(throwable)
-                    }
-                }
-            )
-        }
     }
 
     override suspend fun getPersonDetails(personId: Int): Result<PersonDetails> = runCatching {
@@ -263,34 +302,8 @@ class MovieRepositoryImpl @Inject constructor(
             fetch = { api.discoverByGenres(genreId.toString()).results }
         )
 
-    override suspend fun browseGenreTv(genreId: Int): Result<List<Movie>> = runCatching {
-        api.discoverTvByGenres(genreId.toString()).results.map { it.toMovie() }
-    }
-
     override suspend fun getPopularTv(): Result<List<Movie>> = runCatching {
         api.getPopularTv().results.map { it.toMovie() }
-    }
-
-    /**
-     * Backs the search screen's collapsible filter panel (Phase 2.5) — a plain `/discover/movie`
-     * call, since TMDB's text-search endpoints don't accept genre/year/language/rating params.
-     * Network-only, single page (no pagination yet — that's its own later phase), but every
-     * result still gets upserted into the shared `movies` table like any other fetch, so a movie
-     * found this way is just as available offline afterward as one found any other way.
-     */
-    override suspend fun discoverMovies(filters: DiscoverFilters): Result<List<Movie>> = runCatching {
-        val favoriteIds = favoriteDao.observeFavoriteMovies().first().map { it.id }.toSet()
-        val response = api.discoverMovies(
-            genreIds = filters.genreId?.toString(),
-            year = filters.year,
-            language = filters.language,
-            minRating = filters.minRating
-        )
-        val now = System.currentTimeMillis()
-        if (response.results.isNotEmpty()) {
-            movieDao.upsertMovies(response.results.map { it.toEntity(now) })
-        }
-        response.results.map { it.toEntity(now).toDomain(isFavorite = it.id in favoriteIds) }
     }
 
     override fun observeRecentSearches(limit: Int): Flow<List<String>> =
@@ -352,6 +365,19 @@ class MovieRepositoryImpl @Inject constructor(
         MovieCategory.FOR_YOU -> api.getPopular().results
     }
 
+    /** [fetchCategoryFromNetwork]'s paged counterpart for [getPagedCategory] — same per-category
+     * endpoint mapping, but keeps the full [PagedResponseDto] (page/totalPages) that
+     * [CategoryRemoteMediator] needs instead of just the results list. */
+    private suspend fun fetchCategoryFromNetworkPaged(category: MovieCategory, page: Int): PagedResponseDto<MovieDto> =
+        when (category) {
+            MovieCategory.TRENDING_TODAY -> api.getTrendingToday(page)
+            MovieCategory.POPULAR -> api.getPopular(page)
+            MovieCategory.TOP_RATED -> api.getTopRated(page)
+            MovieCategory.NOW_PLAYING -> api.getNowPlaying(page)
+            MovieCategory.UPCOMING -> api.getUpcoming(page)
+            MovieCategory.FOR_YOU -> api.getPopular(page)
+        }
+
     /** Shared plumbing for every screen that's "just a list of movies under some cache key". */
     private fun cachedCategoryFlow(
         storageKey: String,
@@ -389,9 +415,10 @@ class MovieRepositoryImpl @Inject constructor(
 
     companion object {
         private const val STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000L // 2 hours
-        private const val LOCAL_SEARCH_LIMIT = 25
-        private const val MAX_MOVIE_RESULTS = 40
         private const val MAX_PEOPLE_RESULTS = 10
+        // Matches TMDB's own fixed page size, so one Paging 3 "page" load is exactly one TMDB
+        // request — no partial-page bookkeeping needed.
+        private const val PAGE_SIZE = 20
 
         // Curated first-open genre chips. Most genres share the same id between movie and TV;
         // a few don't exist for one media type at all (Horror/Romance/Thriller have no TV

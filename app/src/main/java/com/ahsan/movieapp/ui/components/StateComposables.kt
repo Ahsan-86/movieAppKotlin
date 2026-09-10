@@ -6,7 +6,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,11 +19,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
 
 @Composable
 fun FullScreenLoading(modifier: Modifier = Modifier) {
@@ -89,6 +91,40 @@ fun EmptyState(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp)
         )
+    }
+}
+
+/**
+ * Phase 4 (pagination) — a small full-width row for the bottom of a paginated grid/list, driven
+ * directly by [LazyPagingItems.loadState.append][androidx.paging.CombinedLoadStates.append]: a
+ * spinner while the next TMDB page is loading, a "Couldn't load more — Retry" row if that append
+ * failed (network drop mid-scroll, say), and nothing at all once every page has loaded or none of
+ * this screen's data supports further pages. Every Phase 4 screen shares this one footer instead
+ * of each rolling its own, the same "shared composable" convention as [FullScreenLoading]/
+ * [FullScreenError] above.
+ */
+@Composable
+fun <T : Any> PagingAppendFooter(pagingItems: LazyPagingItems<T>, modifier: Modifier = Modifier) {
+    when (val append = pagingItems.loadState.append) {
+        is LoadState.Loading -> Row(
+            modifier = modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary)
+        }
+        is LoadState.Error -> Row(
+            modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Couldn't load more",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(onClick = { pagingItems.retry() }) { Text("Retry") }
+        }
+        is LoadState.NotLoading -> Unit
     }
 }
 

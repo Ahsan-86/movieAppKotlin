@@ -105,6 +105,7 @@ dependencies {
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.room.paging)
     ksp(libs.room.compiler)
 
     // Retrofit / networking
@@ -124,6 +125,10 @@ dependencies {
 
     // WorkManager (offline sync)
     implementation(libs.androidx.work.runtime.ktx)
+
+    // Paging 3 (Phase 4) — infinite-scroll "load more" lists backed by Room + RemoteMediator
+    implementation(libs.androidx.paging.runtime.ktx)
+    implementation(libs.androidx.paging.compose)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)

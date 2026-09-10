@@ -8,6 +8,7 @@ import com.ahsan.movieapp.data.local.dao.MovieDao
 import com.ahsan.movieapp.data.local.dao.SearchHistoryDao
 import com.ahsan.movieapp.data.local.entity.CastMemberEntity
 import com.ahsan.movieapp.data.local.entity.CategoryMovieCrossRef
+import com.ahsan.movieapp.data.local.entity.CategoryRemoteKeys
 import com.ahsan.movieapp.data.local.entity.FavoriteEntity
 import com.ahsan.movieapp.data.local.entity.MovieDetailsEntity
 import com.ahsan.movieapp.data.local.entity.MovieEntity
@@ -20,15 +21,18 @@ import com.ahsan.movieapp.data.local.entity.SearchHistoryEntity
         FavoriteEntity::class,
         MovieDetailsEntity::class,
         CastMemberEntity::class,
-        SearchHistoryEntity::class
+        SearchHistoryEntity::class,
+        CategoryRemoteKeys::class
     ],
     // Bumped 2 -> 3 for Phase 3's Information-section fields on MovieDetailsEntity
     // (originalTitle, status, homepage, budget, revenue, productionCountries,
     // productionCompaniesRaw). Bumped 3 -> 4 for Phase 3 Round B's collection-teaser fields
-    // (collectionId, collectionName, collectionPosterPath). fallbackToDestructiveMigration() is
-    // set in DatabaseModule, so each bump resets local Favorites once on first run after the
-    // update — same as the Phase 2 search_history addition did; flagged to Ahsan each time.
-    version = 4,
+    // (collectionId, collectionName, collectionPosterPath). Bumped 4 -> 5 for Phase 4's new
+    // category_remote_keys table (CategoryRemoteKeys — tracks the next TMDB page per paginated
+    // category). fallbackToDestructiveMigration() is set in DatabaseModule, so each bump resets
+    // local Favorites once on first run after the update — same as the Phase 2 search_history
+    // addition did; flagged to Ahsan each time.
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

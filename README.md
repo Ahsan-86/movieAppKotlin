@@ -60,4 +60,4 @@ Every ViewModel talks only to its repository — never directly to Retrofit or F
 
 ## A note on this being an AI-assisted rewrite
 
-Large portions of this rewrite were generated with Claude Code, developed in phases and reviewed/tested locally in Android Studio after each phase. See `movie-app-rewrite-progress.md` for the phase-by-phase history.
+Large portions of this rewrite were generated with Claude Code, developed in phases and reviewed/tested locally in Android Studio after each phase.

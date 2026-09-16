@@ -12,9 +12,10 @@ import android.widget.Toast
  * the same way a movie poster does either 404s (no movie with that id) or — worse — silently opens
  * a real but unrelated movie that happens to share the id (found via user testing, 2026-09-10).
  *
- * There's no TV detail screen yet (that's Phase 2.6 — full app-wide TV support, not started), so
- * until then every TV item's tap goes here instead of [com.ahsan.movieapp.domain.model.Movie]'s
- * normal click-through, with a short explanation rather than either broken behavior above.
+ * Phase 2.6 (full app-wide TV support) is what retires this everywhere — a real TV detail screen
+ * now exists (`ui/tv/TvDetailScreen.kt`, Session 1) and Explore's "Popular TV Shows" row already
+ * routes there instead of here (see `MovieNavGraph.kt`'s `navigateToTvDetail`). Genre's TV tab and
+ * PersonScreen's TV filmography still route through this toast — that's Session 4's job.
  */
 fun Context.showTvDetailsUnavailableToast() {
     Toast.makeText(this, "TV show details aren't available yet — coming in a future update", Toast.LENGTH_SHORT).show()

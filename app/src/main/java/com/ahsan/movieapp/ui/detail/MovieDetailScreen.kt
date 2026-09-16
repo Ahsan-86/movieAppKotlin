@@ -67,11 +67,16 @@ import com.ahsan.movieapp.domain.model.WatchProviderRegion
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MoviePosterCard
+import com.ahsan.movieapp.ui.components.TrailerShareRow
 
 /**
- * Detail screen: backdrop, poster, key facts, favorite toggle, overview, cast/crew (Phase 3 Round
- * A), Information/Similar/Recommendations (added the same round on Ahsan's post-build feedback),
- * a collection teaser (Round B), and streaming availability (Round C).
+ * Detail screen: backdrop, poster, key facts, genres, favorite toggle, then a Watch Trailer + Share
+ * row (Phase 2.6 Session 2) inside that same title/meta/genre info column beside the poster —
+ * repositioned there on Ahsan's 2026-09-12 post-ship feedback (originally a separate full-width row
+ * below that column, mirroring [com.ahsan.movieapp.ui.tv.TvDetailScreen]'s identical move); then
+ * overview, cast/crew (Phase 3 Round A), Information/Similar/Recommendations (added the same round
+ * on Ahsan's post-build feedback), a collection teaser (Round B), and streaming availability
+ * (Round C).
  *
  * Real, pinned top bar (title = the movie's name, a normal back arrow) rather than a back button
  * floating over the backdrop — same dynamic-per-screen pattern as PersonScreen/GenreScreen. The
@@ -86,6 +91,7 @@ fun MovieDetailScreen(
     onViewAllCastCrew: (movieId: Int) -> Unit,
     onMovieClick: (Movie) -> Unit,
     onCollectionClick: (collectionId: Int, collectionName: String) -> Unit,
+    onWatchTrailer: (videoId: String) -> Unit,
     viewModel: MovieDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -169,6 +175,13 @@ fun MovieDetailScreen(
                                         modifier = Modifier.padding(top = 4.dp)
                                     )
                                 }
+                                TrailerShareRow(
+                                    trailerKey = state.trailerKey,
+                                    shareTitle = details.title,
+                                    shareUrl = "https://www.themoviedb.org/movie/${details.id}",
+                                    onWatchTrailer = onWatchTrailer,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
                             }
                         }
 

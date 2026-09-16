@@ -22,6 +22,16 @@ sealed class Destination(val route: String) {
     }
 
     /**
+     * Phase 2.6 Session 1 — the TV detail screen. Its own route (not reusing [MovieDetail]) since
+     * TMDB TV ids and movie ids are separate namespaces sharing the same numeric range (see
+     * util/TvNavigation.kt) — a `tv/{tvId}` route makes that explicit rather than relying on
+     * callers to route correctly by convention.
+     */
+    data object TvDetail : Destination("tv/{tvId}") {
+        fun createRoute(tvId: Int) = "tv/$tvId"
+    }
+
+    /**
      * Phase 3 Round A's "view all" — the full cast + director beyond what fits in the Detail
      * screen's horizontal row. A separate route (not a shared ViewModel with MovieDetail) so it
      * re-fetches by movieId like every other full-screen destination in this app; credits are a
@@ -56,6 +66,28 @@ sealed class Destination(val route: String) {
     data object CollectionDetail : Destination("collection/{collectionId}/{collectionName}") {
         fun createRoute(collectionId: Int, collectionName: String) =
             "collection/$collectionId/${java.net.URLEncoder.encode(collectionName, "UTF-8")}"
+    }
+
+    /**
+     * Phase 2.6 Session 2 — a single season's full episode list, opened from the TV detail
+     * screen's Seasons section. seasonName travels as a nav arg (same URL-encoded convention as
+     * [PersonFilmography]/[CollectionDetail]) so the top bar has a title to show immediately,
+     * before the season-details fetch completes.
+     */
+    data object SeasonEpisodes : Destination("tv/{tvId}/season/{seasonNumber}/{seasonName}") {
+        fun createRoute(tvId: Int, seasonNumber: Int, seasonName: String) =
+            "tv/$tvId/season/$seasonNumber/${java.net.URLEncoder.encode(seasonName, "UTF-8")}"
+    }
+
+    /**
+     * Phase 2.6 Session 2 post-ship — the trailer's own full-screen destination, replacing the
+     * earlier Dialog-based player (see [com.ahsan.movieapp.ui.components.TrailerPlayerScreen]'s doc
+     * for why a real nav destination replaced a floating [androidx.compose.ui.window.Dialog]). The
+     * YouTube video id travels as a plain path segment (not URL-encoded like the name-bearing
+     * routes above) since YouTube ids are always URL-safe (alphanumeric, `-`, `_`).
+     */
+    data object TrailerPlayer : Destination("trailer/{videoId}") {
+        fun createRoute(videoId: String) = "trailer/$videoId"
     }
 }
 

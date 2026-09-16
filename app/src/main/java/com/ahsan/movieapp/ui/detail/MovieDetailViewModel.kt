@@ -12,6 +12,7 @@ import com.ahsan.movieapp.domain.model.WatchProviderRegion
 import com.ahsan.movieapp.domain.model.WatchProviders
 import com.ahsan.movieapp.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +35,9 @@ data class MovieDetailUiState(
     val watchProviders: WatchProviderRegion? = null,
     val watchRegions: List<String> = emptyList(),
     val selectedRegion: String = "",
+    // Phase 2.6 Session 2 — Watch Trailer button. Null means either still loading or TMDB has no
+    // YouTube trailer for this movie; either way the button just doesn't render.
+    val trailerKey: String? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null
 )
@@ -62,7 +66,7 @@ private data class WatchState(
  * The device's own region as an ISO 3166-1 country code (e.g. "US", "GB"), falling back to "US"
  * when the locale doesn't resolve to one — per Ahsan's confirmed Round C scope ("locale-derived
  * default, US fallback"). If TMDB turns out to have no watch-provider data for this region either,
- * [MovieDetailViewModel.init] falls back to "US" a second time once the fetch actually completes.
+ * MovieDetailViewModel.init falls back to "US" a second time once the fetch actually completes.
  */
 private fun defaultRegionCode(): String = Locale.getDefault().country.takeIf { it.isNotBlank() } ?: "US"
 
@@ -82,8 +86,11 @@ class MovieDetailViewModel @Inject constructor(
     // this screen needs to show.
     private val creditsState = MutableStateFlow(CreditsState())
     private val watchState = MutableStateFlow(WatchState())
+    // Phase 2.6 Session 2 — Watch Trailer button. Fetched separately (own launch, no onFailure),
+    // same failure-tolerant, separately-fetched convention as creditsState/watchState above.
+    private val trailerKeyState = MutableStateFlow<String?>(null)
 
-    val uiState: StateFlow<MovieDetailUiState> = combine(
+    private val baseState: Flow<MovieDetailUiState> = combine(
         repository.getMovieDetails(movieId),
         creditsState,
         repository.getSimilarMovies(movieId),
@@ -107,6 +114,13 @@ class MovieDetailViewModel @Inject constructor(
             isLoading = resource is Resource.Loading && resource.data == null,
             errorMessage = (resource as? Resource.Error)?.message?.takeIf { resource.data == null }
         )
+    }
+
+    // trailerKeyState is combined in as a second layer rather than folded into the 5-flow combine()
+    // above — kotlinx.coroutines' combine() only has named-lambda overloads up to 5 flows, and a
+    // 6th flow would need the array-based vararg overload instead; nesting is simpler here.
+    val uiState: StateFlow<MovieDetailUiState> = combine(baseState, trailerKeyState) { state, trailerKey ->
+        state.copy(trailerKey = trailerKey)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MovieDetailUiState(selectedRegion = defaultRegionCode()))
 
     init {
@@ -132,6 +146,11 @@ class MovieDetailViewModel @Inject constructor(
                     }
                 }
             // Deliberately no onFailure handling here — see the comment on WatchState above.
+        }
+        viewModelScope.launch {
+            repository.getMovieTrailerKey(movieId)
+                .onSuccess { key -> trailerKeyState.value = key }
+            // Deliberately no onFailure handling — see the comment on trailerKeyState above.
         }
     }
 

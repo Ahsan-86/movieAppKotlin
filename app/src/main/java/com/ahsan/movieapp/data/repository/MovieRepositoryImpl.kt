@@ -36,7 +36,10 @@ import com.ahsan.movieapp.domain.model.MovieCredits
 import com.ahsan.movieapp.domain.model.MovieDetails
 import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.PersonCredits
+import com.ahsan.movieapp.data.mapper.bestYoutubeTrailerKey
 import com.ahsan.movieapp.domain.model.PersonDetails
+import com.ahsan.movieapp.domain.model.SeasonDetails
+import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.domain.model.WatchProviders
 import com.ahsan.movieapp.util.Constants
 import com.ahsan.movieapp.util.Resource
@@ -347,6 +350,51 @@ class MovieRepositoryImpl @Inject constructor(
             )
             favoriteDao.addFavorite(FavoriteEntity(movieId = movie.id, addedAt = System.currentTimeMillis()))
         }
+    }
+
+    /**
+     * Phase 2.6 Session 1 — the TV detail screen's base info section. One-shot, network-only, no
+     * Room cache — same convention as [getMovieCredits]/[getCollectionDetails]/[getWatchProviders].
+     */
+    override suspend fun getTvDetails(tvId: Int): Result<TvShowDetails> = runCatching {
+        api.getTvDetails(tvId).toDomain()
+    }
+
+    /**
+     * TV counterpart of [getMovieCredits] — same "read the crew list already returned by the
+     * credits call to find the director" approach, no second network request.
+     */
+    override suspend fun getTvCredits(tvId: Int): Result<MovieCredits> = runCatching {
+        val dto = api.getTvCredits(tvId)
+        val cast = dto.cast.sortedBy { it.order }.map { it.toDomain() }
+        val director = dto.crew.firstOrNull { it.job == "Director" }?.toPerson()
+        MovieCredits(cast = cast, director = director)
+    }
+
+    /** TV detail screen's Similar section, added on Ahsan's post-build feedback. Network-only, no
+     *  Room cache — see the interface doc. */
+    override suspend fun getSimilarTvShows(tvId: Int): Result<List<Movie>> = runCatching {
+        api.getSimilarTv(tvId).results.map { it.toMovie() }
+    }
+
+    /** TV detail screen's Recommendations section — see the interface doc. */
+    override suspend fun getRecommendedTvShows(tvId: Int): Result<List<Movie>> = runCatching {
+        api.getRecommendedTv(tvId).results.map { it.toMovie() }
+    }
+
+    /** Movie detail screen's Watch Trailer button (Phase 2.6 Session 2) — see the interface doc. */
+    override suspend fun getMovieTrailerKey(movieId: Int): Result<String?> = runCatching {
+        api.getMovieVideos(movieId).bestYoutubeTrailerKey()
+    }
+
+    /** TV detail screen's Watch Trailer button — see the interface doc. */
+    override suspend fun getTvTrailerKey(tvId: Int): Result<String?> = runCatching {
+        api.getTvVideos(tvId).bestYoutubeTrailerKey()
+    }
+
+    /** TV detail screen's Seasons section drill-down — see the interface doc. */
+    override suspend fun getSeasonDetails(tvId: Int, seasonNumber: Int): Result<SeasonDetails> = runCatching {
+        api.getSeasonDetails(tvId, seasonNumber).toDomain()
     }
 
     override suspend fun refreshAllCategories(): Result<Unit> = runCatching {

@@ -12,6 +12,8 @@ import com.ahsan.movieapp.domain.model.MovieDetails
 import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.PersonCredits
 import com.ahsan.movieapp.domain.model.PersonDetails
+import com.ahsan.movieapp.domain.model.SeasonDetails
+import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.domain.model.WatchProviders
 import com.ahsan.movieapp.util.Resource
 import kotlinx.coroutines.flow.Flow
@@ -155,4 +157,54 @@ interface MovieRepository {
 
     /** Refreshes every list category from the network; used by the background sync worker. */
     suspend fun refreshAllCategories(): Result<Unit>
+
+    /**
+     * Phase 2.6 Session 1 — the TV detail screen's base info section. One-shot, network-only, no
+     * Room cache — same convention as [getMovieCredits]/[getCollectionDetails]/[getWatchProviders]
+     * for data that doesn't have its own offline table yet (this app doesn't persist TV data at
+     * all — see [getPopularTv]'s doc). A Favorites-aware `isFavorite` flag isn't part of
+     * [TvShowDetails] yet; that needs Session 6's Favorites schema migration (movie/TV id
+     * collision — see the project doc's Decisions).
+     */
+    suspend fun getTvDetails(tvId: Int): Result<TvShowDetails>
+
+    /**
+     * TV counterpart of [getMovieCredits] — cast + director (crew job == "Director"), same
+     * one-shot, network-only, no-Room-cache convention. Reuses [MovieCredits] as the return shape
+     * since TMDB's `/tv/{id}/credits` has the identical cast/crew fields as the movie side.
+     */
+    suspend fun getTvCredits(tvId: Int): Result<MovieCredits>
+
+    /**
+     * TV counterpart of [getSimilarMovies] — the TV detail screen's Similar section, added on
+     * Ahsan's post-build feedback to Phase 2.6 Session 1. One-shot, network-only, no Room cache —
+     * same convention as [getTvDetails]/[getTvCredits] (this app doesn't persist TV data at all).
+     * Results come back as [Movie] (via [com.ahsan.movieapp.data.mapper.toMovie]) — the same
+     * bridge every other TV listing in this app uses so TV rows can render through the shared
+     * poster-card components.
+     */
+    suspend fun getSimilarTvShows(tvId: Int): Result<List<Movie>>
+
+    /**
+     * TV counterpart of [getRecommendedMovies] — a separate TMDB algorithm from
+     * [getSimilarTvShows], deliberately not deduped against it, same as the movie side. One-shot,
+     * network-only, no Room cache.
+     */
+    suspend fun getRecommendedTvShows(tvId: Int): Result<List<Movie>>
+
+    /**
+     * Phase 2.6 Session 2 — the Watch Trailer button on the Movie detail screen. One-shot,
+     * network-only (no Room cache — same convention as [getMovieCredits]). Null means TMDB has no
+     * YouTube video attached for this movie, in which case the button doesn't render.
+     */
+    suspend fun getMovieTrailerKey(movieId: Int): Result<String?>
+
+    /** TV counterpart of [getMovieTrailerKey] — backs the TV detail screen's Watch Trailer button. */
+    suspend fun getTvTrailerKey(tvId: Int): Result<String?>
+
+    /**
+     * Phase 2.6 Session 2 — a season's full episode list, opened from the TV detail screen's
+     * Seasons section. One-shot, network-only, no Room cache — same convention as [getTvDetails].
+     */
+    suspend fun getSeasonDetails(tvId: Int, seasonNumber: Int): Result<SeasonDetails>
 }

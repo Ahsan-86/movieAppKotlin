@@ -39,7 +39,10 @@ import com.ahsan.movieapp.ui.genre.GenreScreen
 import com.ahsan.movieapp.ui.home.HomeScreen
 import com.ahsan.movieapp.ui.person.PersonScreen
 import com.ahsan.movieapp.ui.search.SearchScreen
+import com.ahsan.movieapp.ui.components.TrailerPlayerScreen
 import com.ahsan.movieapp.ui.trending.TrendingScreen
+import com.ahsan.movieapp.ui.tv.SeasonEpisodesScreen
+import com.ahsan.movieapp.ui.tv.TvDetailScreen
 
 /**
  * App entry point: gates on session state (first launch shows the guest/login chooser,
@@ -102,6 +105,13 @@ private fun MainNavHost() {
                 val scrollToTopEvents = remember(tabReselectBus) { tabReselectBus.reselected.forRoute(Destination.Explore.route) }
                 HomeScreen(
                     onMovieClick = { navController.navigateToDetail(it) },
+                    // Phase 2.6 Session 1 — temporary early hookup: Explore's Popular TV Shows row
+                    // now routes to the real TV detail screen instead of the toast, purely so this
+                    // session has an end-to-end way to verify. The row itself stays one-shot/
+                    // uncached until Session 3 rebuilds it with Room-backed pagination; Genre's TV
+                    // tab and PersonScreen's filmography still route through the toast until
+                    // Session 4's formal retirement.
+                    onTvClick = { navController.navigateToTvDetail(it) },
                     onGenreClick = { navController.navigateToGenre(it) },
                     scrollToTopEvents = scrollToTopEvents
                 )
@@ -147,8 +157,44 @@ private fun MainNavHost() {
                     onMovieClick = { navController.navigateToDetail(it) },
                     onCollectionClick = { collectionId, collectionName ->
                         navController.navigateToCollection(collectionId, collectionName)
-                    }
+                    },
+                    onWatchTrailer = { videoId -> navController.navigateToTrailer(videoId) }
                 )
+            }
+            composable(
+                route = Destination.TvDetail.route,
+                arguments = listOf(androidx.navigation.navArgument("tvId") { type = androidx.navigation.NavType.IntType })
+            ) {
+                TvDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onPersonClick = { personId, personName -> navController.navigateToPerson(personId, personName) },
+                    // Similar/Recommendations posters push a new TV Detail screen onto the back
+                    // stack, same "plain navigate()" convention as MovieDetailScreen's onMovieClick
+                    // above — a TV -> Similar -> Similar chain works the same way.
+                    onTvClick = { navController.navigateToTvDetail(it) },
+                    // Phase 2.6 Session 2 — a tapped season opens its full episode list.
+                    onSeasonClick = { tvId, seasonNumber, seasonName ->
+                        navController.navigate(Destination.SeasonEpisodes.createRoute(tvId, seasonNumber, seasonName))
+                    },
+                    onWatchTrailer = { videoId -> navController.navigateToTrailer(videoId) }
+                )
+            }
+            composable(
+                route = Destination.SeasonEpisodes.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument("tvId") { type = androidx.navigation.NavType.IntType },
+                    androidx.navigation.navArgument("seasonNumber") { type = androidx.navigation.NavType.IntType },
+                    androidx.navigation.navArgument("seasonName") { type = androidx.navigation.NavType.StringType }
+                )
+            ) {
+                SeasonEpisodesScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Destination.TrailerPlayer.route,
+                arguments = listOf(androidx.navigation.navArgument("videoId") { type = androidx.navigation.NavType.StringType })
+            ) { backStackEntry ->
+                val videoId = backStackEntry.arguments?.getString("videoId").orEmpty()
+                TrailerPlayerScreen(videoId = videoId, onBack = { navController.popBackStack() })
             }
             composable(
                 route = Destination.CastCrewList.route,
@@ -204,6 +250,12 @@ private fun NavHostController.navigateToDetail(movie: Movie) {
     navigate(Destination.MovieDetail.createRoute(movie.id))
 }
 
+/** Phase 2.6 Session 1 — routes a tapped TV item (still modeled as [Movie], see
+ *  util/TvNavigation.kt) to the real TV detail screen instead of the "not available yet" toast. */
+private fun NavHostController.navigateToTvDetail(movie: Movie) {
+    navigate(Destination.TvDetail.createRoute(movie.id))
+}
+
 private fun NavHostController.navigateToPerson(person: Person) {
     navigateToPerson(person.id, person.name)
 }
@@ -221,6 +273,12 @@ private fun NavHostController.navigateToGenre(genre: GenreChip) {
 /** Detail screen's collection teaser (Phase 3 Round B) -> the full franchise list. */
 private fun NavHostController.navigateToCollection(collectionId: Int, collectionName: String) {
     navigate(Destination.CollectionDetail.createRoute(collectionId, collectionName))
+}
+
+/** Phase 2.6 Session 2 post-ship — "Watch Trailer" -> the trailer's own full-screen destination
+ *  (see [TrailerPlayerScreen]'s doc for why this replaced an in-place Dialog). */
+private fun NavHostController.navigateToTrailer(videoId: String) {
+    navigate(Destination.TrailerPlayer.createRoute(videoId))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -9,7 +9,10 @@ import com.ahsan.movieapp.data.remote.dto.MovieDto
 import com.ahsan.movieapp.data.remote.dto.MultiSearchResultDto
 import com.ahsan.movieapp.data.remote.dto.PagedResponseDto
 import com.ahsan.movieapp.data.remote.dto.PersonDetailsDto
+import com.ahsan.movieapp.data.remote.dto.SeasonDetailsDto
+import com.ahsan.movieapp.data.remote.dto.TvDetailsDto
 import com.ahsan.movieapp.data.remote.dto.TvShowDto
+import com.ahsan.movieapp.data.remote.dto.VideosResponseDto
 import com.ahsan.movieapp.data.remote.dto.WatchProvidersResponseDto
 import retrofit2.http.GET
 import retrofit2.http.Path
@@ -128,4 +131,54 @@ interface TmdbApi {
      */
     @GET("3/person/{id}/combined_credits")
     suspend fun getPersonCombinedCredits(@Path("id") personId: Int): CombinedCreditsDto
+
+    /**
+     * Phase 2.6 Session 1 — the TV detail screen's base info section. Scoped down from
+     * [MovieDetailsDto]'s full field set to what that screen needs (see [TvDetailsDto]'s doc);
+     * Seasons (Session 2) is a separate `/tv/{id}/season/{season_number}` call, not part of this
+     * response's fields used here.
+     */
+    @GET("3/tv/{id}")
+    suspend fun getTvDetails(@Path("id") tvId: Int): TvDetailsDto
+
+    /**
+     * TV counterpart of [getMovieCredits] — same cast/crew shape, reused via [CreditsDto] rather
+     * than a separate TV-specific DTO. Backs the TV detail screen's Cast & Crew section.
+     */
+    @GET("3/tv/{id}/credits")
+    suspend fun getTvCredits(@Path("id") tvId: Int): CreditsDto
+
+    /**
+     * TV counterpart of [getSimilarMovies] — backs the TV detail screen's Similar section, added
+     * on Ahsan's post-build feedback to Phase 2.6 Session 1.
+     */
+    @GET("3/tv/{id}/similar")
+    suspend fun getSimilarTv(@Path("id") tvId: Int, @Query("page") page: Int = 1): PagedResponseDto<TvShowDto>
+
+    /**
+     * TV counterpart of [getMovieRecommendations] — a separate TMDB algorithm from [getSimilarTv],
+     * deliberately not deduped against it, same as the movie side.
+     */
+    @GET("3/tv/{id}/recommendations")
+    suspend fun getRecommendedTv(@Path("id") tvId: Int, @Query("page") page: Int = 1): PagedResponseDto<TvShowDto>
+
+    /**
+     * Phase 2.6 Session 2 — backs the Watch Trailer button on the Movie detail screen. TMDB
+     * returns every attached video (trailers, teasers, clips, etc.) across sites; see
+     * [com.ahsan.movieapp.data.mapper.bestYoutubeTrailerKey] for how the one shown is picked.
+     */
+    @GET("3/movie/{id}/videos")
+    suspend fun getMovieVideos(@Path("id") movieId: Int): VideosResponseDto
+
+    /** TV counterpart of [getMovieVideos] — backs the Watch Trailer button on the TV detail screen. */
+    @GET("3/tv/{id}/videos")
+    suspend fun getTvVideos(@Path("id") tvId: Int): VideosResponseDto
+
+    /**
+     * Phase 2.6 Session 2 — one season's full episode list, opened by tapping a season in the TV
+     * detail screen's Seasons section. Not part of `/tv/{id}` itself (that only returns the season
+     * summaries — see [TvDetailsDto.seasons]).
+     */
+    @GET("3/tv/{id}/season/{season_number}")
+    suspend fun getSeasonDetails(@Path("id") tvId: Int, @Path("season_number") seasonNumber: Int): SeasonDetailsDto
 }

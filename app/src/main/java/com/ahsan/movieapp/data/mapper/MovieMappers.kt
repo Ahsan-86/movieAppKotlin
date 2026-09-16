@@ -12,15 +12,21 @@ import com.ahsan.movieapp.data.remote.dto.CrewMemberDto
 import com.ahsan.movieapp.data.remote.dto.MovieDetailsDto
 import com.ahsan.movieapp.data.remote.dto.MovieDto
 import com.ahsan.movieapp.data.remote.dto.MultiSearchResultDto
+import com.ahsan.movieapp.data.remote.dto.EpisodeDto
 import com.ahsan.movieapp.data.remote.dto.PersonDetailsDto
 import com.ahsan.movieapp.data.remote.dto.PersonDto
 import com.ahsan.movieapp.data.remote.dto.ProductionCompanyDto
+import com.ahsan.movieapp.data.remote.dto.SeasonDetailsDto
+import com.ahsan.movieapp.data.remote.dto.SeasonDto
+import com.ahsan.movieapp.data.remote.dto.TvDetailsDto
 import com.ahsan.movieapp.data.remote.dto.TvShowDto
+import com.ahsan.movieapp.data.remote.dto.VideosResponseDto
 import com.ahsan.movieapp.data.remote.dto.WatchProviderDto
 import com.ahsan.movieapp.data.remote.dto.WatchProviderRegionDto
 import com.ahsan.movieapp.data.remote.dto.WatchProvidersResponseDto
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.CollectionSummary
+import com.ahsan.movieapp.domain.model.Episode
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.MovieCollection
 import com.ahsan.movieapp.domain.model.MovieDetails
@@ -28,6 +34,9 @@ import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.PersonCredits
 import com.ahsan.movieapp.domain.model.PersonDetails
 import com.ahsan.movieapp.domain.model.ProductionCompany
+import com.ahsan.movieapp.domain.model.Season
+import com.ahsan.movieapp.domain.model.SeasonDetails
+import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.domain.model.WatchProvider
 import com.ahsan.movieapp.domain.model.WatchProviderRegion
 import com.ahsan.movieapp.domain.model.WatchProviders
@@ -326,6 +335,82 @@ private fun CombinedCreditDto.toMovie(favoriteIds: Set<Int>): Movie = Movie(
     genreIds = genreIds.orEmpty(),
     isFavorite = id in favoriteIds
 )
+
+/**
+ * `/tv/{id}` -> the TV detail screen's info section + Information section (Phase 2.6 Session 1).
+ * Network-only, same convention as [CollectionDetailsDto.toDomain]/[WatchProvidersResponseDto.toDomain]
+ * for data with no offline table yet. `episode_run_time`'s first entry is used as a representative
+ * typical episode length — see [TvShowDetails.episodeRuntimeMinutes]'s doc. `networks`/
+ * `production_companies` are mapped names-only (no logos), same convention as
+ * [MovieDetails.productionCompaniesFormatted].
+ */
+fun TvDetailsDto.toDomain(): TvShowDetails = TvShowDetails(
+    id = id,
+    name = name,
+    overview = overview.orEmpty(),
+    posterUrl = Constants.posterUrl(posterPath),
+    backdropUrl = Constants.backdropUrl(backdropPath, Constants.BACKDROP_WIDTH),
+    firstAirDate = firstAirDate.orEmpty(),
+    voteAverage = voteAverage ?: 0.0,
+    voteCount = voteCount ?: 0,
+    genres = genres.orEmpty().map { it.name },
+    tagline = tagline?.takeIf { it.isNotBlank() },
+    numberOfSeasons = numberOfSeasons,
+    numberOfEpisodes = numberOfEpisodes,
+    episodeRuntimeMinutes = episodeRunTime?.firstOrNull(),
+    originalName = originalName.orEmpty(),
+    status = status,
+    homepage = homepage,
+    countries = productionCountries.orEmpty().map { it.name },
+    networks = networks.orEmpty().map { it.name },
+    productionCompanies = productionCompanies.orEmpty().map { it.name },
+    // Season 0 ("Specials") is excluded from the Seasons section — see Season's class doc.
+    seasons = seasons.orEmpty().filter { it.seasonNumber > 0 }.map { it.toDomain() }
+)
+
+/** One entry from `/tv/{id}`'s `seasons` array -> the Seasons section (Phase 2.6 Session 2). */
+private fun SeasonDto.toDomain(): Season = Season(
+    seasonNumber = seasonNumber,
+    name = name,
+    overview = overview.orEmpty(),
+    posterUrl = Constants.posterUrl(posterPath, Constants.POSTER_WIDTH_SMALL),
+    episodeCount = episodeCount ?: 0,
+    airDate = airDate.orEmpty()
+)
+
+/**
+ * `/tv/{id}/season/{season_number}` -> a season's full episode list, opened from the TV detail
+ * screen's Seasons section (Phase 2.6 Session 2). Network-only, same convention as
+ * [TvDetailsDto.toDomain] above.
+ */
+fun SeasonDetailsDto.toDomain(): SeasonDetails = SeasonDetails(
+    seasonNumber = seasonNumber,
+    name = name,
+    overview = overview.orEmpty(),
+    episodes = episodes.orEmpty().map { it.toDomain() }
+)
+
+private fun EpisodeDto.toDomain(): Episode = Episode(
+    episodeNumber = episodeNumber,
+    name = name,
+    overview = overview.orEmpty(),
+    imageUrl = Constants.backdropUrl(stillPath),
+    airDate = airDate.orEmpty()
+)
+
+/**
+ * Picks the single best YouTube trailer key out of a `/movie|tv/{id}/videos` response, for the
+ * Detail screen's Watch Trailer button (Phase 2.6 Session 2) — prefers an official YouTube
+ * trailer, falls back to any YouTube trailer, then any YouTube video at all; null if TMDB has no
+ * YouTube video attached (the button simply doesn't render — see
+ * [com.ahsan.movieapp.ui.components.TrailerShareRow]'s doc).
+ */
+fun VideosResponseDto.bestYoutubeTrailerKey(): String? {
+    val youtubeVideos = results.orEmpty().filter { it.site == "YouTube" }
+    return youtubeVideos.firstOrNull { it.type == "Trailer" && it.official == true }?.key
+        ?: youtubeVideos.firstOrNull { it.type == "Trailer" }?.key
+        ?: youtubeVideos.firstOrNull()?.key
+}
 
 /**
  * Bridges a `/discover/tv` row into the same [Movie] shape everything else renders — TV shows

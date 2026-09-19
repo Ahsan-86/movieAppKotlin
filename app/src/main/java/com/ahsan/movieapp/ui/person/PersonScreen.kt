@@ -1,6 +1,8 @@
 package com.ahsan.movieapp.ui.person
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,8 +42,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,7 +56,8 @@ import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MovieListRow
-import com.ahsan.movieapp.util.showTvDetailsUnavailableToast
+import com.ahsan.movieapp.ui.components.backgroundSwatch
+import com.ahsan.movieapp.ui.components.rememberBackdropPalette
 
 /**
  * Full screen with a real, pinned top bar — title is the person's name, a normal back arrow next
@@ -62,11 +69,14 @@ import com.ahsan.movieapp.util.showTvDetailsUnavailableToast
  * screen's list-view mode) rather than a poster grid, which is also why this is a plain
  * `LazyColumn` and not a `LazyVerticalGrid` like it used to be.
  *
- * The bar itself is transparent and floats over the content rather than pushing it down, so the
- * hero photo can start right at the very top of the screen (behind the status bar) instead of
- * leaving a plain-background gap above it — the common "photo behind the app bar" treatment. A
- * short gradient scrim sits behind the bar so the back button and title stay legible regardless
- * of what's showing underneath (a bright poster, or the plain background during loading/error).
+ * The bar is transparent and floats over the content rather than pushing it down, so the hero
+ * photo can start right at the very top of the screen (behind the status bar) instead of leaving a
+ * plain-background gap above it — the common "photo behind the app bar" treatment. A short gradient
+ * scrim sits behind the bar so the back button and title stay legible regardless of what's showing
+ * underneath (a bright portrait, or the plain background during loading/error). The title itself is
+ * hidden at rest (the hero caption shows the name then) and fades in only once the hero has scrolled
+ * past — the same scroll-aware bar as the Movie/TV detail screens (2026-09-20 alignment pass), and
+ * the same luminance-adaptive scrim + palette-tinted background those screens use.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 // contentWindowInsets is deliberately (0,0,0,0) below (see the comment on that param) — the
@@ -77,31 +87,67 @@ import com.ahsan.movieapp.util.showTvDetailsUnavailableToast
 fun PersonScreen(
     onBack: () -> Unit,
     onMovieClick: (Movie) -> Unit,
+    // TV filmography rows route to the real TV detail screen (2026-09-22 — the "not available
+    // yet" toast was retired now that TvDetailScreen exists).
+    onTvClick: (Movie) -> Unit,
     viewModel: PersonViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    // One list state shared by the scroll-aware bar above and the LazyColumn in PersonContent, so
+    // the bar can read how far the hero has scrolled.
+    val listState = rememberLazyListState()
+
+    val profileUrl = state.details?.profileUrl
+    val palette = rememberBackdropPalette(profileUrl)
+    val profileTone = palette?.backgroundSwatch?.rgb?.let { Color(it) }
+    // Bright portraits get a stronger scrim behind the transparent bar so the white title/back stay
+    // legible; dark ones keep the lighter scrim. Defaults to a dark tone (0.2 luminance) so the
+    // scrim never disappears when there's no sampled color (loading/error states).
+    val scrimAlpha = (0.5f + 0.25f * (profileTone?.luminance() ?: 0.2f)).coerceIn(0.5f, 0.9f)
+    // The screen background is the theme background tinted toward the photo's palette, so the
+    // sections below the hero continue the image's color instead of a flat theme color. The theme
+    // tint still rules — palette nudges it about a third of the way.
+    val background = profileTone?.let { lerp(MaterialTheme.colorScheme.background, it, 0.35f) }
+        ?: MaterialTheme.colorScheme.background
 
     Scaffold(
+        containerColor = background,
         topBar = {
+            // PersonHero is the first (tall, 3:4) item in the LazyColumn below, so "scrolled past
+            // 100dp" is: the first item's scroll offset past 100dp, or any later item on screen.
+            // The LazyListState fields are snapshot-backed, so reading them here recomposes only
+            // this lambda as the page scrolls. Loading/error have no hero behind the bar, so they
+            // default to the opaque titled bar.
+            val barOpaque = listState.firstVisibleItemIndex > 0 ||
+                listState.firstVisibleItemScrollOffset > with(LocalDensity.current) { 100.dp.toPx() } ||
+                state.isLoading || (state.errorMessage != null && state.credits == null)
+            val barColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.surface else Color.Transparent)
+            val barContentColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.onSurface else Color.White)
             Box {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent)
+                AnimatedVisibility(visible = !barOpaque) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Black.copy(alpha = scrimAlpha), Color.Transparent)
+                                )
                             )
-                        )
-                )
+                    )
+                }
                 TopAppBar(
-                    title = { Text(state.personName, color = Color.White) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    title = {
+                        AnimatedVisibility(visible = barOpaque) {
+                            Text(state.personName, color = barContentColor)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = barContentColor)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = barColor)
                 )
             }
         },
@@ -117,7 +163,9 @@ fun PersonScreen(
                     FullScreenError(message = state.errorMessage ?: "Couldn't load this person")
                 else -> PersonContent(
                     state = state,
+                    listState = listState,
                     onMovieClick = onMovieClick,
+                    onTvClick = onTvClick,
                     onMediaTabSelected = viewModel::onMediaTabSelected,
                     onRoleTabSelected = viewModel::onRoleTabSelected,
                     onToggleFavorite = viewModel::toggleFavorite
@@ -131,19 +179,21 @@ fun PersonScreen(
 @Composable
 private fun PersonContent(
     state: PersonUiState,
+    listState: LazyListState,
     onMovieClick: (Movie) -> Unit,
+    onTvClick: (Movie) -> Unit,
     onMediaTabSelected: (MediaTab) -> Unit,
     onRoleTabSelected: (RoleTab) -> Unit,
     onToggleFavorite: (Movie) -> Unit
 ) {
     val movies = state.displayedMovies
-    val context = LocalContext.current
 
     // No horizontal contentPadding here — the hero photo needs to run edge-to-edge (fix #4), and
     // the filmography rows use MovieListRow exactly as SearchResultsList does, unpadded. The
     // filter row and empty state add their own horizontal inset since they're plain text/controls,
     // not full-bleed media.
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(bottom = 16.dp),
         modifier = Modifier.fillMaxSize()
     ) {
@@ -178,11 +228,11 @@ private fun PersonContent(
             items(movies, key = { it.id }) { movie ->
                 MovieListRow(
                     movie = movie,
-                    // TV ids aren't movie ids — see util/TvNavigation.kt for why this can't just
-                    // reuse onMovieClick the way the Movies tab does.
+                    // TV ids aren't movie ids — TV rows route to the real TV detail screen
+                    // (onTvClick), not through the movie detail route the Movies tab uses.
                     onClick = {
                         if (state.selectedMediaType == MediaTab.TV) {
-                            context.showTvDetailsUnavailableToast()
+                            onTvClick(movie)
                         } else {
                             onMovieClick(movie)
                         }
@@ -207,8 +257,9 @@ private fun PersonContent(
  * gradient behind the caption text specifically. Only the (optional) biography still lives below
  * the photo, since a multi-paragraph bio can't reasonably be overlaid without hurting legibility.
  * This is a plain item inside the outer LazyColumn (see PersonContent) so it scrolls underneath
- * the pinned, transparent top bar as the user browses — the back button and name in that bar stay
- * put; the name shown here is this caption, not a duplicate of the app bar title.
+ * the pinned, transparent top bar as the user browses — the back button stays put, and this caption
+ * is where the name lives at rest; the top bar's own title fades in only after the hero has scrolled
+ * past (the scroll-aware bar in [PersonScreen]), so the two never show the name simultaneously.
  */
 @Composable
 private fun PersonHero(details: com.ahsan.movieapp.domain.model.PersonDetails) {

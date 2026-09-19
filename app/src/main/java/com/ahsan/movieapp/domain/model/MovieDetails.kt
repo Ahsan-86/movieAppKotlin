@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.domain.model
 
+import java.util.Locale
+
 data class MovieDetails(
     val id: Int,
     val title: String,
@@ -32,7 +34,7 @@ data class MovieDetails(
     val collection: CollectionSummary? = null
 ) {
     val releaseYear: String get() = releaseDate.take(4).ifBlank { "—" }
-    val ratingOutOfTen: String get() = String.format("%.1f", voteAverage)
+    val ratingOutOfTen: String get() = String.format(Locale.US, "%.1f", voteAverage)
     val runtimeFormatted: String? get() = runtimeMinutes?.let { "${it / 60}h ${it % 60}m" }
 
     val originalTitleIfPresent: String? get() = originalTitle.takeIf { it.isNotBlank() }

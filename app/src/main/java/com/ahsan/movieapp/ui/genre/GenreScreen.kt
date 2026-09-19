@@ -25,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.LoadState
@@ -39,26 +38,25 @@ import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.PagingAppendFooter
 import com.ahsan.movieapp.ui.person.MediaTab
-import com.ahsan.movieapp.util.showTvDetailsUnavailableToast
 
 /**
  * Full-screen "browse a genre" view opened from the search screen's genre chips. Shows a
  * Movies/TV segmented toggle only when the genre actually has both (e.g. "Horror" is
  * movie-only) — same pattern as the person screen's Movies/TV toggle. Both tabs are paginated,
  * infinite-scroll (Phase 4 Round 2 for Movies, Round 3 for TV) — see [GenreViewModel]'s class doc
- * for why they're backed by two different mechanisms under the hood. Tapping a TV item shows a
- * "not available yet" toast instead of opening the movie detail screen — TV ids aren't movie ids,
- * see [com.ahsan.movieapp.util.showTvDetailsUnavailableToast]'s doc for why.
+ * for why they're backed by two different mechanisms under the hood. Tapping a TV item routes to
+ * the real TV detail screen via [onTvClick] (the toast that used to live here was retired on
+ * 2026-09-22 now that the TV detail screen exists).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GenreScreen(
     onBack: () -> Unit,
     onMovieClick: (Movie) -> Unit,
+    onTvClick: (Movie) -> Unit,
     viewModel: GenreViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     // Each is only non-null (and only ever collected) when this chip actually has that media
     // genre — a TV-only chip's pagedMovies is null and a movie-only chip's pagedTvShows is null,
     // so there's simply nothing to page for the tab that doesn't apply.
@@ -107,7 +105,7 @@ fun GenreScreen(
                     GenrePagedGrid(
                         pagingItems = pagedTvShows,
                         emptyBody = "No TV shows found for ${state.genreName}.",
-                        onItemClick = { context.showTvDetailsUnavailableToast() },
+                        onItemClick = onTvClick,
                         // TV shows can't be favorited yet — no schema support for TV favorites.
                         onToggleFavorite = null
                     )

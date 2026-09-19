@@ -105,12 +105,9 @@ private fun MainNavHost() {
                 val scrollToTopEvents = remember(tabReselectBus) { tabReselectBus.reselected.forRoute(Destination.Explore.route) }
                 HomeScreen(
                     onMovieClick = { navController.navigateToDetail(it) },
-                    // Phase 2.6 Session 1 — temporary early hookup: Explore's Popular TV Shows row
-                    // now routes to the real TV detail screen instead of the toast, purely so this
-                    // session has an end-to-end way to verify. The row itself stays one-shot/
-                    // uncached until Session 3 rebuilds it with Room-backed pagination; Genre's TV
-                    // tab and PersonScreen's filmography still route through the toast until
-                    // Session 4's formal retirement.
+                    // Phase 2.6 Session 1 — Popular TV Shows row routes to the real TV detail
+                    // screen. The row itself stays one-shot/uncached until Session 3 rebuilds it
+                    // with Room-backed pagination.
                     onTvClick = { navController.navigateToTvDetail(it) },
                     onGenreClick = { navController.navigateToGenre(it) },
                     scrollToTopEvents = scrollToTopEvents
@@ -240,7 +237,10 @@ private fun MainNavHost() {
             ) {
                 PersonScreen(
                     onBack = { navController.popBackStack() },
-                    onMovieClick = { navController.navigateToDetail(it) }
+                    onMovieClick = { navController.navigateToDetail(it) },
+                    // TV filmography rows route to the real TV detail screen (toast retired
+                    // 2026-09-22).
+                    onTvClick = { navController.navigateToTvDetail(it) }
                 )
             }
             composable(
@@ -253,7 +253,10 @@ private fun MainNavHost() {
             ) {
                 GenreScreen(
                     onBack = { navController.popBackStack() },
-                    onMovieClick = { navController.navigateToDetail(it) }
+                    onMovieClick = { navController.navigateToDetail(it) },
+                    // Genre's TV tab routes to the real TV detail screen (toast retired
+                    // 2026-09-22).
+                    onTvClick = { navController.navigateToTvDetail(it) }
                 )
             }
         }
@@ -264,8 +267,9 @@ private fun NavHostController.navigateToDetail(movie: Movie) {
     navigate(Destination.MovieDetail.createRoute(movie.id))
 }
 
-/** Phase 2.6 Session 1 — routes a tapped TV item (still modeled as [Movie], see
- *  util/TvNavigation.kt) to the real TV detail screen instead of the "not available yet" toast. */
+/** Routes a tapped TV item (still modeled as [Movie] — its `id` is a TV id, not a movie id) to
+ *  the real TV detail screen. Used by Explore's Popular TV row, Search's TV results, Genre's TV
+ *  tab, and PersonScreen's TV filmography. */
 private fun NavHostController.navigateToTvDetail(movie: Movie) {
     navigate(Destination.TvDetail.createRoute(movie.id))
 }

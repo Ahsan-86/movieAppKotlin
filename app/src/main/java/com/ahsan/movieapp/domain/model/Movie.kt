@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.domain.model
 
+import java.util.Locale
+
 /** UI-facing movie model — screens only ever see this, never the network DTO or the Room entity. */
 data class Movie(
     val id: Int,
@@ -14,7 +16,7 @@ data class Movie(
     val isFavorite: Boolean = false
 ) {
     val releaseYear: String get() = releaseDate.take(4).ifBlank { "—" }
-    val ratingOutOfTen: String get() = String.format("%.1f", voteAverage)
+    val ratingOutOfTen: String get() = String.format(Locale.US, "%.1f", voteAverage)
 }
 
 enum class MovieCategory(val apiPath: String, val storageKey: String) {

@@ -19,12 +19,25 @@ class TvGenrePagingSource(
     private val genreId: Int
 ) : PagingSource<Int, Movie>() {
 
+    // Same defensive guard as SearchMoviesPagingSource/DiscoverPagingSource — TMDB's
+    // `/discover/tv` page boundaries aren't guaranteed disjoint when results tie on the sort key
+    // (popularity), so the same show can come back on more than one page. The genre grid keys
+    // every cell with itemKey{ it.id }, which requires every key in the whole list to be unique —
+    // a returning id crashes with `IllegalArgumentException: Key "<id>" was already used` once the
+    // user scrolls far enough for the repeat to load. One `seenTvIds` set per PagingSource instance
+    // (fresh instance per genre/refresh) drops any repeat on a later page. Paging 3's `load()`
+    // calls are always sequential for one PagingSource, so this plain mutable set needs no
+    // synchronization.
+    private val seenTvIds = mutableSetOf<Int>()
+
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Movie> {
         val page = params.key ?: 1
         return try {
             val response = api.discoverTvByGenres(genreId.toString(), page = page)
             LoadResult.Page(
-                data = response.results.map { it.toMovie() },
+                data = response.results
+                    .map { it.toMovie() }
+                    .filter { seenTvIds.add(it.id) },
                 // TMDB genre browsing is only ever fetched forward, page 1 onward.
                 prevKey = null,
                 nextKey = (page + 1).takeIf { page < response.totalPages }

@@ -23,9 +23,9 @@ sealed class Destination(val route: String) {
 
     /**
      * Phase 2.6 Session 1 — the TV detail screen. Its own route (not reusing [MovieDetail]) since
-     * TMDB TV ids and movie ids are separate namespaces sharing the same numeric range (see
-     * util/TvNavigation.kt) — a `tv/{tvId}` route makes that explicit rather than relying on
-     * callers to route correctly by convention.
+     * TMDB TV ids and movie ids are separate namespaces sharing the same numeric range — a
+     * `tv/{tvId}` route makes that explicit rather than relying on callers to route correctly by
+     * convention.
      */
     data object TvDetail : Destination("tv/{tvId}") {
         fun createRoute(tvId: Int) = "tv/$tvId"

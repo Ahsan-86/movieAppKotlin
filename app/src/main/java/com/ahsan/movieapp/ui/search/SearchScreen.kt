@@ -31,13 +31,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -80,6 +80,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import coil.compose.AsyncImage
+import java.util.Locale
 import com.ahsan.movieapp.data.repository.SearchViewMode
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
@@ -334,7 +335,7 @@ private fun ViewModeRow(selected: SearchViewMode, onSelected: (SearchViewMode) -
             .padding(top = 4.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.End
     ) {
-        ViewModeButton(icon = Icons.Filled.List, contentDescription = "List view", isSelected = selected == SearchViewMode.LIST) {
+        ViewModeButton(icon = Icons.AutoMirrored.Filled.List, contentDescription = "List view", isSelected = selected == SearchViewMode.LIST) {
             onSelected(SearchViewMode.LIST)
         }
         ViewModeButton(icon = Icons.Filled.GridView, contentDescription = "Grid view", isSelected = selected == SearchViewMode.GRID) {
@@ -594,7 +595,7 @@ private fun MinRatingSlider(minRating: Float?, onMinRatingChanged: (Float?) -> U
     val sliderValue = minRating ?: 0f
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = "Minimum rating: " + if (minRating == null) "Any" else String.format("%.1f", minRating),
+            text = "Minimum rating: " + if (minRating == null) "Any" else String.format(Locale.US, "%.1f", minRating),
             style = MaterialTheme.typography.bodyMedium
         )
         Slider(

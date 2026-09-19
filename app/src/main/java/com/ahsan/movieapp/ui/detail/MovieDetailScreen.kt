@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,7 +28,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
@@ -72,24 +70,27 @@ import com.ahsan.movieapp.domain.model.MovieDetails
 import com.ahsan.movieapp.domain.model.WatchProvider
 import com.ahsan.movieapp.domain.model.WatchProviderRegion
 import com.ahsan.movieapp.ui.components.CastMemberCard
+import com.ahsan.movieapp.ui.components.DetailHeroCaption
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.TrailerShareRow
+import com.ahsan.movieapp.ui.components.UrlAutoSizeText
 import com.ahsan.movieapp.ui.components.backgroundSwatch
 import com.ahsan.movieapp.ui.components.rememberBackdropPalette
 
 /**
- * Detail screen: backdrop, poster, key facts, genres, favorite toggle, then a Watch Trailer + Share
- * row (Phase 2.6 Session 2) inside that same title/meta/genre info column beside the poster —
- * repositioned there on Ahsan's 2026-09-12 post-ship feedback (originally a separate full-width row
- * below that column, mirroring [com.ahsan.movieapp.ui.tv.TvDetailScreen]'s identical move); then
- * overview, cast/crew (Phase 3 Round A), Information/Similar/Recommendations (added the same round
- * on Ahsan's post-build feedback), a collection teaser (Round B), and streaming availability
- * (Round C).
+ * Detail screen: a big full-width portrait poster hero (PersonHero-style, 2026-09-22) with the
+ * title/tagline/rating/year/runtime/genres overlaid on its bottom edge via the shared
+ * [DetailHeroCaption] — the backdrop is gone and the poster is the hero; then the Overview section
+ * directly below it with the Watch Trailer + Share row (Phase 2.6 Session 2) at the end of that
+ * section — repositioned on Ahsan's 2026-09-12 post-ship feedback (originally a separate full-width
+ * row below, mirroring [com.ahsan.movieapp.ui.tv.TvDetailScreen]'s identical move); then
+ * cast/crew (Phase 3 Round A), Information/Similar/Recommendations (added the same round on Ahsan's
+ * post-build feedback), a collection teaser (Round B), and streaming availability (Round C).
  *
- * Transparent top bar over the backdrop — the PersonScreen treatment: a pinned title + normal
- * back arrow floating over a short gradient scrim, with the backdrop bleeding edge-to-edge behind
+ * Transparent top bar over the hero — the PersonScreen treatment: a pinned title + normal
+ * back arrow floating over a short gradient scrim, with the hero bleeding edge-to-edge behind
  * it (contentWindowInsets zeroed, content padding discarded). Same dynamic-per-screen pattern as
  * PersonScreen/GenreScreen. The generic "Movie App" bar the root tabs share is hidden entirely here
  * (see MovieNavGraph's TOP_LEVEL_ROUTES check); everything below this bar scrolls as one column.
@@ -114,17 +115,19 @@ fun MovieDetailScreen(
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 
-    val backdropUrl = state.details?.let { it.backdropUrl ?: it.posterUrl }
-    val palette = rememberBackdropPalette(backdropUrl)
-    val backdropTone = palette?.backgroundSwatch?.rgb?.let { Color(it) }
-    // Bright backdrops get a stronger scrim behind the transparent bar so the white title/back
-    // stay legible; dark ones keep the lighter scrim. Defaults to a dark tone (0.2 luminance) so
-    // the scrim never disappears when there's no sampled color (loading/error states).
-    val scrimAlpha = (0.5f + 0.25f * (backdropTone?.luminance() ?: 0.2f)).coerceIn(0.5f, 0.9f)
-    // The screen background is the theme background tinted toward the backdrop's color, so the
+    // The hero is now the poster itself (2026-09-22, PersonHero-style), so the palette comes from
+    // the poster — the tinted background continues its colors, not the discarded backdrop's.
+    val posterUrl = state.details?.posterUrl
+    val palette = rememberBackdropPalette(posterUrl)
+    val posterTone = palette?.backgroundSwatch?.rgb?.let { Color(it) }
+    // Bright posters get a stronger scrim behind the transparent bar so the white title/back stay
+    // legible; dark ones keep the lighter scrim. Defaults to a dark tone (0.2 luminance) so the
+    // scrim never disappears when there's no sampled color (loading/error states).
+    val scrimAlpha = (0.5f + 0.25f * (posterTone?.luminance() ?: 0.2f)).coerceIn(0.5f, 0.9f)
+    // The screen background is the theme background tinted toward the poster's color, so the
     // sections below the hero continue the image's palette instead of a flat theme color. The
     // theme tint still rules — palette nudges it about a third of the way.
-    val background = backdropTone?.let { lerp(MaterialTheme.colorScheme.background, it, 0.35f) }
+    val background = posterTone?.let { lerp(MaterialTheme.colorScheme.background, it, 0.35f) }
         ?: MaterialTheme.colorScheme.background
 
     Scaffold(
@@ -165,7 +168,7 @@ fun MovieDetailScreen(
                 )
             }
         },
-        // Zero content insets — paired with the transparent bar above, this lets the backdrop
+        // Zero content insets — paired with the transparent bar above, this lets the hero poster
         // (and, in the loading/error states, the plain background) run all the way to the top of
         // the screen instead of stopping below a reserved app-bar-height gap. Same treatment as
         // PersonScreen.
@@ -191,69 +194,49 @@ fun MovieDetailScreen(
                 else -> {
                     val details = state.details!!
                     Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
-                        AsyncImage(
-                            model = details.backdropUrl ?: details.posterUrl,
-                            contentDescription = details.title,
-                            contentScale = ContentScale.Crop,
+                        // Big portrait poster hero (PersonHero-style, 2026-09-22): the 2:3 poster
+                        // fills a full-width 3:4 hero and carries the title/tagline/rating/year/
+                        // runtime/genres caption on its bottom edge (DetailHeroCaption) — no more
+                        // backdrop, no more small overlapping poster + side info column.
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(16f / 10f)
-                        )
-
-                        Row(modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().offsetUp()) {
+                                .aspectRatio(3f / 4f)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
                             AsyncImage(
                                 model = details.posterUrl,
-                                contentDescription = null,
+                                contentDescription = details.title,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .width(110.dp)
-                                    .aspectRatio(2f / 3f)
-                                    .clip(RoundedCornerShape(12.dp))
+                                modifier = Modifier.fillMaxSize()
                             )
-
-                            Column(modifier = Modifier.padding(start = 16.dp).weight(1f)) {
-                                Text(text = details.title, style = MaterialTheme.typography.headlineMedium)
-                                if (!details.tagline.isNullOrBlank()) {
-                                    Text(
-                                        text = "“${details.tagline}”",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.padding(top = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    MetaChip(icon = Icons.Filled.Star, text = details.ratingOutOfTen)
-                                    Text(text = details.releaseYear, style = MaterialTheme.typography.labelLarge)
-                                    details.runtimeFormatted?.let {
-                                        Text(text = it, style = MaterialTheme.typography.labelLarge)
-                                    }
-                                }
-                                if (details.genres.isNotEmpty()) {
-                                    Text(
-                                        text = details.genres.joinToString(" • "),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                                TrailerShareRow(
-                                    trailerKey = state.trailerKey,
-                                    shareTitle = details.title,
-                                    shareUrl = "https://www.themoviedb.org/movie/${details.id}",
-                                    onWatchTrailer = onWatchTrailer,
-                                    modifier = Modifier.padding(top = 8.dp)
-                                )
-                            }
+                            DetailHeroCaption(
+                                title = details.title,
+                                tagline = details.tagline,
+                                rating = details.ratingOutOfTen,
+                                metaLabels = buildList {
+                                    add(details.releaseYear)
+                                    details.runtimeFormatted?.let { add(it) }
+                                },
+                                genres = details.genres
+                            )
                         }
 
+                        // Overview sits directly below the hero poster, per 2026-09-22 feedback; the
+                        // Watch Trailer + Share row lives at the end of this section.
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(text = "Overview", style = MaterialTheme.typography.titleLarge)
                             Text(
                                 text = details.overview.ifBlank { "No description available." },
                                 style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.padding(top = 8.dp)
+                            )
+                            TrailerShareRow(
+                                trailerKey = state.trailerKey,
+                                shareTitle = details.title,
+                                shareUrl = "https://www.themoviedb.org/movie/${details.id}",
+                                onWatchTrailer = onWatchTrailer,
+                                modifier = Modifier.padding(top = 12.dp)
                             )
                         }
 
@@ -330,13 +313,15 @@ private fun InformationSection(details: MovieDetails) {
 
         if (website != null) {
             val uriHandler = LocalUriHandler.current
-            InfoRow(label = "Website", value = website, onClick = { uriHandler.openUri(website) })
+            // The Website value is the one row whose value can be a long unbroken URL — run it
+            // through UrlAutoSizeText so it shrinks to fit the row instead of clipping.
+            InfoRow(label = "Website", value = website, onClick = { uriHandler.openUri(website) }, autoShrink = true)
         }
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {
+private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null, autoShrink: Boolean = false) {
     Row(
         modifier = Modifier
             .padding(vertical = 4.dp)
@@ -349,14 +334,22 @@ private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null)
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(140.dp)
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = if (onClick != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
-            textDecoration = if (onClick != null) TextDecoration.Underline else null,
-            modifier = Modifier.weight(1f)
-        )
+        if (autoShrink) {
+            UrlAutoSizeText(
+                url = value,
+                color = if (onClick != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = if (onClick != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                textDecoration = if (onClick != null) TextDecoration.Underline else null,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
@@ -602,13 +595,3 @@ private fun CastCrewSection(
 }
 
 private const val CAST_ROW_LIMIT = 15
-
-@Composable
-private fun MetaChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(16.dp))
-        Text(text = text, style = MaterialTheme.typography.labelLarge)
-    }
-}
-
-private fun Modifier.offsetUp(): Modifier = this.offset(y = (-40).dp)

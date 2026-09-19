@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -27,7 +26,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,31 +63,36 @@ import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.Season
 import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.ui.components.CastMemberCard
+import com.ahsan.movieapp.ui.components.DetailHeroCaption
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.TrailerShareRow
+import com.ahsan.movieapp.ui.components.UrlAutoSizeText
 import com.ahsan.movieapp.ui.components.backgroundSwatch
 import com.ahsan.movieapp.ui.components.rememberBackdropPalette
 
 /**
- * Phase 2.6's TV detail screen: backdrop, poster, key facts, genres, then a Watch Trailer + Share
- * row (Session 2), all inside the same title/meta info column beside the poster — repositioned
- * there on Ahsan's 2026-09-12 post-ship feedback (originally a separate full-width row below that
- * column); then overview, Cast & Crew, a collapsible Seasons section (Session 2, collapsed by
- * default per the same feedback round), Information, Similar, and Recommendations sections
- * (Session 1, following the same layout pattern as [com.ahsan.movieapp.ui.detail.MovieDetailScreen]
- * — the last three added on Ahsan's post-build feedback, "where is information and similar and
- * recommendation sections?", after the initial narrower build shipped). Still deliberately excludes
- * what these rounds don't cover: no favorite toggle (needs Session 6's Favorites schema migration),
- * and no collection-teaser/streaming-availability sections (movie-specific — TV has no TMDB "collection"
+ * Phase 2.6's TV detail screen: a big full-width portrait poster hero (PersonHero-style,
+ * 2026-09-22) with the title/tagline/rating/year/seasons·episode runtime/genres overlaid on its
+ * bottom edge via the shared [DetailHeroCaption] — the backdrop is gone and the poster is the hero;
+ * then the Overview section directly below it with the Watch Trailer + Share row (Session 2) at the
+ * end of that section — repositioned on Ahsan's 2026-09-12 post-ship feedback (originally a
+ * separate full-width row below, mirroring [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s
+ * identical move); then Cast & Crew, a collapsible Seasons section (Session 2, collapsed by default
+ * per the same feedback round), Information, Similar, and Recommendations sections (Session 1,
+ * following the same layout pattern as [com.ahsan.movieapp.ui.detail.MovieDetailScreen] — the last
+ * three added on Ahsan's post-build feedback, "where is information and similar and recommendation
+ * sections?", after the initial narrower build shipped). Still deliberately excludes what these
+ * rounds don't cover: no favorite toggle (needs Session 6's Favorites schema migration), and no
+ * collection-teaser/streaming-availability sections (movie-specific — TV has no TMDB "collection"
  * concept and no round has extended Round C's watch-providers work to TV). The Cast & Crew heading
  * carries the same "view all" arrow as [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s, opening
  * the media-agnostic cast & crew list for this show's full cast + director.
  *
  * Same full-screen pattern as every other detail-type screen (Movie/Person/Genre): its own
  * Scaffold + transparent TopAppBar over a short gradient scrim (the PersonScreen treatment — the
- * backdrop bleeds edge-to-edge behind the bar, contentWindowInsets zeroed), with a real back
+ * hero poster bleeds edge-to-edge behind the bar, contentWindowInsets zeroed), with a real back
  * button, gated out of `MovieNavGraph`'s
  * `TOP_LEVEL_ROUTES` set, no bottom nav. [onTvClick] lets Similar/Recommendations posters push
  * another TV detail screen onto the back stack (TV -> Similar -> Similar chains the same way
@@ -119,17 +122,19 @@ fun TvDetailScreen(
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 
-    val backdropUrl = state.details?.let { it.backdropUrl ?: it.posterUrl }
-    val palette = rememberBackdropPalette(backdropUrl)
-    val backdropTone = palette?.backgroundSwatch?.rgb?.let { Color(it) }
-    // Bright backdrops get a stronger scrim behind the transparent bar so the white title/back
-    // stay legible; dark ones keep the lighter scrim. Defaults to a dark tone (0.2 luminance) so
-    // the scrim never disappears when there's no sampled color (loading/error states).
-    val scrimAlpha = (0.5f + 0.25f * (backdropTone?.luminance() ?: 0.2f)).coerceIn(0.5f, 0.9f)
-    // The screen background is the theme background tinted toward the backdrop's color, so the
+    // The hero is now the poster itself (2026-09-22, PersonHero-style), so the palette comes from
+    // the poster — the tinted background continues its colors, not the discarded backdrop's.
+    val posterUrl = state.details?.posterUrl
+    val palette = rememberBackdropPalette(posterUrl)
+    val posterTone = palette?.backgroundSwatch?.rgb?.let { Color(it) }
+    // Bright posters get a stronger scrim behind the transparent bar so the white title/back stay
+    // legible; dark ones keep the lighter scrim. Defaults to a dark tone (0.2 luminance) so the
+    // scrim never disappears when there's no sampled color (loading/error states).
+    val scrimAlpha = (0.5f + 0.25f * (posterTone?.luminance() ?: 0.2f)).coerceIn(0.5f, 0.9f)
+    // The screen background is the theme background tinted toward the poster's color, so the
     // sections below the hero continue the image's palette instead of a flat theme color. The
     // theme tint still rules — palette nudges it about a third of the way.
-    val background = backdropTone?.let { lerp(MaterialTheme.colorScheme.background, it, 0.35f) }
+    val background = posterTone?.let { lerp(MaterialTheme.colorScheme.background, it, 0.35f) }
         ?: MaterialTheme.colorScheme.background
 
     Scaffold(
@@ -170,7 +175,7 @@ fun TvDetailScreen(
                 )
             }
         },
-        // Zero content insets — paired with the transparent bar above, this lets the backdrop
+        // Zero content insets — paired with the transparent bar above, this lets the hero poster
         // (and, in the loading/error states, the plain background) run all the way to the top of
         // the screen instead of stopping below a reserved app-bar-height gap. Same treatment as
         // PersonScreen.
@@ -183,72 +188,50 @@ fun TvDetailScreen(
                 else -> {
                     val details = state.details!!
                     Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
-                        AsyncImage(
-                            model = details.backdropUrl ?: details.posterUrl,
-                            contentDescription = details.name,
-                            contentScale = ContentScale.Crop,
+                        // Big portrait poster hero (PersonHero-style, 2026-09-22): the 2:3 poster
+                        // fills a full-width 3:4 hero and carries the title/tagline/rating/year/
+                        // seasons·episode-runtime/genres caption on its bottom edge (DetailHeroCaption)
+                        // — no more backdrop, no more small overlapping poster + side info column.
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(16f / 10f)
-                        )
-
-                        Row(modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().offsetUp()) {
+                                .aspectRatio(3f / 4f)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
                             AsyncImage(
                                 model = details.posterUrl,
-                                contentDescription = null,
+                                contentDescription = details.name,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .width(110.dp)
-                                    .aspectRatio(2f / 3f)
-                                    .clip(RoundedCornerShape(12.dp))
+                                modifier = Modifier.fillMaxSize()
                             )
-
-                            Column(modifier = Modifier.padding(start = 16.dp).weight(1f)) {
-                                Text(text = details.name, style = MaterialTheme.typography.headlineMedium)
-                                if (!details.tagline.isNullOrBlank()) {
-                                    Text(
-                                        text = "“${details.tagline}”",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.padding(top = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    TvMetaChip(icon = Icons.Filled.Star, text = details.ratingOutOfTen)
-                                    Text(text = details.releaseYear, style = MaterialTheme.typography.labelLarge)
-                                    details.seasonsFormatted?.let {
-                                        Text(text = it, style = MaterialTheme.typography.labelLarge)
-                                    }
-                                    details.episodeRuntimeFormatted?.let {
-                                        Text(text = it, style = MaterialTheme.typography.labelLarge)
-                                    }
-                                }
-                                if (details.genres.isNotEmpty()) {
-                                    Text(
-                                        text = details.genres.joinToString(" • "),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                                TrailerShareRow(
-                                    trailerKey = state.trailerKey,
-                                    shareTitle = details.name,
-                                    shareUrl = "https://www.themoviedb.org/tv/${details.id}",
-                                    onWatchTrailer = onWatchTrailer,
-                                    modifier = Modifier.padding(top = 8.dp)
-                                )
-                            }
+                            DetailHeroCaption(
+                                title = details.name,
+                                tagline = details.tagline,
+                                rating = details.ratingOutOfTen,
+                                metaLabels = buildList {
+                                    add(details.releaseYear)
+                                    details.seasonsFormatted?.let { add(it) }
+                                    details.episodeRuntimeFormatted?.let { add(it) }
+                                },
+                                genres = details.genres
+                            )
                         }
 
+                        // Overview sits directly below the hero poster, per 2026-09-22 feedback; the
+                        // Watch Trailer + Share row lives at the end of this section.
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(text = "Overview", style = MaterialTheme.typography.titleLarge)
                             Text(
                                 text = details.overview.ifBlank { "No description available." },
                                 style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.padding(top = 8.dp)
+                            )
+                            TrailerShareRow(
+                                trailerKey = state.trailerKey,
+                                shareTitle = details.name,
+                                shareUrl = "https://www.themoviedb.org/tv/${details.id}",
+                                onWatchTrailer = onWatchTrailer,
+                                modifier = Modifier.padding(top = 12.dp)
                             )
                         }
 
@@ -324,14 +307,6 @@ private fun TvCastCrewSection(
 }
 
 private const val TV_CAST_ROW_LIMIT = 15
-
-@Composable
-private fun TvMetaChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(16.dp))
-        Text(text = text, style = MaterialTheme.typography.labelLarge)
-    }
-}
 
 /**
  * Phase 2.6 Session 2 — every season of the show, each with its poster image, name, air year,
@@ -485,13 +460,15 @@ private fun TvInformationSection(details: TvShowDetails) {
 
         if (website != null) {
             val uriHandler = LocalUriHandler.current
-            TvInfoRow(label = "Website", value = website, onClick = { uriHandler.openUri(website) })
+            // The Website value is the one row whose value can be a long unbroken URL — run it
+            // through UrlAutoSizeText so it shrinks to fit the row instead of clipping.
+            TvInfoRow(label = "Website", value = website, onClick = { uriHandler.openUri(website) }, autoShrink = true)
         }
     }
 }
 
 @Composable
-private fun TvInfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {
+private fun TvInfoRow(label: String, value: String, onClick: (() -> Unit)? = null, autoShrink: Boolean = false) {
     Row(
         modifier = Modifier
             .padding(vertical = 4.dp)
@@ -504,21 +481,29 @@ private fun TvInfoRow(label: String, value: String, onClick: (() -> Unit)? = nul
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(140.dp)
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = if (onClick != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
-            textDecoration = if (onClick != null) TextDecoration.Underline else null,
-            modifier = Modifier.weight(1f)
-        )
+        if (autoShrink) {
+            UrlAutoSizeText(
+                url = value,
+                color = if (onClick != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = if (onClick != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                textDecoration = if (onClick != null) TextDecoration.Underline else null,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
 /**
  * Shared layout for the Similar and Recommendations sections — same shape as
  * [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s `PosterRowSection`, reusing [MoviePosterCard]
- * (TV shows are modeled as [Movie] throughout this app — see util/TvNavigation.kt). The two
+ * (TV shows are modeled as [Movie] throughout this app — their id is a TV id, not a movie id). The two
  * sections are deliberately separate lists/API calls (see
  * [com.ahsan.movieapp.data.repository.MovieRepository.getSimilarTvShows] vs
  * [com.ahsan.movieapp.data.repository.MovieRepository.getRecommendedTvShows]) and are not deduped
@@ -543,5 +528,3 @@ private fun TvPosterRowSection(title: String, shows: List<Movie>, onTvClick: (Mo
         }
     }
 }
-
-private fun Modifier.offsetUp(): Modifier = this.offset(y = (-40).dp)

@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.domain.model
 
+import java.util.Locale
+
 /**
  * TV counterpart of [MovieDetails] — Phase 2.6's TV detail screen (info section, Cast & Crew, and
  * an Information section added on Ahsan's post-build feedback, Session 1; a Seasons section,
@@ -41,7 +43,7 @@ data class TvShowDetails(
     val seasons: List<Season> = emptyList()
 ) {
     val releaseYear: String get() = firstAirDate.take(4).ifBlank { "—" }
-    val ratingOutOfTen: String get() = String.format("%.1f", voteAverage)
+    val ratingOutOfTen: String get() = String.format(Locale.US, "%.1f", voteAverage)
 
     val seasonsFormatted: String?
         get() = numberOfSeasons?.takeIf { it > 0 }?.let { "$it Season${if (it != 1) "s" else ""}" }

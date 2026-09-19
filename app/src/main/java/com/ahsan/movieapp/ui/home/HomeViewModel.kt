@@ -31,8 +31,7 @@ data class HomeSection(
     val allowFavoriting: Boolean = true,
     // True only for the "Popular TV Shows" row — its items reuse the Movie model (see
     // data/mapper/MovieMappers.kt's TvShowDto.toMovie()) but their id is a TV id, not a movie id,
-    // so HomeScreen needs to know not to route a tap through the normal onMovieClick. See
-    // util/TvNavigation.kt for the full explanation.
+    // so HomeScreen needs to know not to route a tap through the normal onMovieClick.
     val isTv: Boolean = false
 )
 

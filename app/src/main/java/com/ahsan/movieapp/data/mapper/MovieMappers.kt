@@ -18,6 +18,7 @@ import com.ahsan.movieapp.data.remote.dto.PersonDto
 import com.ahsan.movieapp.data.remote.dto.ProductionCompanyDto
 import com.ahsan.movieapp.data.remote.dto.SeasonDetailsDto
 import com.ahsan.movieapp.data.remote.dto.SeasonDto
+import com.ahsan.movieapp.data.remote.dto.TvAggregateCrewMemberDto
 import com.ahsan.movieapp.data.remote.dto.TvDetailsDto
 import com.ahsan.movieapp.data.remote.dto.TvShowDto
 import com.ahsan.movieapp.data.remote.dto.VideosResponseDto
@@ -202,6 +203,19 @@ fun CrewMemberDto.toPerson(): Person = Person(
 )
 
 /**
+ * An aggregate TV director credit surfaced as a [Person] — the fallback source when the plain
+ * `/tv/{id}/credits` crew has no "Director" (see MovieRepositoryImpl.getTvCredits). Aggregate
+ * crew members carry a `jobs` list (per-episode roles) instead of a single `job`, so the known
+ * role comes from the matching job entry.
+ */
+fun TvAggregateCrewMemberDto.toPerson(): Person = Person(
+    id = id,
+    name = name,
+    profileUrl = Constants.profileUrl(profilePath),
+    knownFor = jobs.firstOrNull { it.job == "Director" }?.job
+)
+
+/**
  * `/collection/{id}` -> the Detail screen's full "franchise" list (Phase 3 Round B). `parts`
  * decodes straight into the existing [MovieDto], mapped here directly to [Movie] (bypassing Room,
  * same convention as [TvShowDto.toMovie] and [CombinedCreditDto.toMovie]) since this path is
@@ -266,11 +280,30 @@ fun MultiSearchResultDto.toMovieDto(): MovieDto = MovieDto(
     overview = overview,
     posterPath = posterPath,
     backdropPath = backdropPath,
-    releaseDate = releaseDate,
+    // Movies carry `release_date` (TV rows carry `first_air_date`) — fall through so a movie row
+    // stays identical to before even if TMDB ever puts a first_air_date on one.
+    releaseDate = releaseDate ?: firstAirDate,
     voteAverage = voteAverage,
     voteCount = voteCount,
     genreIds = genreIds,
     mediaType = mediaType
+)
+
+/**
+ * Bridges a `/search/multi` row (media_type == "tv") back into the [TvShowDto] pipeline, the
+ * same shape `/discover/tv` rows already flow through ([TvShowDto.toMovie]) — the search TV row
+ * and the genre-browse TV row map to the exact same [Movie] afterwards.
+ */
+fun MultiSearchResultDto.toTvShowDto(): TvShowDto = TvShowDto(
+    id = id,
+    name = name ?: title.orEmpty(),
+    overview = overview,
+    posterPath = posterPath,
+    backdropPath = backdropPath,
+    firstAirDate = firstAirDate,
+    voteAverage = voteAverage,
+    voteCount = voteCount,
+    genreIds = genreIds
 )
 
 /** Bridges a `/search/multi` row (media_type == "person") back into the existing PersonDto pipeline. */

@@ -105,10 +105,21 @@ interface MovieRepository {
      * The people half of a `/search/multi` query — one-shot, capped, and NOT paginated (unlike
      * [getPagedSearchMovies]): only the first handful of people a query returns are ever shown, so
      * there's nothing worth infinite-scrolling here, same reasoning that keeps Cast & Crew and
-     * Similar/Recommendations out of Phase 4's scope entirely. TV results are dropped, same as the
-     * movies half.
+     * Similar/Recommendations out of Phase 4's scope entirely. TV results are surfaced separately
+     * by [searchTvShows], not dropped.
      */
     suspend fun searchPeople(query: String): Result<List<Person>>
+
+    /**
+     * The TV half of a `/search/multi` query, rendered as the search screen's "TV Shows" row
+     * (grouped separately from the movie grid the way people already are). Same convention as
+     * [searchPeople]: one-shot, capped, NOT paginated — and network-only with no Room upsert,
+     * since this app doesn't persist TV data (a TV id in the movie-only `movies` table would
+     * collide with a movie that happens to share the same numeric id). Results come back as
+     * [Movie] via the same [com.ahsan.movieapp.data.mapper.toMovie] bridge every other TV listing
+     * uses, so they render through the shared poster-card components with `isFavorite = false`.
+     */
+    suspend fun searchTvShows(query: String): Result<List<Movie>>
 
     /** Bio, photo, and primary role for the person screen's header. */
     suspend fun getPersonDetails(personId: Int): Result<PersonDetails>
@@ -171,7 +182,9 @@ interface MovieRepository {
     /**
      * TV counterpart of [getMovieCredits] — cast + director (crew job == "Director"), same
      * one-shot, network-only, no-Room-cache convention. Reuses [MovieCredits] as the return shape
-     * since TMDB's `/tv/{id}/credits` has the identical cast/crew fields as the movie side.
+     * since TMDB's `/tv/{id}/credits` has the identical cast/crew fields as the movie side. When
+     * that crew list has no Director (common for series), the impl falls back to
+     * `/tv/{id}/aggregate_credits` to find one.
      */
     suspend fun getTvCredits(tvId: Int): Result<MovieCredits>
 

@@ -119,6 +119,8 @@ dependencies {
 
     // Images
     implementation(libs.coil.compose)
+    // Palette — dominant-color extraction for the detail screens' image-aware background/scrim.
+    implementation(libs.androidx.palette.ktx)
 
     // DataStore (session / prefs)
     implementation(libs.androidx.datastore.preferences)

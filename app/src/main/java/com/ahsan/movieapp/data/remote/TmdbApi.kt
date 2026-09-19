@@ -10,6 +10,7 @@ import com.ahsan.movieapp.data.remote.dto.MultiSearchResultDto
 import com.ahsan.movieapp.data.remote.dto.PagedResponseDto
 import com.ahsan.movieapp.data.remote.dto.PersonDetailsDto
 import com.ahsan.movieapp.data.remote.dto.SeasonDetailsDto
+import com.ahsan.movieapp.data.remote.dto.TvAggregateCreditsDto
 import com.ahsan.movieapp.data.remote.dto.TvDetailsDto
 import com.ahsan.movieapp.data.remote.dto.TvShowDto
 import com.ahsan.movieapp.data.remote.dto.VideosResponseDto
@@ -116,7 +117,8 @@ interface TmdbApi {
     /**
      * Single call covering movies, TV, and people — replaces the old separate
      * `/search/movie` + `/search/person` calls so one settled query is one network request,
-     * not two in parallel. The repository filters by `media_type` and drops TV results.
+     * not two in parallel. The repository splits the results by `media_type`: movies feed the
+     * paginated search grid, TV shows a capped "TV Shows" row, people a capped row of their own.
      */
     @GET("3/search/multi")
     suspend fun searchMulti(@Query("query") query: String, @Query("page") page: Int = 1): PagedResponseDto<MultiSearchResultDto>
@@ -147,6 +149,14 @@ interface TmdbApi {
      */
     @GET("3/tv/{id}/credits")
     suspend fun getTvCredits(@Path("id") tvId: Int): CreditsDto
+
+    /**
+     * The whole-show rollup of [getTvCredits], across every episode. `/tv/{id}/credits`' `crew`
+     * is often empty for series, so the director is read from this aggregate view instead (see
+     * MovieRepositoryImpl.getTvCredits' fallback).
+     */
+    @GET("3/tv/{id}/aggregate_credits")
+    suspend fun getTvAggregateCredits(@Path("id") tvId: Int): TvAggregateCreditsDto
 
     /**
      * TV counterpart of [getSimilarMovies] — backs the TV detail screen's Similar section, added

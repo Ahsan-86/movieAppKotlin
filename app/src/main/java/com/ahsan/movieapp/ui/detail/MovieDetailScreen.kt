@@ -1,5 +1,8 @@
 package com.ahsan.movieapp.ui.detail
 
+import android.annotation.SuppressLint
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,7 +29,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AssistChip
@@ -40,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,8 +52,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -64,10 +71,13 @@ import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.MovieDetails
 import com.ahsan.movieapp.domain.model.WatchProvider
 import com.ahsan.movieapp.domain.model.WatchProviderRegion
+import com.ahsan.movieapp.ui.components.CastMemberCard
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.TrailerShareRow
+import com.ahsan.movieapp.ui.components.backgroundSwatch
+import com.ahsan.movieapp.ui.components.rememberBackdropPalette
 
 /**
  * Detail screen: backdrop, poster, key facts, genres, favorite toggle, then a Watch Trailer + Share
@@ -78,12 +88,19 @@ import com.ahsan.movieapp.ui.components.TrailerShareRow
  * on Ahsan's post-build feedback), a collection teaser (Round B), and streaming availability
  * (Round C).
  *
- * Real, pinned top bar (title = the movie's name, a normal back arrow) rather than a back button
- * floating over the backdrop — same dynamic-per-screen pattern as PersonScreen/GenreScreen. The
- * generic "Movie App" bar the root tabs share is hidden entirely here (see MovieNavGraph's
- * TOP_LEVEL_ROUTES check); everything below this bar scrolls as one column.
+ * Transparent top bar over the backdrop — the PersonScreen treatment: a pinned title + normal
+ * back arrow floating over a short gradient scrim, with the backdrop bleeding edge-to-edge behind
+ * it (contentWindowInsets zeroed, content padding discarded). Same dynamic-per-screen pattern as
+ * PersonScreen/GenreScreen. The generic "Movie App" bar the root tabs share is hidden entirely here
+ * (see MovieNavGraph's TOP_LEVEL_ROUTES check); everything below this bar scrolls as one column.
  */
 @OptIn(ExperimentalMaterial3Api::class)
+// contentWindowInsets is deliberately (0,0,0,0) below (see the comment on that param) and the
+// Scaffold's content padding is deliberately discarded as `_`. With a topBar present, Material3's
+// Scaffold sets its top value to the topBar's measured height, so applying it would push the
+// backdrop down past the transparent bar instead of behind it. The lint check can't tell
+// "deliberately unused" from "forgot to apply it", hence the suppress.
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun MovieDetailScreen(
     onBack: () -> Unit,
@@ -95,18 +112,64 @@ fun MovieDetailScreen(
     viewModel: MovieDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
+
+    val backdropUrl = state.details?.let { it.backdropUrl ?: it.posterUrl }
+    val palette = rememberBackdropPalette(backdropUrl)
+    val backdropTone = palette?.backgroundSwatch?.rgb?.let { Color(it) }
+    // Bright backdrops get a stronger scrim behind the transparent bar so the white title/back
+    // stay legible; dark ones keep the lighter scrim. Defaults to a dark tone (0.2 luminance) so
+    // the scrim never disappears when there's no sampled color (loading/error states).
+    val scrimAlpha = (0.5f + 0.25f * (backdropTone?.luminance() ?: 0.2f)).coerceIn(0.5f, 0.9f)
+    // The screen background is the theme background tinted toward the backdrop's color, so the
+    // sections below the hero continue the image's palette instead of a flat theme color. The
+    // theme tint still rules — palette nudges it about a third of the way.
+    val background = backdropTone?.let { lerp(MaterialTheme.colorScheme.background, it, 0.35f) }
+        ?: MaterialTheme.colorScheme.background
 
     Scaffold(
+        containerColor = background,
         topBar = {
-            TopAppBar(
-                title = { Text(state.details?.title.orEmpty()) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+            // 100dp of scroll is safely past the hero; ScrollState.value is snapshot-backed, so
+            // reading it here recomposes only this lambda as the page scrolls. Loading/error have
+            // no hero behind the bar, so they default to the opaque titled bar.
+            val barOpaque = scrollState.value > with(LocalDensity.current) { 100.dp.toPx() } ||
+                state.isLoading || state.details == null
+            val barColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.surface else Color.Transparent)
+            val barContentColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.onSurface else Color.White)
+            Box {
+                AnimatedVisibility(visible = !barOpaque) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Black.copy(alpha = scrimAlpha), Color.Transparent)
+                                )
+                            )
+                    )
                 }
-            )
+                TopAppBar(
+                    title = {
+                        AnimatedVisibility(visible = barOpaque) {
+                            Text(state.details?.title.orEmpty(), color = barContentColor)
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = barContentColor)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = barColor)
+                )
+            }
         },
+        // Zero content insets — paired with the transparent bar above, this lets the backdrop
+        // (and, in the loading/error states, the plain background) run all the way to the top of
+        // the screen instead of stopping below a reserved app-bar-height gap. Same treatment as
+        // PersonScreen.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             state.details?.let { details ->
                 FloatingActionButton(
@@ -120,14 +183,14 @@ fun MovieDetailScreen(
                 }
             }
         }
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+    ) { _ ->
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
                 state.isLoading -> FullScreenLoading()
                 state.details == null -> FullScreenError(message = state.errorMessage ?: "Couldn't load this movie")
                 else -> {
                     val details = state.details!!
-                    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
                         AsyncImage(
                             model = details.backdropUrl ?: details.posterUrl,
                             contentDescription = details.title,
@@ -194,10 +257,9 @@ fun MovieDetailScreen(
                             )
                         }
 
-                        if (state.cast.isNotEmpty() || state.director != null) {
+                        if (state.cast.isNotEmpty()) {
                             CastCrewSection(
                                 cast = state.cast,
-                                director = state.director,
                                 onPersonClick = onPersonClick,
                                 onViewAll = { onViewAllCastCrew(details.id) }
                             )
@@ -504,13 +566,13 @@ private fun PosterRowSection(title: String, movies: List<Movie>, onMovieClick: (
 /**
  * Phase 3 Round A's cast/crew section — sits directly below the Overview. A "view all" arrow next
  * to the heading opens [com.ahsan.movieapp.ui.detail.CastCrewListScreen] with the full cast (this
- * row only shows the first [CAST_ROW_LIMIT]) plus the director. Cast + director only, per the
- * confirmed Phase 3 scope — no other crew roles.
+ * row only shows the first [CAST_ROW_LIMIT]). Cast only on the detail itself — the director is
+ * deliberately not duplicated here since the cast & crew list (where the director is shown) is one
+ * arrow-tap away.
  */
 @Composable
 private fun CastCrewSection(
     cast: List<CastMember>,
-    director: com.ahsan.movieapp.domain.model.Person?,
     onPersonClick: (personId: Int, personName: String) -> Unit,
     onViewAll: () -> Unit
 ) {
@@ -525,24 +587,6 @@ private fun CastCrewSection(
             }
         }
 
-        if (director != null) {
-            Row(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .clickable { onPersonClick(director.id, director.name) },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = "Director",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(text = director.name, style = MaterialTheme.typography.bodyLarge)
-            }
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(12.dp))
-        }
-
         if (cast.isNotEmpty()) {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -550,7 +594,7 @@ private fun CastCrewSection(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 items(cast.take(CAST_ROW_LIMIT), key = { it.id }) { member ->
-                    CastMemberChip(member = member, onClick = { onPersonClick(member.id, member.name) })
+                    CastMemberCard(member = member, onClick = { onPersonClick(member.id, member.name) })
                 }
             }
         }
@@ -558,63 +602,6 @@ private fun CastCrewSection(
 }
 
 private const val CAST_ROW_LIMIT = 15
-
-/**
- * Shows the actor's real name AND the character they played, same "who / as whom" pairing
- * [com.ahsan.movieapp.ui.detail.CastCrewListScreen]'s `PersonRow` already shows for the "view all"
- * list — the name is the primary (larger, bolder) line, with the character underneath in a
- * smaller, dimmer style, matching how a secondary/subtitle line reads elsewhere in the app (e.g.
- * PersonScreen's role label under the person's name).
- */
-@Composable
-private fun CastMemberChip(member: CastMember, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier.width(84.dp).clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            if (member.profileUrl != null) {
-                AsyncImage(
-                    model = member.profileUrl,
-                    contentDescription = member.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Filled.Person,
-                    contentDescription = member.name,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxSize().padding(16.dp)
-                )
-            }
-        }
-        Text(
-            text = member.name,
-            style = MaterialTheme.typography.labelMedium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp)
-        )
-        if (member.character.isNotBlank()) {
-            Text(
-                text = member.character,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-    }
-}
 
 @Composable
 private fun MetaChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {

@@ -135,6 +135,8 @@ private fun MainNavHost() {
                 SearchScreen(
                     onMovieClick = { navController.navigateToDetail(it) },
                     onPersonClick = { navController.navigateToPerson(it) },
+                    // TV search results ("TV Shows" row) route to the real TV detail screen.
+                    onTvClick = { navController.navigateToTvDetail(it) },
                     onGenreClick = { navController.navigateToGenre(it) },
                     scrollToTopEvents = scrollToTopEvents
                 )
@@ -176,6 +178,9 @@ private fun MainNavHost() {
                     onSeasonClick = { tvId, seasonNumber, seasonName ->
                         navController.navigate(Destination.SeasonEpisodes.createRoute(tvId, seasonNumber, seasonName))
                     },
+                    // Same arrow next to "Cast & Crew" as MovieDetailScreen — the full list plus
+                    // director, fetched by tvId on the media-agnostic CastCrewListScreen.
+                    onViewAllCastCrew = { tvId -> navController.navigate(Destination.TvCastCrewList.createRoute(tvId)) },
                     onWatchTrailer = { videoId -> navController.navigateToTrailer(videoId) }
                 )
             }
@@ -199,6 +204,15 @@ private fun MainNavHost() {
             composable(
                 route = Destination.CastCrewList.route,
                 arguments = listOf(androidx.navigation.navArgument("movieId") { type = androidx.navigation.NavType.IntType })
+            ) {
+                CastCrewListScreen(
+                    onBack = { navController.popBackStack() },
+                    onPersonClick = { personId, personName -> navController.navigateToPerson(personId, personName) }
+                )
+            }
+            composable(
+                route = Destination.TvCastCrewList.route,
+                arguments = listOf(androidx.navigation.navArgument("tvId") { type = androidx.navigation.NavType.IntType })
             ) {
                 CastCrewListScreen(
                     onBack = { navController.popBackStack() },

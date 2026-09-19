@@ -19,6 +19,7 @@ import com.ahsan.movieapp.data.mapper.toMovie
 import com.ahsan.movieapp.data.mapper.toMovieEntity
 import com.ahsan.movieapp.data.mapper.toPersonDto
 import com.ahsan.movieapp.data.mapper.toPerson
+import com.ahsan.movieapp.data.mapper.toTvShowDto
 import com.ahsan.movieapp.data.paging.CategoryRemoteMediator
 import com.ahsan.movieapp.data.paging.DiscoverPagingSource
 import com.ahsan.movieapp.data.paging.SearchMoviesPagingSource
@@ -120,6 +121,19 @@ class MovieRepositoryImpl @Inject constructor(
             .filter { it.mediaType == "person" }
             .take(MAX_PEOPLE_RESULTS)
             .map { it.toPersonDto().toDomain() }
+    }
+
+    /**
+     * The TV half of a search query — the "TV Shows" row, same one-shot/capped/net-only shape as
+     * [searchPeople]. Deliberately NOT upserted into the shared `movies` table (a TV id there
+     * could clobber a same-numbered movie, and this app doesn't persist TV data at all — see
+     * [getPopularTv]'s doc), so TV search rows always come back `isFavorite = false`.
+     */
+    override suspend fun searchTvShows(query: String): Result<List<Movie>> = runCatching {
+        api.searchMulti(query).results
+            .filter { it.mediaType == "tv" }
+            .take(MAX_TV_SEARCH_RESULTS)
+            .map { it.toTvShowDto().toMovie() }
     }
 
     /**
@@ -362,12 +376,20 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * TV counterpart of [getMovieCredits] — same "read the crew list already returned by the
-     * credits call to find the director" approach, no second network request.
+     * credits call to find the director" approach, no second network request. With one caveat:
+     * `/tv/{id}/credits`' `crew` is often empty for series, so when it has no "Director" entry we
+     * fall back to `/tv/{id}/aggregate_credits` (the whole-show rollup, which carries per-episode
+     * directors) to match the movie path's "always show the director" behavior.
      */
     override suspend fun getTvCredits(tvId: Int): Result<MovieCredits> = runCatching {
         val dto = api.getTvCredits(tvId)
         val cast = dto.cast.sortedBy { it.order }.map { it.toDomain() }
-        val director = dto.crew.firstOrNull { it.job == "Director" }?.toPerson()
+        val director = dto.crew.firstOrNull { it.job == "Director" }
+            ?.toPerson()
+            ?: runCatching { api.getTvAggregateCredits(tvId) }.getOrNull()
+                ?.crew
+                ?.firstOrNull { member -> member.jobs.any { it.job == "Director" } }
+                ?.toPerson()
         MovieCredits(cast = cast, director = director)
     }
 
@@ -464,6 +486,9 @@ class MovieRepositoryImpl @Inject constructor(
     companion object {
         private const val STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000L // 2 hours
         private const val MAX_PEOPLE_RESULTS = 10
+        // The "TV Shows" search row is a bounded horizontal rail, so keep it a single-page cap of
+        // poster-sized cards rather than an infinite scroll — same trade-off as [MAX_PEOPLE_RESULTS].
+        private const val MAX_TV_SEARCH_RESULTS = 20
         // Matches TMDB's own fixed page size, so one Paging 3 "page" load is exactly one TMDB
         // request — no partial-page bookkeeping needed.
         private const val PAGE_SIZE = 20

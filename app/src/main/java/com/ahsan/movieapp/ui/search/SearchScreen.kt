@@ -98,6 +98,9 @@ import java.util.Calendar
 fun SearchScreen(
     onMovieClick: (Movie) -> Unit,
     onPersonClick: (Person) -> Unit,
+    // TV search results ("TV Shows" row) route to the real TV detail screen, same as Explore's
+    // Popular TV Shows row — the item is still modeled as [Movie] (its `id` is a TV id).
+    onTvClick: (Movie) -> Unit,
     onGenreClick: (GenreChip) -> Unit,
     // Fires when the user re-taps the Search icon while already on this screen — same "scroll
     // back to top" behavior as re-tapping an already-selected bottom nav tab. Null outside the
@@ -132,8 +135,8 @@ fun SearchScreen(
                     if (state.viewMode == SearchViewMode.LIST) resultsListState.animateScrollToItem(0)
                     else resultsGridState.animateScrollToItem(0)
                 }
-                pagedSearchMovies.itemCount == 0 && state.people.isEmpty() &&
-                    pagedSearchMovies.loadState.refresh !is LoadState.Loading && !state.isSearchingPeople -> {
+                pagedSearchMovies.itemCount == 0 && state.people.isEmpty() && state.tvShows.isEmpty() &&
+                    pagedSearchMovies.loadState.refresh !is LoadState.Loading && !state.isSearchingPeople && !state.isSearchingTv -> {
                     // EmptyState — a centered message, nothing scrollable to reset.
                 }
                 state.viewMode == SearchViewMode.LIST -> resultsListState.animateScrollToItem(0)
@@ -153,9 +156,10 @@ fun SearchScreen(
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
                 // The movie grid has its own loadState-driven loading UI (FullScreenLoading /
-                // PagingAppendFooter); this spinner just reflects the one-shot people fetch, the
-                // last "single Result call per debounced query" left on this screen.
-                if (state.isSearchingPeople) {
+                // PagingAppendFooter); this spinner just reflects the two one-shot fetches (people
+                // + TV Shows rows), the last "single Result call per debounced query"s left on
+                // this screen.
+                if (state.isSearchingPeople || state.isSearchingTv) {
                     CircularProgressIndicator(modifier = Modifier
                         .padding(8.dp)
                         .size(20.dp), strokeWidth = 2.dp)
@@ -189,7 +193,9 @@ fun SearchScreen(
                             SearchViewMode.LIST -> SearchResultsList(
                                 movies = pagedFilteredMovies,
                                 people = emptyList(),
+                                tvShows = emptyList(),
                                 onMovieClick = onMovieClick,
+                                onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 listState = resultsListState
@@ -197,9 +203,11 @@ fun SearchScreen(
                             else -> SearchResultsGrid(
                                 movies = pagedFilteredMovies,
                                 people = emptyList(),
+                                tvShows = emptyList(),
                                 columns = if (state.viewMode == SearchViewMode.GRID_DENSE) GridCells.Fixed(4) else GridCells.Adaptive(minSize = 128.dp),
                                 posterWidth = null,
                                 onMovieClick = onMovieClick,
+                                onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 gridState = resultsGridState
@@ -226,16 +234,16 @@ fun SearchScreen(
             )
             else -> {
                 val moviesRefresh = pagedSearchMovies.loadState.refresh
-                val nothingLoadedYet = pagedSearchMovies.itemCount == 0 && state.people.isEmpty()
+                val nothingLoadedYet = pagedSearchMovies.itemCount == 0 && state.people.isEmpty() && state.tvShows.isEmpty()
                 when {
-                    nothingLoadedYet && (moviesRefresh is LoadState.Loading || state.isSearchingPeople) -> FullScreenLoading()
+                    nothingLoadedYet && (moviesRefresh is LoadState.Loading || state.isSearchingPeople || state.isSearchingTv) -> FullScreenLoading()
                     nothingLoadedYet && moviesRefresh is LoadState.Error -> FullScreenError(
                         message = moviesRefresh.error.message ?: "Search failed",
                         onRetry = { pagedSearchMovies.retry() }
                     )
                     nothingLoadedYet -> EmptyState(
                         title = "No results",
-                        body = "Nothing matched \"${state.query}\"."
+                        body = "Nothing matched \"${state.query}\" — no movies, TV shows, or people."
                     )
                     else -> {
                         // The view-mode toggle only makes sense once there's something to lay out —
@@ -246,7 +254,9 @@ fun SearchScreen(
                             SearchViewMode.LIST -> SearchResultsList(
                                 movies = pagedSearchMovies,
                                 people = state.people,
+                                tvShows = state.tvShows,
                                 onMovieClick = onMovieClick,
+                                onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 listState = resultsListState
@@ -254,9 +264,11 @@ fun SearchScreen(
                             SearchViewMode.GRID -> SearchResultsGrid(
                                 movies = pagedSearchMovies,
                                 people = state.people,
+                                tvShows = state.tvShows,
                                 columns = GridCells.Adaptive(minSize = 128.dp),
                                 posterWidth = null,
                                 onMovieClick = onMovieClick,
+                                onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 gridState = resultsGridState
@@ -264,9 +276,11 @@ fun SearchScreen(
                             SearchViewMode.GRID_DENSE -> SearchResultsGrid(
                                 movies = pagedSearchMovies,
                                 people = state.people,
+                                tvShows = state.tvShows,
                                 columns = GridCells.Fixed(4),
                                 posterWidth = null,
                                 onMovieClick = onMovieClick,
+                                onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 gridState = resultsGridState
@@ -712,18 +726,22 @@ private fun GenreChipItem(genre: GenreChip, onClick: () -> Unit, modifier: Modif
  *
  * Phase 4 (pagination) Round 4 — [movies] is now a [LazyPagingItems] source (either
  * [SearchViewModel.pagedSearchMovies] or [SearchViewModel.pagedFilteredMovies], depending on the
- * caller) rather than a plain list; [people] stays a plain, small, non-paginated list either way
- * (empty for the filter-results caller, since Discover has no people to show). A
- * [PagingAppendFooter] closes out the movies section, same shared composable every other
+ * caller) rather than a plain list; [people] and [tvShows] stay plain, small, non-paginated lists
+ * either way (both empty for the filter-results caller, since Discover has no people or TV to
+ * show). A [PagingAppendFooter] closes out the movies section, same shared composable every other
  * paginated grid in this app already uses.
  */
 @Composable
 private fun SearchResultsGrid(
     movies: LazyPagingItems<Movie>,
     people: List<Person>,
+    // One-shot [Movie] list for the "TV Shows" row (see SearchViewModel.uiState) — empty for the
+    // filter-results caller, since Discover has no TV counterpart.
+    tvShows: List<Movie>,
     columns: GridCells,
     posterWidth: androidx.compose.ui.unit.Dp?,
     onMovieClick: (Movie) -> Unit,
+    onTvClick: (Movie) -> Unit,
     onPersonClick: (Person) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
     gridState: LazyGridState
@@ -741,8 +759,13 @@ private fun SearchResultsGrid(
                 PeopleResultsRow(people = people, onPersonClick = onPersonClick)
             }
         }
+        if (tvShows.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                TvShowsResultsRow(tvShows = tvShows, onTvClick = onTvClick)
+            }
+        }
         if (movies.itemCount > 0) {
-            if (people.isNotEmpty()) {
+            if (people.isNotEmpty() || tvShows.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         text = "Movies",
@@ -767,12 +790,14 @@ private fun SearchResultsGrid(
     }
 }
 
-/** List-view mode: a LazyColumn of full-width rows instead of a poster grid. See [SearchResultsGrid]'s doc for [movies]/[people]. */
+/** List-view mode: a LazyColumn of full-width rows instead of a poster grid. See [SearchResultsGrid]'s doc for [movies]/[people]/[tvShows]. */
 @Composable
 private fun SearchResultsList(
     movies: LazyPagingItems<Movie>,
     people: List<Person>,
+    tvShows: List<Movie>,
     onMovieClick: (Movie) -> Unit,
+    onTvClick: (Movie) -> Unit,
     onPersonClick: (Person) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
     listState: LazyListState
@@ -785,8 +810,11 @@ private fun SearchResultsList(
         if (people.isNotEmpty()) {
             item { PeopleResultsRow(people = people, onPersonClick = onPersonClick) }
         }
+        if (tvShows.isNotEmpty()) {
+            item { TvShowsResultsRow(tvShows = tvShows, onTvClick = onTvClick) }
+        }
         if (movies.itemCount > 0) {
-            if (people.isNotEmpty()) {
+            if (people.isNotEmpty() || tvShows.isNotEmpty()) {
                 item {
                     Text(
                         text = "Movies",
@@ -816,6 +844,31 @@ private fun PeopleResultsRow(people: List<Person>, onPersonClick: (Person) -> Un
         LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(people, key = { it.id }) { person ->
                 PersonResultCard(person = person, onClick = { onPersonClick(person) })
+            }
+        }
+    }
+}
+
+/**
+ * A LazyRow for the search screen's TV results, grouped separately from the movie grid the same
+ * way people are. TV shows can't be favorited yet (the Favorites schema is movie-id only), so the
+ * cards render without a heart toggle — same convention as Explore's Popular TV Shows row.
+ */
+@Composable
+private fun TvShowsResultsRow(tvShows: List<Movie>, onTvClick: (Movie) -> Unit) {
+    Column {
+        Text(
+            text = "TV Shows",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            items(tvShows, key = { it.id }) { tvShow ->
+                MoviePosterCard(
+                    movie = tvShow,
+                    onClick = { onTvClick(tvShow) },
+                    onToggleFavorite = null
+                )
             }
         }
     }

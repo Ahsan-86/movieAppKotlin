@@ -35,6 +35,12 @@ data class SearchUiState(
     // row, which stays a small one-shot fetch per query (never paginated, see the class doc).
     val people: List<Person> = emptyList(),
     val isSearchingPeople: Boolean = false,
+    // The "TV Shows" result row — a capped one-shot [Movie] list per debounced query (see
+    // MovieRepository.searchTvShows), grouped separately from the movie grid the same way
+    // [people] is. TV rows can't be favorited (no Favorites schema support for TV ids yet), so
+    // unlike the movie grid they render with no heart toggle.
+    val tvShows: List<Movie> = emptyList(),
+    val isSearchingTv: Boolean = false,
     val recentSearches: List<String> = emptyList(),
     val genreChips: List<GenreChip> = emptyList(),
     val viewMode: SearchViewMode = SearchViewMode.GRID,
@@ -70,9 +76,11 @@ data class SearchUiState(
  * The people row stays a small one-shot fetch per debounced query (see [SearchUiState.people]) —
  * only the first handful of people a query returns are ever shown, so there's nothing to paginate
  * there, same reasoning that keeps Cast & Crew and Similar/Recommendations out of Phase 4 entirely.
- * The first-open state still shows genre chips (tapping one navigates to a dedicated full-screen
- * genre browser) instead of a blank prompt. The results layout (list/grid/4-up grid) is a
- * persisted preference, not local state.
+ * The TV Shows row follows the exact same pattern (see [SearchUiState.tvShows] and
+ * [MovieRepository.searchTvShows]): capped, non-paginated, network-only, grouped separately from
+ * the movie grid. The first-open state still shows genre chips (tapping one navigates to a
+ * dedicated full-screen genre browser) instead of a blank prompt. The results layout
+ * (list/grid/4-up grid) is a persisted preference, not local state.
  */
 @HiltViewModel
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -87,6 +95,7 @@ class SearchViewModel @Inject constructor(
     private val queryFlow = MutableStateFlow("")
     private val appliedFiltersFlow = MutableStateFlow<DiscoverFilters?>(null)
     private var peopleJob: Job? = null
+    private var tvJob: Job? = null
 
     val pagedSearchMovies: Flow<PagingData<Movie>> = queryFlow
         .debounce(350)
@@ -106,7 +115,10 @@ class SearchViewModel @Inject constructor(
         queryFlow
             .debounce(350)
             .distinctUntilChanged()
-            .onEach { query -> loadPeople(query) }
+            .onEach { query ->
+                loadPeople(query)
+                loadTvShows(query)
+            }
             .launchIn(viewModelScope)
 
         repository.observeRecentSearches()
@@ -214,6 +226,24 @@ class SearchViewModel @Inject constructor(
                     // Fails silently — the movie grid still has its own loadState-driven error/retry,
                     // and losing just the people row isn't worth a second error surface for one query.
                     _uiState.update { it.copy(people = emptyList(), isSearchingPeople = false) }
+                }
+        }
+    }
+
+    /** Same pattern as [loadPeople] for the "TV Shows" row — capped one-shot, silent failure, no
+     *  Room involvement (TV data isn't persisted in this app). */
+    private fun loadTvShows(query: String) {
+        tvJob?.cancel()
+        if (query.isBlank()) {
+            _uiState.update { it.copy(tvShows = emptyList(), isSearchingTv = false) }
+            return
+        }
+        tvJob = viewModelScope.launch {
+            _uiState.update { it.copy(isSearchingTv = true) }
+            repository.searchTvShows(query)
+                .onSuccess { tvShows -> _uiState.update { it.copy(tvShows = tvShows, isSearchingTv = false) } }
+                .onFailure {
+                    _uiState.update { it.copy(tvShows = emptyList(), isSearchingTv = false) }
                 }
         }
     }

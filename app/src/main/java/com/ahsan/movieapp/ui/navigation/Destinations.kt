@@ -41,6 +41,16 @@ sealed class Destination(val route: String) {
         fun createRoute(movieId: Int) = "movie/$movieId/cast-crew"
     }
 
+    /**
+     * The same "view all" cast + director screen as [CastCrewList], but for TV shows — reached
+     * from TvDetailScreen's cast/crew heading (mirrors MovieDetailScreen's navigation). Its own
+     * route since it carries a `tvId` (TMDB TV ids share the movie numeric range), with the
+     * media-agnostic [com.ahsan.movieapp.ui.detail.CastCrewListScreen] reused for both.
+     */
+    data object TvCastCrewList : Destination("tv/{tvId}/cast-crew") {
+        fun createRoute(tvId: Int) = "tv/$tvId/cast-crew"
+    }
+
     data object PersonFilmography : Destination("person/{personId}/{personName}") {
         fun createRoute(personId: Int, personName: String) =
             "person/$personId/${java.net.URLEncoder.encode(personName, "UTF-8")}"

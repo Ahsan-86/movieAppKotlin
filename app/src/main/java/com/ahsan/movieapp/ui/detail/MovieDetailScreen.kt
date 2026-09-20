@@ -57,12 +57,14 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.CollectionSummary
 import com.ahsan.movieapp.domain.model.Movie
@@ -218,7 +220,8 @@ fun MovieDetailScreen(
                                     add(details.releaseYear)
                                     details.runtimeFormatted?.let { add(it) }
                                 },
-                                genres = details.genres
+                                genres = details.genres,
+                                showMetaDiamond = true
                             )
                         }
 
@@ -266,12 +269,8 @@ fun MovieDetailScreen(
                             )
                         }
 
-                        if (state.similarMovies.isNotEmpty()) {
-                            PosterRowSection(title = "Similar", movies = state.similarMovies, onMovieClick = onMovieClick)
-                        }
-
-                        if (state.recommendedMovies.isNotEmpty()) {
-                            PosterRowSection(title = "Recommendations", movies = state.recommendedMovies, onMovieClick = onMovieClick)
+                        if (state.moreLikeThis.isNotEmpty()) {
+                            PosterRowSection(movies = state.moreLikeThis, onMovieClick = onMovieClick)
                         }
                     }
                 }
@@ -531,16 +530,18 @@ private fun ProviderLogo(provider: WatchProvider, onClick: (() -> Unit)?) {
 }
 
 /**
- * Shared layout for the Similar and Recommendations sections — a heading followed by a horizontal
- * poster row, reusing [MoviePosterCard] like every other carousel in the app. The two sections are
- * deliberately separate lists/API calls (see MovieRepository.getSimilarMovies vs
- * getRecommendedMovies) and are not deduped against each other.
+ * Layout for the "More Like This" shelf (Review-queue item 2 → option A): a heading followed by a
+ * uniform horizontal poster row at 144dp, reusing [MoviePosterCard] like every other carousel in
+ * the app. Option B (spotlight + queue) was tried here but Ahsan's intent was the Person screen's
+ * filmography — this shelf stays in the app's standard row language. The shelf shows
+ * Recommendations only (Similar dropped 2026-09-20: not relevant enough); title unchanged from
+ * Review-queue item 1 → option C.
  */
 @Composable
-private fun PosterRowSection(title: String, movies: List<Movie>, onMovieClick: (Movie) -> Unit) {
+private fun PosterRowSection(movies: List<Movie>, onMovieClick: (Movie) -> Unit) {
     Column(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
         Text(
-            text = title,
+            text = stringResource(R.string.similar_title),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
@@ -550,7 +551,7 @@ private fun PosterRowSection(title: String, movies: List<Movie>, onMovieClick: (
             modifier = Modifier.fillMaxWidth()
         ) {
             items(movies, key = { it.id }) { movie ->
-                MoviePosterCard(movie = movie, onClick = { onMovieClick(movie) }, onToggleFavorite = null, width = 128.dp)
+                MoviePosterCard(movie = movie, onClick = { onMovieClick(movie) }, onToggleFavorite = null, width = 144.dp)
             }
         }
     }

@@ -21,6 +21,19 @@ import javax.inject.Inject
 enum class MediaTab { MOVIES, TV }
 enum class RoleTab { ACTOR, DIRECTOR }
 
+/**
+ * One cell of the single-bucket credit filter (Review-queue item 4 → option A, 2026-09-20):
+ * an (Acting/Directed) × (Movies/TV) combination with its credit count. Only buckets with
+ * credits present are shown, so the row never has empty states.
+ */
+data class CreditBucket(
+    val media: MediaTab,
+    val role: RoleTab,
+    val count: Int
+) {
+    val exists: Boolean get() = count > 0
+}
+
 data class PersonUiState(
     val personName: String = "",
     val details: PersonDetails? = null,
@@ -30,10 +43,18 @@ data class PersonUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null
 ) {
-    val showTvTab: Boolean get() = credits?.hasTvCredits == true
-
-    val showDirectorTab: Boolean
-        get() = credits?.hasDirectingCredits(isTv = selectedMediaType == MediaTab.TV) == true
+    // Present credit buckets in Ahsan's canonical order (2026-09-20): Acting-Movies, Acting-TV,
+    // Directed-Movies, Directed-TV; empty buckets are dropped so the chips never have empty states.
+    val creditBuckets: List<CreditBucket>
+        get() {
+            val c = credits ?: return emptyList()
+            return listOf(
+                CreditBucket(MediaTab.MOVIES, RoleTab.ACTOR, c.actingMovies.size),
+                CreditBucket(MediaTab.TV, RoleTab.ACTOR, c.actingTvShows.size),
+                CreditBucket(MediaTab.MOVIES, RoleTab.DIRECTOR, c.directingMovies.size),
+                CreditBucket(MediaTab.TV, RoleTab.DIRECTOR, c.directingTvShows.size)
+            ).filter { it.exists }
+        }
 
     val displayedMovies: List<Movie>
         get() {
@@ -43,14 +64,30 @@ data class PersonUiState(
                 MediaTab.TV -> if (selectedRole == RoleTab.ACTOR) c.actingTvShows else c.directingTvShows
             }
         }
+
+    // Person filmography grouped by release year, newest year first; the unknown-year bucket
+    // ("—" releaseYear, or any non-numeric year) sorts last. Within a year, the credits keep their
+    // original order. Backs the year-sectioned list on PersonScreen (Session 5 → option 2, chosen
+    // 2026-09-20).
+    val filmographyByYear: List<Pair<String, List<Movie>>>
+        get() = displayedMovies
+            .groupBy { it.releaseYear }
+            .entries
+            .sortedWith(
+                compareByDescending<Map.Entry<String, List<Movie>>> { entry ->
+                    entry.key.toIntOrNull() ?: Int.MIN_VALUE
+                }
+            )
+            .map { it.key to it.value }
 }
 
 /**
- * Backs the redesigned person screen: bio/photo header, then a Movies/TV toggle (only shown if
- * the person actually has TV credits) and an Actor/Director toggle (only shown if they have
- * directing credits for the selected media type). Both toggles are pure client-side filtering —
- * [PersonCredits] is fetched once via TMDB's combined_credits and already split into all four
- * buckets, so switching tabs never re-hits the network.
+ * Backs the redesigned person screen: bio/photo header, then a single row of credit-bucket
+ * chips in the filmography year-chip style (Review-queue item 4 → option A) — "Acting - Movies",
+ * "Directed - Movies", etc., one per present (Acting/Directed) × (Movies/TV) combination, so
+ * switching media type OR role is one tap. Filtering is pure client-side — [PersonCredits] is
+ * fetched once via TMDB's combined_credits and already split into all four buckets, so switching
+ * never re-hits the network.
  */
 @HiltViewModel
 class PersonViewModel @Inject constructor(
@@ -105,14 +142,9 @@ class PersonViewModel @Inject constructor(
         }
     }
 
-    fun onMediaTabSelected(tab: MediaTab) {
-        // Reset back to Actor when switching media type — directing credits differ per type,
-        // and defaulting to Actor avoids landing on a toggle that might now be hidden/empty.
-        _uiState.update { it.copy(selectedMediaType = tab, selectedRole = RoleTab.ACTOR) }
-    }
-
-    fun onRoleTabSelected(role: RoleTab) {
-        _uiState.update { it.copy(selectedRole = role) }
+    // Single-tap bucket select (Review-queue item 4 → option A): sets media type AND role at once.
+    fun selectBucket(media: MediaTab, role: RoleTab) {
+        _uiState.update { it.copy(selectedMediaType = media, selectedRole = role) }
     }
 
     fun toggleFavorite(movie: Movie) {

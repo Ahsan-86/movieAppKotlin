@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +35,15 @@ import androidx.compose.ui.unit.dp
  * (movie runtime vs TV seasons + episode runtime) while everything else stays shared between
  * [com.ahsan.movieapp.ui.detail.MovieDetailScreen] and
  * [com.ahsan.movieapp.ui.tv.TvDetailScreen].
+ *
+ * [showMetaDiamond] inserts small rotated-square diamonds (the B3 accent from the Person credit
+ * filters, confirmed by Ahsan 2026-09-26) between the rating and each following [metaLabels] item
+ * — **Explored/used everywhere now, including the Movie/TV detail heroes**, so rating ◆ year ◆
+ * runtime reads as one dotted meta line. When it's on, [genres] are rendered on a second line
+ * joined by the same diamonds instead of " • " dots.
+ * [compactMeta] shrinks the headline title and rating/meta text (the hero carousel's card,
+ * 2026-09-26 — titleLarge title, labelSmall rating/year once the genres line joined them);
+ * detail heroes pass false and keep the larger labels.
  */
 @Composable
 fun DetailHeroCaption(
@@ -42,7 +52,9 @@ fun DetailHeroCaption(
     rating: String,
     metaLabels: List<String>,
     genres: List<String>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showMetaDiamond: Boolean = false,
+    compactMeta: Boolean = false
 ) {
     Box(modifier = modifier) {
         // Vignette: same soft radial falloff PersonHero uses, darkening corners/edges all around
@@ -77,7 +89,11 @@ fun DetailHeroCaption(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineMedium,
+                style = if (compactMeta) {
+                    MaterialTheme.typography.titleLarge
+                } else {
+                    MaterialTheme.typography.headlineMedium
+                },
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
@@ -90,9 +106,11 @@ fun DetailHeroCaption(
                 )
             }
             Row(
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = if (compactMeta) 3.dp else 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // Tighter rating↔diamond↔year gaps when the B3 diamond is present (hero carousel,
+                // 2026-09-26); detail heroes keep the roomier spacing.
+                horizontalArrangement = Arrangement.spacedBy(if (showMetaDiamond) 5.dp else 12.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -102,29 +120,86 @@ fun DetailHeroCaption(
                         imageVector = Icons.Filled.Star,
                         contentDescription = null,
                         tint = Color(0xFFFFC857),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(if (compactMeta) 12.dp else 16.dp)
                     )
                     Text(
                         text = rating,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = if (compactMeta) {
+                            MaterialTheme.typography.labelSmall
+                        } else {
+                            MaterialTheme.typography.labelLarge
+                        },
                         color = Color.White
                     )
                 }
-                metaLabels.forEach { label ->
+                if (showMetaDiamond) {
+                    // B3 separator (2026-09-26) between the rating and the first meta label: a
+                    // small rotated-square diamond in the caption color. Detail heroes opt in too,
+                    // so rating ◆ year ◆ duration reads as its own dotted meta line.
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .rotate(45f)
+                            .background(Color.White.copy(alpha = 0.6f))
+                    )
+                }
+                metaLabels.forEachIndexed { index, label ->
+                    if (showMetaDiamond && index > 0) {
+                        Box(
+                            modifier = Modifier
+                                .size(4.dp)
+                                .rotate(45f)
+                                .background(Color.White.copy(alpha = 0.6f))
+                        )
+                    }
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = if (compactMeta) {
+                            MaterialTheme.typography.labelSmall
+                        } else {
+                            MaterialTheme.typography.labelLarge
+                        },
                         color = Color.White.copy(alpha = 0.9f)
                     )
                 }
             }
             if (genres.isNotEmpty()) {
-                Text(
-                    text = genres.joinToString(" • "),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.85f),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                if (showMetaDiamond) {
+                    // Narrow row of genre names joined by the same B3 diamonds (2026-09-26) so the
+                    // hero card keeps the diamond language across rating, year and genres.
+                    Row(
+                        modifier = Modifier.padding(top = if (compactMeta) 1.dp else 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(if (compactMeta) 4.dp else 6.dp)
+                    ) {
+                        genres.forEachIndexed { index, genre ->
+                            if (index > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(3.dp)
+                                        .rotate(45f)
+                                        .background(Color.White.copy(alpha = 0.55f))
+                                )
+                            }
+                            Text(
+                                text = genre,
+                                style = if (compactMeta) {
+                                    MaterialTheme.typography.labelSmall
+                                } else {
+                                    MaterialTheme.typography.labelMedium
+                                },
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = genres.joinToString(" • "),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
         }
     }

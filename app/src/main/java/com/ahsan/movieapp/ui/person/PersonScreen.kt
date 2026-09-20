@@ -4,9 +4,13 @@ import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,32 +18,36 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -47,6 +55,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,9 +74,9 @@ import com.ahsan.movieapp.ui.components.rememberBackdropPalette
  * is dynamic per screen rather than the generic "Movie App" bar the root tabs share (that one is
  * hidden entirely on this screen — see MovieNavGraph's TOP_LEVEL_ROUTES check). Everything below
  * the bar — the hero photo, bio, toggles, filmography — is one scrollable `LazyColumn`; the
- * filmography renders as full-width list rows (the shared `MovieListRow`, same as the search
- * screen's list-view mode) rather than a poster grid, which is also why this is a plain
- * `LazyColumn` and not a `LazyVerticalGrid` like it used to be.
+ * filmography renders as the shared full-width `MovieListRow` rows (same as the search screen's
+ * list-view mode), grouped by release year with a year header per section (Session 5 → option 2,
+ * chosen 2026-09-20) and sorted newest-year-first.
  *
  * The bar is transparent and floats over the content rather than pushing it down, so the hero
  * photo can start right at the very top of the screen (behind the status bar) instead of leaving a
@@ -115,11 +124,17 @@ fun PersonScreen(
         topBar = {
             // PersonHero is the first (tall, 3:4) item in the LazyColumn below, so "scrolled past
             // 100dp" is: the first item's scroll offset past 100dp, or any later item on screen.
-            // The LazyListState fields are snapshot-backed, so reading them here recomposes only
-            // this lambda as the page scrolls. Loading/error have no hero behind the bar, so they
-            // default to the opaque titled bar.
-            val barOpaque = listState.firstVisibleItemIndex > 0 ||
-                listState.firstVisibleItemScrollOffset > with(LocalDensity.current) { 100.dp.toPx() } ||
+            // The scroll threshold is derived from the snapshot-backed LazyListState fields, so it
+            // recomposes only when the derived value actually flips. Loading/error have no hero
+            // behind the bar, so they default to the opaque titled bar.
+            val heroPeekPx = with(LocalDensity.current) { 100.dp.toPx() }
+            val scrolledPastHero by remember(listState) {
+                derivedStateOf {
+                    listState.firstVisibleItemIndex > 0 ||
+                        listState.firstVisibleItemScrollOffset > heroPeekPx
+                }
+            }
+            val barOpaque = scrolledPastHero ||
                 state.isLoading || (state.errorMessage != null && state.credits == null)
             val barColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.surface else Color.Transparent)
             val barContentColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.onSurface else Color.White)
@@ -164,10 +179,10 @@ fun PersonScreen(
                 else -> PersonContent(
                     state = state,
                     listState = listState,
+                    profileTone = profileTone,
                     onMovieClick = onMovieClick,
                     onTvClick = onTvClick,
-                    onMediaTabSelected = viewModel::onMediaTabSelected,
-                    onRoleTabSelected = viewModel::onRoleTabSelected,
+                    onBucketSelected = viewModel::selectBucket,
                     onToggleFavorite = viewModel::toggleFavorite
                 )
             }
@@ -180,10 +195,10 @@ fun PersonScreen(
 private fun PersonContent(
     state: PersonUiState,
     listState: LazyListState,
+    profileTone: Color?,
     onMovieClick: (Movie) -> Unit,
     onTvClick: (Movie) -> Unit,
-    onMediaTabSelected: (MediaTab) -> Unit,
-    onRoleTabSelected: (RoleTab) -> Unit,
+    onBucketSelected: (MediaTab, RoleTab) -> Unit,
     onToggleFavorite: (Movie) -> Unit
 ) {
     val movies = state.displayedMovies
@@ -201,15 +216,14 @@ private fun PersonContent(
             item { PersonHero(details = details) }
         }
 
-        if (state.showTvTab || state.showDirectorTab) {
+        if (state.creditBuckets.size > 1) {
             item {
                 PersonFilterRow(
-                    showTvTab = state.showTvTab,
-                    showDirectorTab = state.showDirectorTab,
+                    buckets = state.creditBuckets,
                     selectedMediaType = state.selectedMediaType,
                     selectedRole = state.selectedRole,
-                    onMediaTabSelected = onMediaTabSelected,
-                    onRoleTabSelected = onRoleTabSelected
+                    tone = profileTone,
+                    onBucketSelected = onBucketSelected
                 )
             }
         }
@@ -225,25 +239,33 @@ private fun PersonContent(
                 )
             }
         } else {
-            items(movies, key = { it.id }) { movie ->
-                MovieListRow(
-                    movie = movie,
-                    // TV ids aren't movie ids — TV rows route to the real TV detail screen
-                    // (onTvClick), not through the movie detail route the Movies tab uses.
-                    onClick = {
-                        if (state.selectedMediaType == MediaTab.TV) {
-                            onTvClick(movie)
-                        } else {
-                            onMovieClick(movie)
-                        }
-                    },
-                    // Favoriting stays movie-only for now — the app's Favorites table doesn't yet
-                    // distinguish movies from TV shows, and mixing the two in there ahead of real
-                    // TV support would just create bad data to clean up later.
-                    onToggleFavorite = if (state.selectedMediaType == MediaTab.MOVIES) {
-                        { onToggleFavorite(movie) }
-                    } else null
-                )
+            // Year-grouped filmography (Session 5 → option 2, chosen 2026-09-20): still the same
+            // vertical full-width MovieListRow rows as before, just sorted newest-year-first and
+            // split into year sections by the header below.
+            state.filmographyByYear.forEach { (year, movies) ->
+                item(key = "filmography_year_$year") {
+                    FilmographyYearHeader(year = year, tone = profileTone)
+                }
+                items(movies, key = { it.id }) { movie ->
+                    MovieListRow(
+                        movie = movie,
+                        // TV ids aren't movie ids — TV rows route to the real TV detail screen
+                        // (onTvClick), not through the movie detail route the Movies tab uses.
+                        onClick = {
+                            if (state.selectedMediaType == MediaTab.TV) {
+                                onTvClick(movie)
+                            } else {
+                                onMovieClick(movie)
+                            }
+                        },
+                        // Favoriting stays movie-only for now — the app's Favorites table doesn't
+                        // yet distinguish movies from TV shows, and mixing the two in there ahead
+                        // of real TV support would just create bad data to clean up later.
+                        onToggleFavorite = if (state.selectedMediaType == MediaTab.MOVIES) {
+                            { onToggleFavorite(movie) }
+                        } else null
+                    )
+                }
             }
         }
     }
@@ -362,45 +384,190 @@ private fun ExpandableBio(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PersonFilterRow(
-    showTvTab: Boolean,
-    showDirectorTab: Boolean,
+    buckets: List<CreditBucket>,
     selectedMediaType: MediaTab,
     selectedRole: RoleTab,
-    onMediaTabSelected: (MediaTab) -> Unit,
-    onRoleTabSelected: (RoleTab) -> Unit
+    tone: Color?,
+    onBucketSelected: (MediaTab, RoleTab) -> Unit
 ) {
-    Column(modifier = Modifier.padding(start = 16.dp, top = 20.dp, end = 16.dp, bottom = 4.dp)) {
-        if (showTvTab) {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = selectedMediaType == MediaTab.MOVIES,
-                    onClick = { onMediaTabSelected(MediaTab.MOVIES) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text("Movies") }
-                SegmentedButton(
-                    selected = selectedMediaType == MediaTab.TV,
-                    onClick = { onMediaTabSelected(MediaTab.TV) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text("TV Shows") }
-            }
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+    // One organized chip group per present credit bucket (Review-queue item 4 → option A, chosen
+    // 2026-09-20, layout/labels finalized 2026-09-26). Chip labels are exact and ordered: Acting -
+    // Movies, Acting - TV Shows, Directed - Movies, Directed - TV Shows.
+    //
+    // Count-driven layout (2026-09-26): with exactly two buckets the chips sit on **one horizontal
+    // row and the labels wrap** (the palette gradient grows with the wrapped text); with more than
+    // two they **stack vertically as full-width pills with centered text** — wrap stays off, so the
+    // label is single-line and the gradient spans the whole row, never a scattered multi-line wrap.
+    //
+    // The whole group sits inside a soft rounded container (2026-09-26 — A1: the palette tone at
+    // low alpha, or surfaceVariant when no tone was sampled) so the filters read as one unit. In the
+    // two-chip horizontal layout a hairline divider in the palette tone splits the two chips
+    // (B2 — see Progress.md; B3 is the standing fallback if B2 doesn't look right).
+    val labelOf: (CreditBucket) -> String = { bucket ->
+        when (bucket.role to bucket.media) {
+            RoleTab.ACTOR to MediaTab.MOVIES -> "Acting - Movies"
+            RoleTab.ACTOR to MediaTab.TV -> "Acting - TV Shows"
+            RoleTab.DIRECTOR to MediaTab.MOVIES -> "Directed - Movies"
+            RoleTab.DIRECTOR to MediaTab.TV -> "Directed - TV Shows"
+            else -> ""
         }
-        if (showDirectorTab) {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = selectedRole == RoleTab.ACTOR,
-                    onClick = { onRoleTabSelected(RoleTab.ACTOR) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text("As Actor") }
-                SegmentedButton(
-                    selected = selectedRole == RoleTab.DIRECTOR,
-                    onClick = { onRoleTabSelected(RoleTab.DIRECTOR) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text("As Director") }
+    }
+
+    val vertical = buckets.size > 2
+    val chip: @Composable (CreditBucket) -> Unit = { bucket ->
+        PersonCreditChip(
+            label = labelOf(bucket),
+            selected = selectedMediaType == bucket.media && selectedRole == bucket.role,
+            tone = tone,
+            wrapText = !vertical,
+            fillWidth = vertical,
+            onClick = { onBucketSelected(bucket.media, bucket.role) }
+        )
+    }
+
+    val containerModifier = Modifier
+        .fillMaxWidth()
+        .padding(start = 16.dp, top = 20.dp, end = 16.dp, bottom = 4.dp)
+
+    Column(modifier = containerModifier) {
+        // A3 (2026-09-26 — chosen over the A4 gradient band): hairline framing only — a thin
+        // full-width divider above and below the group, no box, so the chips keep their own
+        // gradients without being overshadowed.
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        Box(modifier = Modifier.padding(vertical = 10.dp)) {
+            if (vertical) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    buckets.forEach { chip(it) }
+                }
+            } else {
+                // Two chips: pin one to each edge of the row with a small palette-tone diamond between
+                // them (B3 — the 2-chip accent, chosen 2026-09-26 over the B2 hairline).
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    chip(buckets[0])
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .rotate(45f)
+                            .background(tone ?: MaterialTheme.colorScheme.secondary)
+                    )
+                    chip(buckets[1])
+                }
             }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+/**
+ * One credit-filter chip in the filmography year-chip style (2026-09-20): same 10dp radius,
+ * 12/6 padding and bold titleMedium text as [FilmographyYearHeader]. The selected bucket fills
+ * with the person palette gradient (tone → darkened tone) and adapts its text color to the tone's
+ * luminance, exactly like the year chips; unselected buckets carry a faint wash of the same
+ * gradient (2026-09-26 — no more bare outline rectangles) plus a soft border and muted text.
+ *
+ * [wrapText] allows the label to break to a second line with the gradient growing to wrap it too
+ * (the two-chip horizontal row); otherwise it stays on one line, ellipsized if needed. [fillWidth]
+ * stretches the chip to the full row width with the text centered (2026-09-26 — the vertical stack
+ * reads as a single-column list, each chip a full-width pill).
+ */
+@Composable
+private fun PersonCreditChip(
+    label: String,
+    selected: Boolean,
+    tone: Color?,
+    wrapText: Boolean,
+    fillWidth: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(10.dp)
+    val bandStart = tone ?: MaterialTheme.colorScheme.secondary
+    val bandEnd = (tone?.let { lerp(it, Color.Black, 0.25f) }) ?: MaterialTheme.colorScheme.primary
+    val onBandColor = if ((tone?.luminance() ?: 0f) > 0.5f) Color(0xFF111111) else Color.White
+    val gradient = Brush.horizontalGradient(listOf(bandStart, bandEnd))
+    val chipStyle = if (selected) {
+        Modifier.background(gradient)
+    } else {
+        Modifier
+            .background(
+                Brush.horizontalGradient(
+                    listOf(bandStart.copy(alpha = 0.22f), bandEnd.copy(alpha = 0.22f))
+                )
+            )
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = shape
+            )
+    }
+
+    Box(
+        modifier = Modifier
+            .clip(shape)
+            .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
+            .then(chipStyle)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) onBandColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (wrapText) Int.MAX_VALUE else 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = if (fillWidth) TextAlign.Center else TextAlign.Start
+        )
+    }
+}
+
+/**
+ * Section header for one release year in the year-grouped filmography (Session 5 → option 2,
+ * chosen 2026-09-20): a rounded gradient chip sized to the year text only (Ahsan's styling picks
+ * 2026-09-20 — no full-width band). The gradient runs from the person photo's palette [tone] into
+ * a darkened version of it, so it harmonizes with the palette-tinted screen background instead of
+ * clashing; [MaterialTheme.colorScheme]'s secondary → primary is the fallback when no tone was
+ * sampled (loading/error). Text is dark on light tones and white on dark ones. The unknown-year
+ * bucket (the "—" releaseYear placeholder from [Movie.releaseYear]) reads "Unknown year", not a
+ * bare dash.
+ */
+@Composable
+private fun FilmographyYearHeader(year: String, tone: Color?) {
+    val label = if (year.toIntOrNull() != null) year else "Unknown year"
+    val bandStart = tone ?: MaterialTheme.colorScheme.secondary
+    val bandEnd = (tone?.let { lerp(it, Color.Black, 0.25f) }) ?: MaterialTheme.colorScheme.primary
+    val textColor = if ((tone?.luminance() ?: 0f) > 0.5f) Color(0xFF111111) else Color.White
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 20.dp, bottom = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .wrapContentWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(Brush.horizontalGradient(listOf(bandStart, bandEnd)))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = textColor
+            )
         }
     }
 }

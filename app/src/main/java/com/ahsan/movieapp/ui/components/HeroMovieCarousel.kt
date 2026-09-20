@@ -19,18 +19,15 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import coil.compose.AsyncImage
 import com.ahsan.movieapp.domain.model.Movie
 import kotlin.math.abs
@@ -38,18 +35,25 @@ import kotlinx.coroutines.delay
 
 /**
  * The Explore screen's top banner: a swipeable, full-width pager of [movies] (the caller passes
- * the top 8 popular titles), each card showing a backdrop image with title/rating scrimmed over
- * the bottom, plus a row of M3-style dots below (an active pill that widens 6→14dp and slides
- * smoothly between pages as you swipe, driven by [PagerState.currentPageOffsetFraction]). Sits
- * above the genre chips row and the rest of Explore's carousel sections — the "hero" in front of
- * the regular shelves, not a replacement for any of them.
+ * the top 8 popular titles), each card a **16:12 poster hero** (a clear landscape rectangle —
+ * 16:11 still read short, bumped another +~9% taller to 4:3-equivalent, 2026-09-26 — taller than
+ * the old 16:9 banner but far shorter than the 3:4 Detail heroes) with the poster image scrimmed by
+ * [DetailHeroCaption] (rating/year/genres) and the parallax/scale polish: adjacent pages shrink to
+ * ~90% for depth as you swipe. Horizontal insets (42dp) keep a clear **peek of the previous and
+ * next card visible on both sides** while the current card is in focus. Below sits a row of M3-style
+ * dots (an active pill that widens 6→14dp and slides smoothly between pages as you swipe, driven by
+ * [PagerState.currentPageOffsetFraction]). The banner sits above the genre chips row and the rest
+ * of Explore's carousel sections.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HeroMovieCarousel(
     movies: List<Movie>,
     onMovieClick: (Movie) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Movie genre-id → display name, resolved by the caller from its fetched genre chips list;
+    // empty = no genre line on the cards. The Movie model only carries genre ids, not names.
+    genreNameById: Map<Int, String> = emptyMap()
 ) {
     if (movies.isEmpty()) return
     val pagerState = rememberPagerState(pageCount = { movies.size })
@@ -76,68 +80,48 @@ fun HeroMovieCarousel(
     Column(modifier = modifier) {
         HorizontalPager(
             state = pagerState,
-            contentPadding = PaddingValues(horizontal = 24.dp),
+            contentPadding = PaddingValues(horizontal = 42.dp),
             pageSpacing = 12.dp,
             modifier = Modifier.fillMaxWidth()
         ) { page ->
             val movie = movies[page]
+            // Relative offset of this page from the focused one (-1..1); drives the parallax/scale:
+            // the focused card is full size, neighbors shrink to ~90% as they slide away.
+            val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
+                    .aspectRatio(16f / 12f)
+                    .graphicsLayer {
+                        val fraction = abs(pageOffset).coerceIn(0f, 1f)
+                        val scale = lerp(1f, 0.9f, fraction)
+                        scaleX = scale
+                        scaleY = scale
+                    }
                     .clip(RoundedCornerShape(20.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { onMovieClick(movie) }
             ) {
                 AsyncImage(
-                    model = movie.backdropUrl ?: movie.posterUrl,
+                    model = movie.posterUrl ?: movie.backdropUrl,
                     contentDescription = movie.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Full-height gradient (not just a bottom sliver) so the title/rating stay legible
-                // over a bright backdrop, not just a dark one.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                            )
-                        )
+                // Same caption treatment as the Detail hero — radial vignette + taller bottom
+                // gradient + headlineMedium title with rating/year/genres — so Explore's big card
+                // speaks the same language as Movie/TV details. The rating↔year and genre diamonds
+                // (B3, 2026-09-26) are opted in here only.
+                DetailHeroCaption(
+                    title = movie.title,
+                    tagline = null,
+                    rating = movie.ratingOutOfTen,
+                    metaLabels = listOfNotNull(movie.releaseYear),
+                    genres = movie.genreIds.mapNotNull { genreNameById[it] },
+                    showMetaDiamond = true,
+                    compactMeta = true
                 )
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = movie.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        Text(
-                            text = "★ ${movie.ratingOutOfTen}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFFFFC857)
-                        )
-                        Text(
-                            text = movie.releaseYear,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color.White.copy(alpha = 0.85f)
-                        )
-                    }
-                }
             }
         }
 

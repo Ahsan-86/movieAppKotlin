@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -61,9 +62,17 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             item(key = "hero") {
+                // Genre id → display name from the already-fetched chips list, so the hero card's
+                // genre line (diamond-joined, 2026-09-26) has real names to show.
+                val genreNameById = remember(state.genreChips) {
+                    state.genreChips.mapNotNull { chip ->
+                        chip.movieGenreId?.let { it to chip.name }
+                    }.toMap()
+                }
                 HeroMovieCarousel(
                     movies = state.heroMovies,
                     onMovieClick = onMovieClick,
+                    genreNameById = genreNameById,
                     modifier = Modifier.padding(top = 16.dp)
                 )
             }

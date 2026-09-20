@@ -52,12 +52,14 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.Season
@@ -213,7 +215,8 @@ fun TvDetailScreen(
                                     details.seasonsFormatted?.let { add(it) }
                                     details.episodeRuntimeFormatted?.let { add(it) }
                                 },
-                                genres = details.genres
+                                genres = details.genres,
+                                showMetaDiamond = true
                             )
                         }
 
@@ -252,12 +255,8 @@ fun TvDetailScreen(
 
                         TvInformationSection(details)
 
-                        if (state.similarTvShows.isNotEmpty()) {
-                            TvPosterRowSection(title = "Similar", shows = state.similarTvShows, onTvClick = onTvClick)
-                        }
-
-                        if (state.recommendedTvShows.isNotEmpty()) {
-                            TvPosterRowSection(title = "Recommendations", shows = state.recommendedTvShows, onTvClick = onTvClick)
+                        if (state.moreLikeThis.isNotEmpty()) {
+                            TvPosterRowSection(shows = state.moreLikeThis, onTvClick = onTvClick)
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -501,19 +500,19 @@ private fun TvInfoRow(label: String, value: String, onClick: (() -> Unit)? = nul
 }
 
 /**
- * Shared layout for the Similar and Recommendations sections — same shape as
+ * Layout for the "More Like This" shelf (Review-queue item 2 → option A) — same shape as
  * [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s `PosterRowSection`, reusing [MoviePosterCard]
- * (TV shows are modeled as [Movie] throughout this app — their id is a TV id, not a movie id). The two
- * sections are deliberately separate lists/API calls (see
- * [com.ahsan.movieapp.data.repository.MovieRepository.getSimilarTvShows] vs
- * [com.ahsan.movieapp.data.repository.MovieRepository.getRecommendedTvShows]) and are not deduped
- * against each other.
+ * (TV shows are modeled as [Movie] throughout this app — their id is a TV id, not a movie id): a
+ * uniform 144dp horizontal row. Option B (spotlight + queue) was tried here but Ahsan's intent was
+ * the Person screen's filmography — this shelf stays in the standard row language. The shelf shows
+ * Recommendations only (Similar dropped 2026-09-20: not relevant enough); title unchanged from
+ * Review-queue item 1 → option C.
  */
 @Composable
-private fun TvPosterRowSection(title: String, shows: List<Movie>, onTvClick: (Movie) -> Unit) {
+private fun TvPosterRowSection(shows: List<Movie>, onTvClick: (Movie) -> Unit) {
     Column(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
         Text(
-            text = title,
+            text = stringResource(R.string.similar_title),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
@@ -523,7 +522,7 @@ private fun TvPosterRowSection(title: String, shows: List<Movie>, onTvClick: (Mo
             modifier = Modifier.fillMaxWidth()
         ) {
             items(shows, key = { it.id }) { show ->
-                MoviePosterCard(movie = show, onClick = { onTvClick(show) }, onToggleFavorite = null, width = 128.dp)
+                MoviePosterCard(movie = show, onClick = { onTvClick(show) }, onToggleFavorite = null, width = 144.dp)
             }
         }
     }

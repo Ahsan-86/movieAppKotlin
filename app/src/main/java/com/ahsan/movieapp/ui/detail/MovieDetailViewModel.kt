@@ -27,8 +27,9 @@ data class MovieDetailUiState(
     val details: MovieDetails? = null,
     val cast: List<CastMember> = emptyList(),
     val director: Person? = null,
-    val similarMovies: List<Movie> = emptyList(),
-    val recommendedMovies: List<Movie> = emptyList(),
+    // One "More Like This" shelf — Recommendations only (Similar dropped 2026-09-20: not relevant
+    // enough). The UI/title keep the shape from Review-queue item 1 → option C.
+    val moreLikeThis: List<Movie> = emptyList(),
     // Round C — streaming availability. watchProviders is the SELECTED region's Stream/Rent/Buy
     // lists (null while loading, or if TMDB has no data for the selected region); watchRegions is
     // every region TMDB returned data for, for the region dropdown; selectedRegion drives both.
@@ -93,19 +94,18 @@ class MovieDetailViewModel @Inject constructor(
     private val baseState: Flow<MovieDetailUiState> = combine(
         repository.getMovieDetails(movieId),
         creditsState,
-        repository.getSimilarMovies(movieId),
         repository.getRecommendedMovies(movieId),
         watchState
-    ) { resource, credits, similar, recommended, watch ->
+    ) { resource, credits, recommended, watch ->
         MovieDetailUiState(
             details = resource.data,
             cast = credits.cast,
             director = credits.director,
-            // Similar/Recommendations are supplementary — a Loading or Error state for either just
-            // means "nothing to show there yet", never blocks the rest of the screen (same
-            // failure-tolerant treatment as credits above).
-            similarMovies = similar.data.orEmpty(),
-            recommendedMovies = recommended.data.orEmpty(),
+            // Recommendations feed the "More Like This" shelf (Similar dropped 2026-09-20: not
+            // relevant enough). Supplementary — a Loading or Error state just means "nothing to
+            // show there yet", never blocks the rest of the screen (same failure-tolerant
+            // treatment as credits above).
+            moreLikeThis = recommended.data.orEmpty(),
             // Watch providers are supplementary too — same failure-tolerant treatment. Only the
             // SELECTED region's lists are exposed; watchRegions backs the dropdown itself.
             watchProviders = watch.providers?.forRegion(watch.selectedRegion),

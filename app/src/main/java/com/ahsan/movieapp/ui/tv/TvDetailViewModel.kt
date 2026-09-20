@@ -20,8 +20,9 @@ data class TvDetailUiState(
     val details: TvShowDetails? = null,
     val cast: List<CastMember> = emptyList(),
     val director: Person? = null,
-    val similarTvShows: List<Movie> = emptyList(),
-    val recommendedTvShows: List<Movie> = emptyList(),
+    // One "More Like This" shelf — Recommendations only (Similar dropped 2026-09-20: not relevant
+    // enough). The UI/title keep the shape from Review-queue item 1 → option C.
+    val moreLikeThis: List<Movie> = emptyList(),
     // Phase 2.6 Session 2 — Watch Trailer button. Null means either still loading or TMDB has no
     // YouTube trailer for this show; either way the button just doesn't render.
     val trailerKey: String? = null,
@@ -30,8 +31,9 @@ data class TvDetailUiState(
 )
 
 /**
- * Phase 2.6's TV detail screen ViewModel — info section, Cast & Crew, Information, Similar, and
- * Recommendations (Session 1, the last three added on Ahsan's post-build feedback), plus a Watch
+ * Phase 2.6's TV detail screen ViewModel — info section, Cast & Crew, Information, a
+ * Recommendations-based "More Like This" shelf (Session 1; merged into one shelf per Review-queue
+ * item 1 → option C, then Similar dropped 2026-09-20: not relevant enough), plus a Watch
  * Trailer button (Session 2). Network-only for every fetch, no Room cache — same one-shot,
  * failure-tolerant convention as [com.ahsan.movieapp.ui.detail.CastCrewListViewModel] and the
  * newer network-only calls on [MovieRepository] ([MovieRepository.getMovieCredits],
@@ -41,7 +43,7 @@ data class TvDetailUiState(
  * path and no favorite toggle here — TV favoriting needs the Favorites schema migration, which is
  * Session 6, not this round.
  *
- * Credits, Similar, Recommendations, and the trailer key are each fetched in their own
+ * Credits, Recommendations, and the trailer key are each fetched in their own
  * `viewModelScope.launch` and deliberately have no `onFailure` handling — a failed fetch just
  * leaves that piece of state at its empty default so its section simply doesn't render, matching
  * com.ahsan.movieapp.ui.detail.MovieDetailViewModel's credits-failure behavior exactly. The
@@ -75,13 +77,8 @@ class TvDetailViewModel @Inject constructor(
             // Deliberately no onFailure handling — see the class doc above.
         }
         viewModelScope.launch {
-            repository.getSimilarTvShows(tvId)
-                .onSuccess { shows -> _uiState.update { it.copy(similarTvShows = shows) } }
-            // Deliberately no onFailure handling — see the class doc above.
-        }
-        viewModelScope.launch {
             repository.getRecommendedTvShows(tvId)
-                .onSuccess { shows -> _uiState.update { it.copy(recommendedTvShows = shows) } }
+                .onSuccess { shows -> _uiState.update { it.copy(moreLikeThis = shows) } }
             // Deliberately no onFailure handling — see the class doc above.
         }
         viewModelScope.launch {

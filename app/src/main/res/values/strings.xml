@@ -25,6 +25,7 @@
 
     <!-- Search -->
     <string name="search_hint">Search movies, cast, anything…</string>
+    <string name="search">Search</string>
     <string name="search_empty">No results for \"%1$s\"</string>
     <string name="search_section_movies">Movies</string>
     <string name="search_section_people">Cast &amp; Crew</string>
@@ -37,8 +38,11 @@
     <string name="overview_title">Overview</string>
 
     <!-- Favorites -->
-    <string name="favorites_empty_title">No favorites yet</string>
+    <string name="favorites_empty_title">No favorite movies yet</string>
     <string name="favorites_empty_body">Tap the heart on any movie to save it here — even offline.</string>
+    <!-- Session 6 — the TV tab's own empty state; movies and TV shows are independent lists now. -->
+    <string name="favorites_empty_tv_title">No favorite TV shows yet</string>
+    <string name="favorites_empty_tv_body">Tap the heart on any TV show to save it here — even offline.</string>
 
     <!-- Auth -->
     <string name="continue_as_guest">Continue as Guest</string>
@@ -93,6 +97,7 @@
     <string name="search_tmdb_body">Find a movie, an actor, or a director by name.</string>
     <string name="search_recent_searches">Recent searches</string>
     <string name="search_clear_all">Clear all</string>
+    <string name="search_remove_recent">Remove this search</string>
     <string name="search_browse_by_genre">Browse by genre</string>
     <string name="search_people">People</string>
 

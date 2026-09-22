@@ -126,6 +126,9 @@ private fun MainNavHost() {
                 val scrollToTopEvents = remember(tabReselectBus) { tabReselectBus.reselected.forRoute(Destination.Favorites.route) }
                 FavoritesScreen(
                     onMovieClick = { navController.navigateToDetail(it) },
+                    // Session 6 — TV favorites route to the real TV detail screen, same as every
+                    // other TV surface.
+                    onTvClick = { navController.navigateToTvDetail(it) },
                     scrollToTopEvents = scrollToTopEvents
                 )
             }

@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ahsan.movieapp.R
+import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.DOT_SEPARATOR
 import com.ahsan.movieapp.ui.components.EmptyState
@@ -182,6 +183,7 @@ fun PersonScreen(
                     state = state,
                     listState = listState,
                     profileTone = profileTone,
+                    favoriteIds = viewModel.favoriteIds.collectAsState(emptySet()).value,
                     onMovieClick = onMovieClick,
                     onTvClick = onTvClick,
                     onBucketSelected = viewModel::selectBucket,
@@ -198,6 +200,7 @@ private fun PersonContent(
     state: PersonUiState,
     listState: LazyListState,
     profileTone: Color?,
+    favoriteIds: Set<Pair<Int, MediaType>>,
     onMovieClick: (Movie) -> Unit,
     onTvClick: (Movie) -> Unit,
     onBucketSelected: (MediaTab, RoleTab) -> Unit,
@@ -253,8 +256,9 @@ private fun PersonContent(
                     FilmographyYearHeader(year = year, tone = profileTone)
                 }
                 items(movies, key = { it.id }) { movie ->
+                    val displayMovie = if (movie.isFavorite == ((movie.id to movie.mediaType) in favoriteIds)) movie else movie.copy(isFavorite = (movie.id to movie.mediaType) in favoriteIds)
                     MovieListRow(
-                        movie = movie,
+                        movie = displayMovie,
                         // TV ids aren't movie ids — TV rows route to the real TV detail screen
                         // (onTvClick), not through the movie detail route the Movies tab uses.
                         onClick = {
@@ -264,12 +268,11 @@ private fun PersonContent(
                                 onMovieClick(movie)
                             }
                         },
-                        // Favoriting stays movie-only for now — the app's Favorites table doesn't
-                        // yet distinguish movies from TV shows, and mixing the two in there ahead
-                        // of real TV support would just create bad data to clean up later.
-                        onToggleFavorite = if (state.selectedMediaType == MediaTab.MOVIES) {
-                            { onToggleFavorite(movie) }
-                        } else null
+                        // Session 6 — both tabs favorite-able (composite-key Favorites table); each
+                        // row re-stamps its heart against the live keyed [favoriteIds] set above so
+                        // it flips immediately, keyed by (id, mediaType) so a movie and a
+                        // same-numbered TV show never fight over one heart.
+                        onToggleFavorite = { onToggleFavorite(displayMovie) }
                     )
                 }
             }

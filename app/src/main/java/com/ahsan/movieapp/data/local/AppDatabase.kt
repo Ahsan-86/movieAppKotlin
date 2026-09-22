@@ -3,6 +3,8 @@ package com.ahsan.movieapp.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ahsan.movieapp.data.local.dao.FavoriteDao
 import com.ahsan.movieapp.data.local.dao.MovieDao
 import com.ahsan.movieapp.data.local.dao.SearchHistoryDao
@@ -38,10 +40,13 @@ import com.ahsan.movieapp.data.local.entity.TvShowEntity
     // category_remote_keys table (CategoryRemoteKeys — tracks the next TMDB page per paginated
     // category). Bumped 5 -> 6 for Phase 2.6 Session 3's TV cache tables (tv_shows, category_tv_shows,
     // tv_remote_keys — caches the Trending TV and Popular TV carousels like movies, see TvShowDao).
-    // fallbackToDestructiveMigration() is set in DatabaseModule, so each bump resets local Favorites
-    // once on first run after the update — same as the Phase 2 search_history addition did; flagged
-    // to Ahsan each time.
-    version = 6,
+    // Bumped 6 -> 7 for Session 6's composite-key Favorites migration: `favorites` gains a
+    // mediaType column and its id becomes composite (id, mediaType) so TV shows can be favorited
+    // without colliding with same-numbered movies. Unlike every prior bump (which reset Favorites
+    // via fallbackToDestructiveMigration), this one is a real Migration — MIGRATION_6_7 rebuilds
+    // the favorites table and replays existing movie favorites into it, so users keep their saved
+    // movies.
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -53,5 +58,30 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "movie_app.db"
+
+        // Session 6 — the project's first real Room Migration. SQLite can't ALTER a primary key,
+        // so the favorites table is recreated: new composite-key shape `(id, mediaType)`, every
+        // existing row replayed as a `'movie'` favorite (they all were, pre-Session 6). Must match
+        // FavoriteEntity exactly or Room's schema validation fails at open. See the Database
+        // annotation's bump comment for the full change history.
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `favorites_new` (
+                        `id` INTEGER NOT NULL,
+                        `mediaType` TEXT NOT NULL,
+                        `addedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`, `mediaType`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "INSERT INTO `favorites_new` (`id`, `mediaType`, `addedAt`) SELECT `movieId`, 'movie', `addedAt` FROM `favorites`"
+                )
+                db.execSQL("DROP TABLE `favorites`")
+                db.execSQL("ALTER TABLE `favorites_new` RENAME TO `favorites`")
+            }
+        }
     }
 }

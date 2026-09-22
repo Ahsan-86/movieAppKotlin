@@ -22,6 +22,9 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
+            // Session 6 — the project's first explicit Room migration (composite-key Favorites),
+            // wired before the destructive fallback so existing movie favorites survive the bump.
+            .addMigrations(AppDatabase.MIGRATION_6_7)
             .fallbackToDestructiveMigration()
             .build()
 

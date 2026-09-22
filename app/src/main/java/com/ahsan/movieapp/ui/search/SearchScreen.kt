@@ -34,6 +34,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
@@ -74,6 +75,7 @@ import coil.compose.AsyncImage
 import com.ahsan.movieapp.data.repository.SearchViewMode
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
+import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.ui.components.EmptyState
@@ -104,7 +106,7 @@ fun SearchScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     // Subscribed unconditionally, same as every other paginated screen — each flow internally
-    // switches to a fresh Pager per debounced query / applied filter set (flatMapLatest, see
+    // switches to a fresh Pager per submitted query / applied filter set (flatMapLatest, see
     // SearchViewModel), so there's nothing to gate on state.query here; an inactive one just sits
     // on PagingData.empty() until its query/filters are non-null.
     val pagedSearchMovies = viewModel.pagedSearchMovies.collectAsLazyPagingItems()
@@ -123,13 +125,21 @@ fun SearchScreen(
     val resultsListState = rememberLazyListState()
     val resultsGridState = rememberLazyGridState()
 
+    // Session 6 — the results branches key off what was actually COMMITTED, not the typed text
+    // (`query`). Typing without submitting stays on the blank home content, so a first keystroke
+    // can never flip the screen into the results layout while its Paging flow is still unloaded
+    // (that was the "full-screen loader while typing on the first search" bug — the never-loaded
+    // flow reported refresh Loading, and typing alone was enough to enter that branch).
+    val hasActiveTextResults = state.committedQuery.isNotBlank() && state.query.isNotBlank()
+    val hasActiveFilterResults = state.isFilterApplied && state.query.isBlank()
+
     LaunchedEffect(scrollToTopEvents) {
         scrollToTopEvents?.collect {
             when {
-                state.query.isBlank() && !state.isFilterApplied -> blankListState.animateScrollToItem(0)
+                !hasActiveTextResults && !hasActiveFilterResults -> blankListState.animateScrollToItem(0)
                 // Filtered results reuse the same list/grid states as text-search results below —
                 // the two are mutually exclusive (filters only apply while the query is blank).
-                state.query.isBlank() && state.isFilterApplied -> {
+                hasActiveFilterResults -> {
                     if (state.viewMode == SearchViewMode.LIST) resultsListState.animateScrollToItem(0)
                     else resultsGridState.animateScrollToItem(0)
                 }
@@ -148,19 +158,29 @@ fun SearchScreen(
         .padding(16.dp)) {
         OutlinedTextField(
             value = state.query,
-            onValueChange = viewModel::onQueryChanged,
+            // Session 6 — typing only edits the text; the query executes on submit (IME search
+            // action or the trailing button) via onSearchSubmit, never as you type.
+            onValueChange = viewModel::onQueryInput,
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
                 // The movie grid has its own loadState-driven loading UI (FullScreenLoading /
                 // PagingAppendFooter); this spinner just reflects the two one-shot fetches (people
-                // + TV Shows rows), the last "single Result call per debounced query"s left on
-                // this screen.
+                // + TV Shows rows), the last "single Result call per submitted query"s left on
+                // this screen. When not searching, a committed (non-blank) query shows the submit
+                // button — the other way to run the search besides the IME's Search key.
                 if (state.isSearchingPeople || state.isSearchingTv) {
                     CircularProgressIndicator(modifier = Modifier
                         .padding(8.dp)
                         .size(20.dp), strokeWidth = 2.dp)
+                } else if (state.query.isNotBlank()) {
+                    IconButton(onClick = {
+                        viewModel.onSearchSubmit()
+                        keyboardController?.hide()
+                    }) {
+                        Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search))
+                    }
                 }
             },
             singleLine = true,
@@ -172,7 +192,7 @@ fun SearchScreen(
         )
 
         when {
-            state.query.isBlank() && state.isFilterApplied -> Column(modifier = Modifier.fillMaxSize()) {
+            hasActiveFilterResults -> Column(modifier = Modifier.fillMaxSize()) {
                 FilterSummaryBar(
                     filters = state.filters,
                     onEdit = viewModel::onEditFilters,
@@ -221,23 +241,7 @@ fun SearchScreen(
                     }
                 }
             }
-            state.query.isBlank() -> BlankSearchContent(
-                recentSearches = state.recentSearches,
-                genreChips = state.genreChips,
-                onRecentClick = viewModel::onRecentSearchClick,
-                onClearAll = viewModel::clearSearchHistory,
-                onGenreClick = onGenreClick,
-                listState = blankListState,
-                filters = state.filters,
-                isFilterPanelExpanded = state.isFilterPanelExpanded,
-                onToggleFilterPanel = viewModel::onToggleFilterPanel,
-                onGenreFilterSelected = viewModel::onGenreFilterSelected,
-                onYearFilterSelected = viewModel::onYearFilterSelected,
-                onLanguageFilterSelected = viewModel::onLanguageFilterSelected,
-                onMinRatingFilterChanged = viewModel::onMinRatingFilterChanged,
-                onApplyFilters = viewModel::onApplyFilters
-            )
-            else -> {
+            hasActiveTextResults -> {
                 val moviesRefresh = pagedSearchMovies.loadState.refresh
                 val nothingLoadedYet = pagedSearchMovies.itemCount == 0 && state.people.isEmpty() && state.tvShows.isEmpty()
                 when {
@@ -306,6 +310,23 @@ fun SearchScreen(
                     }
                 }
             }
+            else -> BlankSearchContent(
+                recentSearches = state.recentSearches,
+                genreChips = state.genreChips,
+                onRecentClick = viewModel::onRecentSearchClick,
+                onRemoveRecent = viewModel::onDeleteRecentSearch,
+                onClearAll = viewModel::clearSearchHistory,
+                onGenreClick = onGenreClick,
+                listState = blankListState,
+                filters = state.filters,
+                isFilterPanelExpanded = state.isFilterPanelExpanded,
+                onToggleFilterPanel = viewModel::onToggleFilterPanel,
+                onGenreFilterSelected = viewModel::onGenreFilterSelected,
+                onYearFilterSelected = viewModel::onYearFilterSelected,
+                onLanguageFilterSelected = viewModel::onLanguageFilterSelected,
+                onMinRatingFilterChanged = viewModel::onMinRatingFilterChanged,
+                onApplyFilters = viewModel::onApplyFilters
+            )
         }
     }
 }
@@ -390,6 +411,7 @@ private fun BlankSearchContent(
     recentSearches: List<String>,
     genreChips: List<GenreChip>,
     onRecentClick: (String) -> Unit,
+    onRemoveRecent: (String) -> Unit,
     onClearAll: () -> Unit,
     onGenreClick: (GenreChip) -> Unit,
     listState: LazyListState,
@@ -429,7 +451,7 @@ private fun BlankSearchContent(
         }
         if (recentSearches.isNotEmpty()) {
             item {
-                RecentSearchesSection(recentSearches = recentSearches, onRecentClick = onRecentClick, onClearAll = onClearAll)
+                RecentSearchesSection(recentSearches = recentSearches, onRecentClick = onRecentClick, onRemoveRecent = onRemoveRecent, onClearAll = onClearAll)
             }
         }
         item {
@@ -448,6 +470,7 @@ private fun BlankSearchContent(
 private fun RecentSearchesSection(
     recentSearches: List<String>,
     onRecentClick: (String) -> Unit,
+    onRemoveRecent: (String) -> Unit,
     onClearAll: () -> Unit
 ) {
     Column(modifier = Modifier.padding(top = 16.dp)) {
@@ -473,6 +496,20 @@ private fun RecentSearchesSection(
                             contentDescription = null,
                             modifier = Modifier.size(AssistChipDefaults.IconSize)
                         )
+                    },
+                    trailingIcon = {
+                        IconButton(
+                            // The chip's core onClick runs the search again; this dismisses just
+                            // this one history entry instead of the whole list (Clear all).
+                            onClick = { onRemoveRecent(query) },
+                            modifier = Modifier.size(AssistChipDefaults.IconSize)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.search_remove_recent),
+                                modifier = Modifier.size(AssistChipDefaults.IconSize)
+                            )
+                        }
                     }
                 )
             }
@@ -585,7 +622,7 @@ private fun SearchResultsGrid(
     // Live favorites set — the paged Movie snapshot's isFavorite goes stale after a toggle in
     // this screen, so each item re-stamps itself against this set at render time. See
     // SearchViewModel.favoriteIds for why.
-    favoriteIds: Set<Int>
+    favoriteIds: Set<Pair<Int, MediaType>>
 ) {
     LazyVerticalGrid(
         columns = columns,
@@ -602,7 +639,7 @@ private fun SearchResultsGrid(
         }
         if (tvShows.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                TvShowsResultsRow(tvShows = tvShows, onTvClick = onTvClick)
+                TvShowsResultsRow(tvShows = tvShows, onTvClick = onTvClick, onToggleFavorite = onToggleFavorite, favoriteIds = favoriteIds)
             }
         }
         if (movies.itemCount > 0) {
@@ -617,7 +654,7 @@ private fun SearchResultsGrid(
             }
             items(count = movies.itemCount, key = movies.itemKey { it.id }) { index ->
                 val movie = movies[index] ?: return@items
-                val displayMovie = if (movie.isFavorite == (movie.id in favoriteIds)) movie else movie.copy(isFavorite = movie.id in favoriteIds)
+                val displayMovie = if (movie.isFavorite == ((movie.id to movie.mediaType) in favoriteIds)) movie else movie.copy(isFavorite = (movie.id to movie.mediaType) in favoriteIds)
                 MoviePosterCard(
                     movie = displayMovie,
                     onClick = { onMovieClick(displayMovie) },
@@ -643,7 +680,7 @@ private fun SearchResultsList(
     onPersonClick: (Person) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
     listState: LazyListState,
-    favoriteIds: Set<Int>
+    favoriteIds: Set<Pair<Int, MediaType>>
 ) {
     LazyColumn(
         state = listState,
@@ -654,7 +691,7 @@ private fun SearchResultsList(
             item { PeopleResultsRow(people = people, onPersonClick = onPersonClick) }
         }
         if (tvShows.isNotEmpty()) {
-            item { TvShowsResultsRow(tvShows = tvShows, onTvClick = onTvClick) }
+            item { TvShowsResultsRow(tvShows = tvShows, onTvClick = onTvClick, onToggleFavorite = onToggleFavorite, favoriteIds = favoriteIds) }
         }
         if (movies.itemCount > 0) {
             if (people.isNotEmpty() || tvShows.isNotEmpty()) {
@@ -668,7 +705,7 @@ private fun SearchResultsList(
             }
             items(count = movies.itemCount, key = movies.itemKey { it.id }) { index ->
                 val movie = movies[index] ?: return@items
-                val displayMovie = if (movie.isFavorite == (movie.id in favoriteIds)) movie else movie.copy(isFavorite = movie.id in favoriteIds)
+                val displayMovie = if (movie.isFavorite == ((movie.id to movie.mediaType) in favoriteIds)) movie else movie.copy(isFavorite = (movie.id to movie.mediaType) in favoriteIds)
                 MovieListRow(movie = displayMovie, onClick = { onMovieClick(displayMovie) }, onToggleFavorite = { onToggleFavorite(displayMovie) })
             }
             item { PagingAppendFooter(pagingItems = movies) }
@@ -695,11 +732,17 @@ private fun PeopleResultsRow(people: List<Person>, onPersonClick: (Person) -> Un
 
 /**
  * A LazyRow for the search screen's TV results, grouped separately from the movie grid the same
- * way people are. TV shows can't be favorited yet (the Favorites schema is movie-id only), so the
- * cards render without a heart toggle — same convention as Explore's Popular TV Shows row.
+ * way people are. Session 6 — TV cards now render a heart like movies (the composite-key Favorites
+ * table can hold both), re-stamping each row's [Movie.isFavorite] against [favoriteIds] at render
+ * time, same live-set trick as the movie grid above.
  */
 @Composable
-private fun TvShowsResultsRow(tvShows: List<Movie>, onTvClick: (Movie) -> Unit) {
+private fun TvShowsResultsRow(
+    tvShows: List<Movie>,
+    onTvClick: (Movie) -> Unit,
+    onToggleFavorite: (Movie) -> Unit,
+    favoriteIds: Set<Pair<Int, MediaType>>
+) {
     Column {
         Text(
             text = stringResource(R.string.tv_shows),
@@ -708,10 +751,11 @@ private fun TvShowsResultsRow(tvShows: List<Movie>, onTvClick: (Movie) -> Unit) 
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(tvShows, key = { it.id }) { tvShow ->
+                val displayTv = if (tvShow.isFavorite == ((tvShow.id to tvShow.mediaType) in favoriteIds)) tvShow else tvShow.copy(isFavorite = (tvShow.id to tvShow.mediaType) in favoriteIds)
                 MoviePosterCard(
-                    movie = tvShow,
-                    onClick = { onTvClick(tvShow) },
-                    onToggleFavorite = null
+                    movie = displayTv,
+                    onClick = { onTvClick(displayTv) },
+                    onToggleFavorite = { onToggleFavorite(displayTv) }
                 )
             }
         }

@@ -69,10 +69,10 @@ interface MovieDao {
      */
     @Query(
         """
-        SELECT movies.*, CASE WHEN favorites.movieId IS NOT NULL THEN 1 ELSE 0 END AS isFavorite
+        SELECT movies.*, CASE WHEN favorites.id IS NOT NULL THEN 1 ELSE 0 END AS isFavorite
         FROM movies
         INNER JOIN category_movies ON movies.id = category_movies.movieId
-        LEFT JOIN favorites ON movies.id = favorites.movieId
+        LEFT JOIN favorites ON movies.id = favorites.id AND favorites.mediaType = 'movie'
         WHERE category_movies.category = :category
         ORDER BY category_movies.position ASC
         """
@@ -130,8 +130,8 @@ interface MovieDao {
     @Query(
         """
         SELECT movies.* FROM movies
-        INNER JOIN favorites ON movies.id = favorites.movieId
-        WHERE favorites.movieId = :movieId
+        INNER JOIN favorites ON movies.id = favorites.id
+        WHERE favorites.id = :movieId AND favorites.mediaType = 'movie'
         LIMIT 1
         """
     )

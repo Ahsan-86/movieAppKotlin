@@ -7,6 +7,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.ahsan.movieapp.data.repository.MovieRepository
 import com.ahsan.movieapp.domain.model.DiscoverFilters
+import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.person.MediaTab
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -83,10 +84,12 @@ class GenreViewModel @Inject constructor(
     val movieFilteredTotal: StateFlow<Int?> = movieTotal.asStateFlow()
     val tvFilteredTotal: StateFlow<Int?> = tvTotal.asStateFlow()
 
-    // Live set of favorited movie ids — the UI re-stamps each paginated movie's isFavorite against
-    // this at render time so hearts flip immediately on toggle (see class doc / SearchViewModel).
-    val favoriteIds: StateFlow<Set<Int>> = repository.observeFavorites()
-        .map { favorites -> favorites.mapTo(mutableSetOf()) { it.id } }
+    // Live set of favorited (id, mediaType) pairs — the UI re-stamps each paginated item's
+    // isFavorite against this at render time so hearts flip immediately on toggle (see class doc /
+    // SearchViewModel). Keyed by mediaType too since Session 6 lets both tabs favorite: a movie and
+    // a same-numbered TV show are separate favorites.
+    val favoriteIds: StateFlow<Set<Pair<Int, MediaType>>> = repository.observeFavorites()
+        .map { favorites -> favorites.mapTo(mutableSetOf()) { it.id to it.mediaType } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     // Null when this chip has no movie genre at all (a TV-only chip) — nothing to page there.
@@ -129,9 +132,11 @@ class GenreViewModel @Inject constructor(
     fun toggleFavorite(movie: Movie) {
         // No optimistic state update needed here: the unfiltered Movies tab reads through Room,
         // whose PagingSource query already joins `favorites` — a toggle re-invalidates it
-        // automatically and Paging 3 diffs in just the changed row. (TV shows can't be favorited
-        // yet; the filtered Movies path follows DiscoverPagingSource's snapshot trade-off, noted
-        // in the class doc.)
+        // automatically and Paging 3 diffs in just the changed row. The TV tab (Session 6) and the
+        // filtered Movies path re-stamp against the live [favoriteIds] set at render time instead,
+        // so those hearts flip immediately too (the filtered path does follow
+        // DiscoverPagingSource's snapshot trade-off when the generic grid first pages, noted in
+        // the class doc).
         viewModelScope.launch { repository.toggleFavorite(movie) }
     }
 

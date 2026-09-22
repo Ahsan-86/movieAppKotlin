@@ -125,8 +125,8 @@ interface MovieRepository {
      * `movies` table would collide with a movie that happens to share the same numeric id — the
      * dedicated `tv_shows` cache is keyed by curated carousel, not searches, per Session 3).
      * Results come back as [Movie] via the same [com.ahsan.movieapp.data.mapper.toMovie] bridge
-     * every other TV listing uses, so they render through the shared poster-card components with
-     * `isFavorite = false`.
+     * every other TV listing uses; TV rows can now be favorited (Session 6's composite-key Favorites),
+     * and the search screen re-stamps their hearts against a live favorites set at render time.
      */
     suspend fun searchTvShows(query: String): Result<List<Movie>>
 
@@ -146,6 +146,9 @@ interface MovieRepository {
 
     suspend fun clearSearchHistory()
 
+    /** Removes a single query from recent-search history (the per-chip delete button). */
+    suspend fun deleteSearchHistory(query: String)
+
     /** A curated set of genres with a real poster pulled from whatever's already cached for that genre. */
     suspend fun getGenreChips(): Result<List<GenreChip>>
 
@@ -164,9 +167,9 @@ interface MovieRepository {
      * Phase 2.6 Session 3 — the TV counterpart of [getCategory], backing the Explore screen's TV
      * carousels (Trending TV Shows, Popular TV Shows). Offline-first the same way: emits the cached
      * page-1 listing from Room immediately, refreshes from TMDB in the background, re-emits on
-     * change. Rows come back as [Movie] (via TvShowEntity.toDomain) always with `isFavorite =
-     * false` — TV ids share TMDB's numeric range with movies, so they must never touch the
-     * movie-only [getFavorites][observeFavorites] table until Session 6's composite-key migration.
+     * change. Rows come back as [Movie] (via TvShowEntity.toDomain) with [com.ahsan.movieapp.domain.model.MediaType] TV;
+     * favorite status is fused live from the TV half of the Session 6 favorites table, so hearts
+     * flip on the carousels just like movie rows.
      */
     fun getCategoryTv(category: TvCategory): Flow<Resource<List<Movie>>>
 
@@ -189,10 +192,24 @@ interface MovieRepository {
      */
     fun getPagedDiscoverMovies(filters: DiscoverFilters, totalResults: MutableStateFlow<Int?>? = null): Flow<PagingData<Movie>>
 
+    /** All saved favorites — movies and TV shows together, each stamped `isFavorite = true` (their
+     *  [com.ahsan.movieapp.domain.model.MediaType] keeps the two apart even with shared TMDB ids).
+     *  Drives the render-time heart re-stamping on the search/genre/person screens. */
     fun observeFavorites(): Flow<List<Movie>>
 
-    fun isFavorite(movieId: Int): Flow<Boolean>
+    /** Movie favorites only, newest-added first — backs the Favorites screen's Movies tab. */
+    fun observeFavoriteMovies(): Flow<List<Movie>>
 
+    /** TV-show favorites only, newest-added first — backs the Favorites screen's TV Shows tab
+     *  (Session 6). Same [Movie] shape as everything else; each row's [com.ahsan.movieapp.domain.model.MediaType] is TV. */
+    fun observeFavoriteTvShows(): Flow<List<Movie>>
+
+    /** Session 6 — whether a specific media item is favorited; the composite key keeps a movie and a
+     *  same-numbered TV show distinct. */
+    fun isFavorite(movieId: Int, mediaType: com.ahsan.movieapp.domain.model.MediaType): Flow<Boolean>
+
+    /** Toggles the favorite flag for [movie], using its own [com.ahsan.movieapp.domain.model.MediaType] —
+     *  a TV show favorite never collides with a same-numbered movie favorite (Session 6). */
     suspend fun toggleFavorite(movie: Movie)
 
     /** Refreshes every list category from the network; used by the background sync worker. */

@@ -26,7 +26,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -85,10 +88,12 @@ import com.ahsan.movieapp.ui.components.rememberBackdropPalette
  * per the same feedback round), Information, Similar, and Recommendations sections (Session 1,
  * following the same layout pattern as [com.ahsan.movieapp.ui.detail.MovieDetailScreen] — the last
  * three added on Ahsan's post-build feedback, "where is information and similar and recommendation
- * sections?", after the initial narrower build shipped). Still deliberately excludes what these
- * rounds don't cover: no favorite toggle (needs Session 6's Favorites schema migration), and no
- * collection-teaser/streaming-availability sections (movie-specific — TV has no TMDB "collection"
- * concept and no round has extended Round C's watch-providers work to TV). The Cast & Crew heading
+ * sections?", after the initial narrower build shipped). Session 6 added the favorite
+ * FloatingActionButton (the same shape as [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s),
+ * now that the composite-key Favorites table holds TV ids. Still deliberately excludes what these
+ * rounds don't cover: no collection-teaser/streaming-availability sections (movie-specific — TV
+ * has no TMDB "collection" concept and no round has extended Round C's watch-providers work to
+ * TV). The Cast & Crew heading
  * carries the same "view all" arrow as [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s, opening
  * the media-agnostic cast & crew list for this show's full cast + director.
  *
@@ -122,6 +127,8 @@ fun TvDetailScreen(
     viewModel: TvDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    // Session 6 — favorite heart for the FloatingActionButton, live off the Favorites table.
+    val isFavorite by viewModel.isFavorite.collectAsState()
     val scrollState = rememberScrollState()
 
     // The hero is now the poster itself (2026-09-22, PersonHero-style), so the palette comes from
@@ -181,7 +188,23 @@ fun TvDetailScreen(
         // (and, in the loading/error states, the plain background) run all the way to the top of
         // the screen instead of stopping below a reserved app-bar-height gap. Same treatment as
         // PersonScreen.
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            // Session 6 — the favorite FAB, mirroring MovieDetailScreen's: only once details have
+            // loaded (there's nothing to toggle against the empty state), heart reflects the live
+            // isFavorite above.
+            if (state.details != null) {
+                FloatingActionButton(
+                    onClick = { viewModel.toggleFavorite() },
+                    containerColor = MaterialTheme.colorScheme.secondary
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = null
+                    )
+                }
+            }
+        }
     ) { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             when {

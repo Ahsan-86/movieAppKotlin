@@ -7,9 +7,11 @@ import androidx.room.PrimaryKey
  * Phase 2.6 Session 3 — one row per TV show TMDB has ever returned to us across the cached TV
  * carousels (Trending TV, Popular TV). The TV mirror of [MovieEntity], deliberately in its own
  * `tv_shows` table rather than the shared `movies` table: TMDB reuses one numeric ID range across
- * movies and TV, so a TV id must never share the movie cache (or, more importantly, the
- * movie-only `favorites` table) until Session 6's composite-key migration. Fields track the TV
- * API's names (`name`, `first_air_date`) rather than the movie API's (`title`, `release_date`).
+ * movies and TV, so a TV id must never share the movie cache. Since Session 6, TV favorites DO
+ * live in the shared `favorites` table — but by the composite `(id, mediaType)` key with
+ * `mediaType = 'tv'`, which is what keeps a same-numbered movie and TV show from colliding.
+ * Fields track the TV API's names (`name`, `first_air_date`) rather than the movie API's
+ * (`title`, `release_date`).
  */
 @Entity(tableName = "tv_shows")
 data class TvShowEntity(

@@ -13,10 +13,11 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Phase 2.6 Session 3 — the `tv_shows`/`category_tv_shows`/`tv_remote_keys` mirror of [MovieDao],
- * backing the Explore screen's TV carousels the exact same way movies are backed. Deliberately no
- * favorites `LEFT JOIN` anywhere (unlike [MovieDao.pagingSourceForCategory]): TV ids share TMDB's
- * numeric range with movie ids, so a cross-media match would wrongly badge a TV show as a movie
- * favorite — TV rows are always `isFavorite = false` until Session 6's composite-key migration.
+ * backing the Explore screen's TV carousels the exact same way movies are backed. TV favorites
+ * DON'T live here as a join — since Session 6 they're in the separate composite-key `favorites`
+ * table (`mediaType = 'tv'`), folded in by MovieRepository.getCategoryTv via a favorites flow
+ * (see MovieRepositoryImpl), never as a SQL join: TV ids share TMDB's numeric range with movie
+ * ids and the two tables' keys mean nothing to each other.
  */
 @Dao
 interface TvShowDao {

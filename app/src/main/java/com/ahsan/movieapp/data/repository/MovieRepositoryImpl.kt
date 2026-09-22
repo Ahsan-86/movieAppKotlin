@@ -13,6 +13,7 @@ import com.ahsan.movieapp.data.local.dao.TvShowDao
 import com.ahsan.movieapp.data.local.entity.FavoriteEntity
 import com.ahsan.movieapp.data.local.entity.MovieEntity
 import com.ahsan.movieapp.data.local.entity.SearchHistoryEntity
+import com.ahsan.movieapp.data.local.entity.TvShowEntity
 import com.ahsan.movieapp.data.mapper.combineToMovieDetails
 import com.ahsan.movieapp.data.mapper.toDomain
 import com.ahsan.movieapp.data.mapper.toEntity
@@ -34,6 +35,7 @@ import com.ahsan.movieapp.data.remote.dto.TvShowDto
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
+import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.MovieCategory
 import com.ahsan.movieapp.domain.model.MovieCollection
@@ -213,7 +215,7 @@ class MovieRepositoryImpl @Inject constructor(
             combine(
                 movieDao.observeMovie(movieId),
                 movieDao.observeMovieDetails(movieId),
-                favoriteDao.isFavorite(movieId)
+                favoriteDao.isFavorite(movieId, MediaType.MOVIE.stored)
             ) { base, extra, favorite ->
                 base?.let { combineToMovieDetails(it, extra, favorite) }
             }
@@ -360,8 +362,8 @@ class MovieRepositoryImpl @Inject constructor(
         )
 
     /** Phase 2.6 Session 3 — see the interface doc. Same offline-first mechanism as [getCategory],
-     *  over the new `tv_shows` cache tables; never combines with the movie favorite table (TV rows
-     *  are always `isFavorite = false` — cross-media id collision, see `TvShowEntity.toDomain`). */
+     *  over the new `tv_shows` cache tables; since Session 6's composite-key migration, the TV
+     *  favorites table fuses in via [cachedCategoryTvFlow], so hearts on TV carousels are live. */
     override fun getCategoryTv(category: TvCategory): Flow<Resource<List<Movie>>> =
         cachedCategoryTvFlow(
             storageKey = category.storageKey,
@@ -389,33 +391,78 @@ class MovieRepositoryImpl @Inject constructor(
         searchHistoryDao.clearAll()
     }
 
+    override suspend fun deleteSearchHistory(query: String) {
+        searchHistoryDao.deleteSearch(query)
+    }
+
+    /** Session 6 — every favorite (movies and TV shows), movies first then TV, each stamped
+     *  `isFavorite = true`. [Movie.mediaType] keeps same-numbered movies and TV shows apart; the
+     *  UI re-stamps whatever it renders against this (search/genre/person) or consumes it directly
+     *  (the Favorites screen, which splits it by tab). */
     override fun observeFavorites(): Flow<List<Movie>> =
+        combine(
+            favoriteDao.observeFavoriteMovies(),
+            favoriteDao.observeFavoriteTvShows()
+        ) { movies, tvShows ->
+            movies.map { it.toDomain(isFavorite = true) } + tvShows.map { it.toDomain(isFavorite = true) }
+        }
+
+    override fun observeFavoriteMovies(): Flow<List<Movie>> =
         favoriteDao.observeFavoriteMovies().map { list -> list.map { it.toDomain(isFavorite = true) } }
 
-    override fun isFavorite(movieId: Int): Flow<Boolean> = favoriteDao.isFavorite(movieId)
+    override fun observeFavoriteTvShows(): Flow<List<Movie>> =
+        favoriteDao.observeFavoriteTvShows().map { list -> list.map { it.toDomain(isFavorite = true) } }
+
+    override fun isFavorite(movieId: Int, mediaType: MediaType): Flow<Boolean> =
+        favoriteDao.isFavorite(movieId, mediaType.stored)
 
     override suspend fun toggleFavorite(movie: Movie) {
-        val currentlyFavorite = favoriteDao.isFavorite(movie.id).first()
+        val currentlyFavorite = favoriteDao.isFavorite(movie.id, movie.mediaType.stored).first()
         if (currentlyFavorite) {
-            favoriteDao.removeFavorite(movie.id)
+            favoriteDao.removeFavorite(movie.id, movie.mediaType.stored)
         } else {
-            movieDao.upsertMovies(
-                listOf(
-                    MovieEntity(
-                        id = movie.id,
-                        title = movie.title,
-                        overview = movie.overview,
-                        posterPath = movie.posterUrl?.substringAfterLast("/")?.let { "/$it" },
-                        backdropPath = movie.backdropUrl?.substringAfterLast("/")?.let { "/$it" },
-                        releaseDate = movie.releaseDate,
-                        voteAverage = movie.voteAverage,
-                        voteCount = movie.voteCount,
-                        genreIds = movie.genreIds,
-                        cachedAt = System.currentTimeMillis()
+            when (movie.mediaType) {
+                // Movies keep the existing behavior: upsert into the shared `movies` cache...
+                MediaType.MOVIE -> movieDao.upsertMovies(
+                    listOf(
+                        MovieEntity(
+                            id = movie.id,
+                            title = movie.title,
+                            overview = movie.overview,
+                            posterPath = movie.posterUrl?.substringAfterLast("/")?.let { "/$it" },
+                            backdropPath = movie.backdropUrl?.substringAfterLast("/")?.let { "/$it" },
+                            releaseDate = movie.releaseDate,
+                            voteAverage = movie.voteAverage,
+                            voteCount = movie.voteCount,
+                            genreIds = movie.genreIds,
+                            cachedAt = System.currentTimeMillis()
+                        )
                     )
                 )
+                // ...TV shows, Session 6, into the `tv_shows` cache instead — never the movie
+                // table, since the id ranges overlap. This is what lets the Favorites screen's TV
+                // tab join the favorite back out of Room even when the show was toggled from a
+                // network-only surface (search row, genre grid).
+                MediaType.TV -> tvShowDao.upsertTvShows(
+                    listOf(
+                        TvShowEntity(
+                            id = movie.id,
+                            name = movie.title,
+                            overview = movie.overview,
+                            posterPath = movie.posterUrl?.substringAfterLast("/")?.let { "/$it" },
+                            backdropPath = movie.backdropUrl?.substringAfterLast("/")?.let { "/$it" },
+                            firstAirDate = movie.releaseDate,
+                            voteAverage = movie.voteAverage,
+                            voteCount = movie.voteCount,
+                            genreIds = movie.genreIds,
+                            cachedAt = System.currentTimeMillis()
+                        )
+                    )
+                )
+            }
+            favoriteDao.addFavorite(
+                FavoriteEntity(id = movie.id, mediaType = movie.mediaType.stored, addedAt = System.currentTimeMillis())
             )
-            favoriteDao.addFavorite(FavoriteEntity(movieId = movie.id, addedAt = System.currentTimeMillis()))
         }
     }
 
@@ -555,15 +602,24 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * Phase 2.6 Session 3 — [cachedCategoryFlow]'s TV counterpart, over the `tv_shows` tables.
-     * Same offline-first/staleness behavior, with two deliberate differences: no favorites `combine`
-     * (TV rows are always `isFavorite = false` — cross-media id collision, see [TvShowDao]), and a
-     * room-table row maps straight back to [Movie] via [com.ahsan.movieapp.data.mapper.toDomain].
+     * Same offline-first/staleness behavior, with one Session 6 change: the TV half of the
+     * composite-key `favorites` table is fused in exactly like the movie version fuses
+     * [observeFavoriteMovies] — a TV favorite and a same-numbered movie favorite are distinct rows
+     * now, so a cross-media id can never wrongly badge a show as a movie favorite.
      */
     private fun cachedCategoryTvFlow(
         storageKey: String,
         fetch: suspend () -> List<TvShowDto>
     ): Flow<Resource<List<Movie>>> = networkBoundResource(
-        query = { tvShowDao.observeCategoryTv(storageKey).map { shows -> shows.map { it.toDomain() } } },
+        query = {
+            combine(
+                tvShowDao.observeCategoryTv(storageKey),
+                favoriteDao.observeFavoriteTvShows()
+            ) { shows, favorites ->
+                val favoriteIds = favorites.mapTo(mutableSetOf()) { it.id }
+                shows.map { it.toDomain(isFavorite = it.id in favoriteIds) }
+            }
+        },
         fetch = fetch,
         saveFetchResult = { dtos ->
             val now = System.currentTimeMillis()

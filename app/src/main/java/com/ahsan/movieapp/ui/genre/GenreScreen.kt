@@ -34,6 +34,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FilterPanelSection
@@ -146,10 +147,10 @@ fun GenreScreen(
                         pagingItems = pagedTvShows,
                         emptyBody = stringResource(R.string.genre_no_tv_shows_found, state.genreName),
                         onItemClick = onTvClick,
-                        // TV shows can't be favorited yet — no schema support for TV favorites.
-                        onToggleFavorite = null,
-                        // No heart to flip on this grid, so no live set to stamp against.
-                        favoriteIds = emptySet()
+                        // Session 6 — TV shows are favoritable now (composite-key Favorites
+                        // table), so the TV tab gets the same live heart + re-stamp as movies.
+                        onToggleFavorite = { movie -> viewModel.toggleFavorite(movie) },
+                        favoriteIds = favoriteIds
                     )
                 } else if (!isTv && pagedMovies != null) {
                     GenrePagedGrid(
@@ -167,16 +168,16 @@ fun GenreScreen(
 
 /** Shared grid for both of [GenreScreen]'s tabs — same loading/error/empty/append handling,
  *  paging library, and layout either way, just a different [LazyPagingItems] source, empty-state
- *  message, click handler, and favoriting behavior. [favoriteIds] re-stamps each movie's
- *  isFavorite at render time (see SearchViewModel.favoriteIds for the why) so the movies tab's
- *  hearts flip immediately on toggle; the TV tab passes an empty set since it has no hearts. */
+ *  message, click handler, and favoriting behavior. [favoriteIds] re-stamps each item's
+ *  isFavorite at render time (see SearchViewModel.favoriteIds for the why) so both tabs' hearts
+ *  flip immediately on toggle. */
 @Composable
 private fun GenrePagedGrid(
     pagingItems: LazyPagingItems<Movie>,
     emptyBody: String,
     onItemClick: (Movie) -> Unit,
     onToggleFavorite: ((Movie) -> Unit)?,
-    favoriteIds: Set<Int>
+    favoriteIds: Set<Pair<Int, MediaType>>
 ) {
     val refreshState = pagingItems.loadState.refresh
     when {
@@ -195,7 +196,7 @@ private fun GenrePagedGrid(
         ) {
             items(count = pagingItems.itemCount, key = pagingItems.itemKey { it.id }) { index ->
                 val movie = pagingItems[index] ?: return@items
-                val displayMovie = if (movie.isFavorite == (movie.id in favoriteIds)) movie else movie.copy(isFavorite = movie.id in favoriteIds)
+                val displayMovie = if (movie.isFavorite == ((movie.id to movie.mediaType) in favoriteIds)) movie else movie.copy(isFavorite = (movie.id to movie.mediaType) in favoriteIds)
                 MoviePosterCard(
                     movie = displayMovie,
                     onClick = { onItemClick(displayMovie) },

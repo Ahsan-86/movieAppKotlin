@@ -30,9 +30,18 @@ data class CategoryMovieCrossRef(
     val fetchedAt: Long
 )
 
-@Entity(tableName = "favorites")
+/**
+ * Session 6 — the Favorites table. TMDB reuses one numeric id range across movies and TV, so the
+ * id alone can't identify a favorite: the primary key is the composite `(id, mediaType)`.
+ * [mediaType] keeps the `"movie"`/`"tv"` string (see [com.ahsan.movieapp.domain.model.MediaType]).
+ * The movie/tv *content* lives on row in the `movies`/`tv_shows` cache tables respectively (each
+ * joined by media type — see `FavoriteDao`); this table only records "this thing is a favorite"
+ * plus the ordering timestamp.
+ */
+@Entity(tableName = "favorites", primaryKeys = ["id", "mediaType"])
 data class FavoriteEntity(
-    @PrimaryKey val movieId: Int,
+    val id: Int,
+    val mediaType: String,
     val addedAt: Long
 )
 

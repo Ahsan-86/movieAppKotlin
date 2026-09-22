@@ -93,7 +93,9 @@ fun HomeScreen(
                     onMovieClick = if (section.isTv) {
                         { onTvClick(it) }
                     } else onMovieClick,
-                    onToggleFavorite = if (section.allowFavoriting) { { viewModel.toggleFavorite(it) } } else null
+                    // Session 6 — every row favorite-able, TV included (the hearts come already
+                    // live-stamped from getCategoryTv's favorites combine, no re-stamp needed here).
+                    onToggleFavorite = { viewModel.toggleFavorite(it) }
                 )
             }
         }

@@ -29,6 +29,7 @@ import com.ahsan.movieapp.data.remote.dto.WatchProvidersResponseDto
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.CollectionSummary
 import com.ahsan.movieapp.domain.model.Episode
+import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.MovieCollection
 import com.ahsan.movieapp.domain.model.MovieDetails
@@ -350,14 +351,14 @@ fun CombinedCreditsDto.toDomain(favoriteIds: Set<Int>): PersonCredits {
     val distinctCrew = crew.distinctBy { it.id to it.mediaType to it.job }
 
     return PersonCredits(
-        actingMovies = distinctCast.filter { it.mediaType == "movie" }.map { it.toMovie(favoriteIds) }.sortedByDescending { it.releaseDate },
-        directingMovies = distinctCrew.filter { it.mediaType == "movie" && it.job == "Director" }.map { it.toMovie(favoriteIds) }.sortedByDescending { it.releaseDate },
-        actingTvShows = distinctCast.filter { it.mediaType == "tv" }.map { it.toMovie(favoriteIds) }.sortedByDescending { it.releaseDate },
-        directingTvShows = distinctCrew.filter { it.mediaType == "tv" && it.job == "Director" }.map { it.toMovie(favoriteIds) }.sortedByDescending { it.releaseDate }
+        actingMovies = distinctCast.filter { it.mediaType == "movie" }.map { it.toMovie(favoriteIds, MediaType.MOVIE) }.sortedByDescending { it.releaseDate },
+        directingMovies = distinctCrew.filter { it.mediaType == "movie" && it.job == "Director" }.map { it.toMovie(favoriteIds, MediaType.MOVIE) }.sortedByDescending { it.releaseDate },
+        actingTvShows = distinctCast.filter { it.mediaType == "tv" }.map { it.toMovie(favoriteIds, MediaType.TV) }.sortedByDescending { it.releaseDate },
+        directingTvShows = distinctCrew.filter { it.mediaType == "tv" && it.job == "Director" }.map { it.toMovie(favoriteIds, MediaType.TV) }.sortedByDescending { it.releaseDate }
     )
 }
 
-private fun CombinedCreditDto.toMovie(favoriteIds: Set<Int>): Movie = Movie(
+private fun CombinedCreditDto.toMovie(favoriteIds: Set<Int>, mediaType: MediaType): Movie = Movie(
     id = id,
     title = title ?: name ?: "Untitled",
     overview = overview.orEmpty(),
@@ -367,7 +368,8 @@ private fun CombinedCreditDto.toMovie(favoriteIds: Set<Int>): Movie = Movie(
     voteAverage = voteAverage ?: 0.0,
     voteCount = voteCount ?: 0,
     genreIds = genreIds.orEmpty(),
-    isFavorite = id in favoriteIds
+    isFavorite = id in favoriteIds,
+    mediaType = mediaType
 )
 
 /**
@@ -447,8 +449,10 @@ fun VideosResponseDto.bestYoutubeTrailerKey(): String? {
 }
 
 /**
- * Bridges a `/discover/tv` row into the same [Movie] shape everything else renders — TV shows
- * can't be favorited yet (no schema support), so this always comes back with isFavorite = false.
+ * Bridges a `/discover/tv` row into the same [Movie] shape everything else renders. Session 6 —
+ * TV shows can now be favorited (the composite-key Favorites migration landed), so this stamps
+ * [MediaType.TV]; snippet-favorite status is supplied per screen (search/genre re-stamp against a
+ * live favorites set; home fuses the TV favorites table into its cached TV rows).
  */
 fun TvShowDto.toMovie(): Movie = Movie(
     id = id,
@@ -460,7 +464,26 @@ fun TvShowDto.toMovie(): Movie = Movie(
     voteAverage = voteAverage ?: 0.0,
     voteCount = voteCount ?: 0,
     genreIds = genreIds.orEmpty(),
-    isFavorite = false
+    isFavorite = false,
+    mediaType = MediaType.TV
+)
+
+/** Session 6 — the active TV detail page into the [Movie] shape the Favorites upsert expects. This
+ *  exists separate from [TvShowDto.toMovie] because the detail payload carries genre *names*, not
+ *  ids, and the TV-detail FAB needs only enough to re-render as a favorite — single-source on the
+ *  data the screen already has, no extra fetch. */
+fun TvShowDetails.toMovie(): Movie = Movie(
+    id = id,
+    title = name,
+    overview = overview,
+    posterUrl = posterUrl,
+    backdropUrl = backdropUrl,
+    releaseDate = firstAirDate,
+    voteAverage = voteAverage,
+    voteCount = voteCount,
+    genreIds = emptyList(),
+    isFavorite = false,
+    mediaType = MediaType.TV
 )
 
 /** Phase 2.6 Session 3 — a TV row into the Room `tv_shows` cache table, the [MovieDto.toEntity]
@@ -480,9 +503,10 @@ fun TvShowDto.toTvEntity(cachedAt: Long): TvShowEntity = TvShowEntity(
 )
 
 /** Phase 2.6 Session 3 — a cached `tv_shows` row back into the [Movie] shape the carousels render.
- *  Always `isFavorite = false`: TV ids share TMDB's numeric range with movies, so a cross-media
- *  `favorites` match would be wrong — TV favorites wait for Session 6's composite-key migration. */
-fun TvShowEntity.toDomain(): Movie = Movie(
+ *  Session 6: TV favorites now live in the composite-key `favorites` table, so [isFavorite] is
+ *  caller-supplied the same way the movie row's is ([MovieEntity.toDomain]) — home fuses the TV
+ *  favorites table in, other embedded screens re-stamp against a live set. `Movie.mediaType` is always TV. */
+fun TvShowEntity.toDomain(isFavorite: Boolean = false): Movie = Movie(
     id = id,
     title = name,
     overview = overview,
@@ -492,5 +516,6 @@ fun TvShowEntity.toDomain(): Movie = Movie(
     voteAverage = voteAverage,
     voteCount = voteCount,
     genreIds = genreIds,
-    isFavorite = false
+    isFavorite = isFavorite,
+    mediaType = MediaType.TV
 )

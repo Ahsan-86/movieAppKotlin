@@ -28,12 +28,11 @@ data class HomeSection(
     val movies: List<Movie>,
     val isLoading: Boolean,
     val errorMessage: String? = null,
-    // False for the TV rows — TV items can't be favorited yet (no schema support; TMDB ids are
-    // shared across the numeric id range), same one-screen exception as the genre screen's TV tab.
-    val allowFavoriting: Boolean = true,
     // True only for the TV rows — their items reuse the Movie model (see TvShowEntity.toDomain)
     // but their id is a TV id, not a movie id, so HomeScreen needs to know not to route a tap
-    // through the normal onMovieClick.
+    // through the normal onMovieClick. Favoriting is available on every row since Session 6: the
+    // composite-key Favorites table holds TV ids separately, and getCategoryTv already re-stamps
+    // each row's heart against the live favorites flow (see MovieRepositoryImpl).
     val isTv: Boolean = false
 )
 
@@ -119,7 +118,6 @@ class HomeViewModel @Inject constructor(
                 movies = resource.data.orEmpty(),
                 isLoading = resource is Resource.Loading && resource.data.isNullOrEmpty(),
                 errorMessage = (resource as? Resource.Error)?.message,
-                allowFavoriting = !source.isTv,
                 isTv = source.isTv
             )
         }
@@ -134,7 +132,7 @@ class HomeViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HomeUiState(
             sections = sectionSources.map { source ->
-                HomeSection(source.labelRes, emptyList(), isLoading = true, allowFavoriting = !source.isTv, isTv = source.isTv)
+                HomeSection(source.labelRes, emptyList(), isLoading = true, isTv = source.isTv)
             }
         )
     )

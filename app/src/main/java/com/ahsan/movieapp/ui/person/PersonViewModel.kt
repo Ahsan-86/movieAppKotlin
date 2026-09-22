@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ahsan.movieapp.data.repository.MovieRepository
+import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.PersonCredits
 import com.ahsan.movieapp.domain.model.PersonDetails
@@ -11,8 +12,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
@@ -104,6 +108,14 @@ class PersonViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PersonUiState(personName = personName))
     val uiState: StateFlow<PersonUiState> = _uiState.asStateFlow()
 
+    // Session 6 — live set of favorited (id, mediaType) pairs. The credits snapshot is stamped at
+    // fetch time, so the filmography re-stamps each row's isFavorite against this set at render
+    // time (PersonScreen); keyed by mediaType because a movie and a same-numbered TV show are
+    // separate favorites now.
+    val favoriteIds: StateFlow<Set<Pair<Int, MediaType>>> = repository.observeFavorites()
+        .map { favorites -> favorites.mapTo(mutableSetOf()) { it.id to it.mediaType } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     init {
         load()
     }
@@ -149,6 +161,9 @@ class PersonViewModel @Inject constructor(
     fun toggleFavorite(movie: Movie) {
         viewModelScope.launch {
             repository.toggleFavorite(movie)
+            // One-shot optimistic flip for the *movie* buckets — id-only match is safe there
+            // because every row in those lists is a movie (mediaType MOVIE); the live keyed
+            // [favoriteIds] re-stamp in PersonScreen keeps the TV rows (and any edge case) in sync.
             _uiState.update { state ->
                 val credits = state.credits ?: return@update state
                 fun flip(list: List<Movie>) = list.map { if (it.id == movie.id) it.copy(isFavorite = !it.isFavorite) else it }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
@@ -24,7 +25,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -69,9 +72,11 @@ data class SearchUiState(
  * side flow emits, not just when the paging flow itself emits, so two overlapping generations ended
  * up trying to collect the same page-event flow at once. Do NOT reintroduce a `combine()` (or
  * `zip()`) of a live side flow against a `Flow<PagingData<*>>` before `cachedIn()` — see
- * `SearchMoviesPagingSource`'s class doc for the fix that replaced it. The trade-off: toggling a
- * favorite from these two screens doesn't flip the heart icon live like Trending/Genre do; it's
- * correct again next time the screen re-queries (new search text, or re-applying filters).
+ * `SearchMoviesPagingSource`'s class doc for the fix that replaced it. The remaining visible
+ * trade-off — toggling a favorite from these two screens didn't flip the heart icon live — was
+ * closed on 2026-09-21 with a render-time overlay ([favoriteIds]): each grid/list item re-stamps
+ * its `isFavorite` against the live favorites set as it's composed, so hearts flip immediately
+ * even though the underlying page was stamped from a snapshot.
  *
  * The people row stays a small one-shot fetch per debounced query (see [SearchUiState.people]) —
  * only the first handful of people a query returns are ever shown, so there's nothing to paginate
@@ -97,6 +102,20 @@ class SearchViewModel @Inject constructor(
     private var peopleJob: Job? = null
     private var tvJob: Job? = null
 
+    // Page-1 Discover responses write their total into this flow ([DiscoverPagingSource]); the
+    // screen shows it only while filters are Applied. Reset to null whenever the filter set
+    // changes so a stale count never lingers until the next page 1 arrives.
+    private val filteredTotal = MutableStateFlow<Int?>(null)
+    val filteredResultCount: StateFlow<Int?> = filteredTotal.asStateFlow()
+
+    // Live set of favorited movie ids (from Room's favorites table). The UI re-stamps each
+    // paginated movie's isFavorite against this set at render time, which is what makes toggling a
+    // favorite here flip the heart immediately instead of waiting for the next re-page (see
+    // DiscoverPagingSource/SearchMoviesPagingSource class docs for why the snapshot can't).
+    val favoriteIds: StateFlow<Set<Int>> = repository.observeFavorites()
+        .map { favorites -> favorites.mapTo(mutableSetOf()) { it.id } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     val pagedSearchMovies: Flow<PagingData<Movie>> = queryFlow
         .debounce(350)
         .distinctUntilChanged()
@@ -107,7 +126,7 @@ class SearchViewModel @Inject constructor(
 
     val pagedFilteredMovies: Flow<PagingData<Movie>> = appliedFiltersFlow
         .flatMapLatest { filters ->
-            if (filters == null) flowOf(PagingData.empty()) else repository.getPagedDiscoverMovies(filters)
+            if (filters == null) flowOf(PagingData.empty()) else repository.getPagedDiscoverMovies(filters, filteredTotal)
         }
         .cachedIn(viewModelScope)
 
@@ -199,6 +218,7 @@ class SearchViewModel @Inject constructor(
         val filters = _uiState.value.filters
         if (filters.isEmpty) return
         _uiState.update { it.copy(isFilterApplied = true) }
+        filteredTotal.value = null
         appliedFiltersFlow.value = filters
     }
 
@@ -209,6 +229,7 @@ class SearchViewModel @Inject constructor(
 
     fun onClearFilters() {
         appliedFiltersFlow.value = null
+        filteredTotal.value = null
         _uiState.update { it.copy(filters = DiscoverFilters(), isFilterApplied = false) }
     }
 

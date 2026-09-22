@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.ui.tv
 
+import com.ahsan.movieapp.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -56,7 +59,7 @@ fun SeasonEpisodesScreen(
                 title = { Text(state.seasonName) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -66,9 +69,9 @@ fun SeasonEpisodesScreen(
             when {
                 state.isLoading -> FullScreenLoading()
                 state.episodes.isEmpty() && state.errorMessage != null ->
-                    FullScreenError(message = state.errorMessage ?: "Couldn't load episodes")
+                    FullScreenError(message = state.errorMessage ?: stringResource(R.string.season_couldnt_load))
                 state.episodes.isEmpty() ->
-                    EmptyState(title = "No episodes yet", body = "TMDB doesn't have episode data for this season yet.")
+                    EmptyState(title = stringResource(R.string.season_empty_title), body = stringResource(R.string.season_empty_body))
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(state.episodes, key = { it.episodeNumber }) { episode ->
                         EpisodeRow(episode = episode)

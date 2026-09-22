@@ -2,10 +2,12 @@ package com.ahsan.movieapp.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ahsan.movieapp.R
 import com.ahsan.movieapp.data.repository.MovieRepository
 import com.ahsan.movieapp.domain.model.GenreChip
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.MovieCategory
+import com.ahsan.movieapp.domain.model.TvCategory
 import com.ahsan.movieapp.util.NetworkConnectivityObserver
 import com.ahsan.movieapp.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,16 +24,16 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class HomeSection(
-    val title: String,
+    val labelRes: Int,
     val movies: List<Movie>,
     val isLoading: Boolean,
     val errorMessage: String? = null,
-    // False for the TV shows row — TV items can't be favorited yet (no schema support), same
-    // one-screen exception as the genre screen's TV tab.
+    // False for the TV rows — TV items can't be favorited yet (no schema support; TMDB ids are
+    // shared across the numeric id range), same one-screen exception as the genre screen's TV tab.
     val allowFavoriting: Boolean = true,
-    // True only for the "Popular TV Shows" row — its items reuse the Movie model (see
-    // data/mapper/MovieMappers.kt's TvShowDto.toMovie()) but their id is a TV id, not a movie id,
-    // so HomeScreen needs to know not to route a tap through the normal onMovieClick.
+    // True only for the TV rows — their items reuse the Movie model (see TvShowEntity.toDomain)
+    // but their id is a TV id, not a movie id, so HomeScreen needs to know not to route a tap
+    // through the normal onMovieClick.
     val isTv: Boolean = false
 )
 
@@ -46,8 +48,9 @@ data class HomeUiState(
 
 /** One row in [HomeViewModel.sectionSources] — where a carousel's movies come from. */
 private data class HomeSectionSource(
-    val title: String,
+    val labelRes: Int,
     val category: MovieCategory? = null,
+    val categoryTv: TvCategory? = null,
     val isTv: Boolean = false
 )
 
@@ -59,16 +62,18 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     // "Popular" doubles as the hero banner's source (see heroSectionIndex below) — its own row
-    // still shows further down, same as a Netflix-style hero-plus-shelf layout. "Popular TV Shows"
-    // (originally "Trending Today") was moved to the bottom and switched to real TV data on
-    // request, rather than keeping a "TV Shows" label over trending-movie data.
+    // still shows further down, same as a Netflix-style hero-plus-shelf layout. The TV rows
+    // ("Popular TV Shows" moved to the bottom and switched to real TV data on request, Phase 2.6
+    // Session 3 adds the "Trending TV Shows" row to it) are backed by the new offline-first
+    // `tv_shows` Room cache (see MovieRepository.getCategoryTv), same as every movie carousel.
     private val sectionSources = listOf(
-        HomeSectionSource("Popular", category = MovieCategory.POPULAR),
-        HomeSectionSource("For You"),
-        HomeSectionSource("Now Playing", category = MovieCategory.NOW_PLAYING),
-        HomeSectionSource("Top Rated", category = MovieCategory.TOP_RATED),
-        HomeSectionSource("Upcoming", category = MovieCategory.UPCOMING),
-        HomeSectionSource("Popular TV Shows", isTv = true)
+        HomeSectionSource(R.string.section_popular, category = MovieCategory.POPULAR),
+        HomeSectionSource(R.string.section_for_you),
+        HomeSectionSource(R.string.section_now_playing, category = MovieCategory.NOW_PLAYING),
+        HomeSectionSource(R.string.section_top_rated, category = MovieCategory.TOP_RATED),
+        HomeSectionSource(R.string.section_upcoming, category = MovieCategory.UPCOMING),
+        HomeSectionSource(R.string.home_popular_tv_shows, categoryTv = TvCategory.POPULAR_TV, isTv = true),
+        HomeSectionSource(R.string.home_trending_tv_shows, categoryTv = TvCategory.TRENDING_TV, isTv = true)
     )
 
     private val heroSectionIndex = sectionSources.indexOfFirst { it.category == MovieCategory.POPULAR }
@@ -83,20 +88,10 @@ class HomeViewModel @Inject constructor(
 
     private fun currentSectionFlows(): List<Flow<Resource<List<Movie>>>> = sectionSources.map { source ->
         when {
-            source.isTv -> popularTvFlow()
+            source.isTv -> repository.getCategoryTv(source.categoryTv!!)
             source.category != null -> repository.getCategory(source.category)
             else -> repository.getForYou()
         }
-    }
-
-    /** Wraps the one-shot [MovieRepository.getPopularTv] call as a Resource flow so it can slot
-     *  into the same combine/retry pipeline as every cached movie category. */
-    private fun popularTvFlow(): Flow<Resource<List<Movie>>> = flow {
-        emit(Resource.Loading())
-        repository.getPopularTv().fold(
-            onSuccess = { movies -> emit(Resource.Success(movies)) },
-            onFailure = { throwable -> emit(Resource.Error(throwable.message ?: "Couldn't load popular TV shows")) }
-        )
     }
 
     /** Fetched once — genre chips don't need to react to retry() or reload on every section refresh. */
@@ -112,7 +107,7 @@ class HomeViewModel @Inject constructor(
         val sections = sectionSources.mapIndexed { index, source ->
             val resource = results[index]
             HomeSection(
-                title = source.title,
+                labelRes = source.labelRes,
                 movies = resource.data.orEmpty(),
                 isLoading = resource is Resource.Loading && resource.data.isNullOrEmpty(),
                 errorMessage = (resource as? Resource.Error)?.message,
@@ -131,7 +126,7 @@ class HomeViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HomeUiState(
             sections = sectionSources.map { source ->
-                HomeSection(source.title, emptyList(), isLoading = true, allowFavoriting = !source.isTv, isTv = source.isTv)
+                HomeSection(source.labelRes, emptyList(), isLoading = true, allowFavoriting = !source.isTv, isTv = source.isTv)
             }
         )
     )

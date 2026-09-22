@@ -62,7 +62,7 @@ class CastCrewListViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage = throwable.message ?: "Couldn't load cast & crew")
+                        it.copy(isLoading = false, errorMessage = throwable.message)
                     }
                 }
         }

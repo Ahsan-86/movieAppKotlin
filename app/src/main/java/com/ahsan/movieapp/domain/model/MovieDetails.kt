@@ -151,8 +151,8 @@ data class Person(
 
 /**
  * Bio/photo shown at the top of the person screen. [birthday]/[deathday] are TMDB's ISO
- * "YYYY-MM-DD" strings, both nullable — [ageText] and the header rely on them. [gender] is TMDB's
- * numeric code; see [genderLabel] for the display mapping.
+ * "YYYY-MM-DD" strings, both nullable — [age] and the header rely on them. [gender] is TMDB's
+ * numeric code; the caller maps it to a localized label (Female/Male/Non-binary/Unknown).
  */
 data class PersonDetails(
     val id: Int,
@@ -166,22 +166,13 @@ data class PersonDetails(
     /** TMDB's numeric gender code: 0 = unspecified, 1 = female, 2 = male, 3 = non-binary. */
     val gender: Int? = null
 ) {
-    /** Always resolves to a value (including "Unknown") — the header never hides this segment. */
-    val genderLabel: String
-        get() = when (gender) {
-            1 -> "Female"
-            2 -> "Male"
-            3 -> "Non-binary"
-            else -> "Unknown"
-        }
-
     /**
-     * "45 years old" as of today, or age at death when [deathday] is present. Null when [birthday]
+     * Age in years as of today, or age at death when [deathday] is present. Null when [birthday]
      * is missing or unparseable, so the header can drop the segment entirely instead of showing a
      * bogus "0 years old". Uses plain integer date-part math rather than java.time, since this
-     * module doesn't assume a desugared minSdk.
+     * module doesn't assume a desugared minSdk. The caller formats it for display ("N years old").
      */
-    val ageText: String?
+    val age: Int?
         get() {
             val birth = birthday?.takeIf { it.isNotBlank() }?.let(::parseIsoDate) ?: return null
             val reference = deathday?.takeIf { it.isNotBlank() }?.let(::parseIsoDate) ?: todayDateParts()
@@ -189,7 +180,7 @@ data class PersonDetails(
             if (reference.month < birth.month || (reference.month == birth.month && reference.day < birth.day)) {
                 age--
             }
-            return age.takeIf { it >= 0 }?.let { "$it years old" }
+            return age.takeIf { it >= 0 }
         }
 }
 

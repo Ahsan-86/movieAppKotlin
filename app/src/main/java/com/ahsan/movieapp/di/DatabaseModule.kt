@@ -6,6 +6,7 @@ import com.ahsan.movieapp.data.local.AppDatabase
 import com.ahsan.movieapp.data.local.dao.FavoriteDao
 import com.ahsan.movieapp.data.local.dao.MovieDao
 import com.ahsan.movieapp.data.local.dao.SearchHistoryDao
+import com.ahsan.movieapp.data.local.dao.TvShowDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,4 +33,7 @@ object DatabaseModule {
 
     @Provides
     fun provideSearchHistoryDao(database: AppDatabase): SearchHistoryDao = database.searchHistoryDao()
+
+    @Provides
+    fun provideTvShowDao(database: AppDatabase): TvShowDao = database.tvShowDao()
 }

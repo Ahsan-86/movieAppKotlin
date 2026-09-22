@@ -60,7 +60,7 @@ class CollectionViewModel @Inject constructor(
                 }
                 .onFailure { throwable ->
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage = throwable.message ?: "Couldn't load this collection")
+                        it.copy(isLoading = false, errorMessage = throwable.message)
                     }
                 }
         }

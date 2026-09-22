@@ -11,11 +11,13 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
@@ -55,7 +57,7 @@ fun TrendingScreen(
             // Nothing cached and the refresh failed — used to fall through to an empty grid with
             // no explanation and no way to try again.
             refreshState is LoadState.Error && movies.itemCount == 0 -> FullScreenError(
-                message = refreshState.error.message ?: "Couldn't load trending movies",
+                message = refreshState.error.message ?: stringResource(R.string.trending_couldnt_load_trending_movies),
                 onRetry = { movies.retry() }
             )
             else -> LazyVerticalGrid(

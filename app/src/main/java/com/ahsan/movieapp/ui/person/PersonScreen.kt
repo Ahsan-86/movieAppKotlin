@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -47,24 +46,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.Movie
+import com.ahsan.movieapp.ui.components.DOT_SEPARATOR
 import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MovieListRow
+import com.ahsan.movieapp.ui.components.SeparatorDiamond
 import com.ahsan.movieapp.ui.components.backgroundSwatch
 import com.ahsan.movieapp.ui.components.rememberBackdropPalette
 
@@ -159,7 +161,7 @@ fun PersonScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = barContentColor)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = barContentColor)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = barColor)
@@ -175,7 +177,7 @@ fun PersonScreen(
             when {
                 state.isLoading -> FullScreenLoading()
                 state.errorMessage != null && state.credits == null ->
-                    FullScreenError(message = state.errorMessage ?: "Couldn't load this person")
+                    FullScreenError(message = state.errorMessage ?: stringResource(R.string.person_load_error))
                 else -> PersonContent(
                     state = state,
                     listState = listState,
@@ -230,11 +232,15 @@ private fun PersonContent(
 
         if (movies.isEmpty()) {
             item {
-                val mediaLabel = if (state.selectedMediaType == MediaTab.TV) "TV credits" else "movies"
-                val roleLabel = if (state.selectedRole == RoleTab.DIRECTOR) "directed" else "appeared in"
+                val mediaLabel = stringResource(
+                    if (state.selectedMediaType == MediaTab.TV) R.string.person_tv_credits else R.string.person_movies
+                )
+                val roleLabel = stringResource(
+                    if (state.selectedRole == RoleTab.DIRECTOR) R.string.person_directed else R.string.person_appeared_in
+                )
                 EmptyState(
-                    title = "Nothing here",
-                    body = "No known $mediaLabel $roleLabel for ${state.personName}.",
+                    title = stringResource(R.string.nothing_here),
+                    body = stringResource(R.string.person_no_known_credits, mediaLabel, roleLabel, state.personName),
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
@@ -346,8 +352,18 @@ private fun PersonHero(details: com.ahsan.movieapp.domain.model.PersonDetails) {
                     )
                 }
                 // Age is omitted (not "0 years old") when birthday is unknown; gender always shows
-                // a value, "Unknown" included, so this line never disappears entirely.
-                val ageGenderLine = listOfNotNull(details.ageText, details.genderLabel).joinToString(" · ")
+                // a value, "Unknown" included, so this line never disappears entirely. Both labels
+                // are mapped here from raw values so they localize with the rest of the app.
+                val ageSegment = details.age?.let { stringResource(R.string.person_years_old, it) }
+                val genderSegment = stringResource(
+                    when (details.gender) {
+                        1 -> R.string.person_gender_female
+                        2 -> R.string.person_gender_male
+                        3 -> R.string.person_gender_nonbinary
+                        else -> R.string.unknown
+                    }
+                )
+                val ageGenderLine = listOfNotNull(ageSegment, genderSegment).joinToString(DOT_SEPARATOR)
                 Text(
                     text = ageGenderLine,
                     style = MaterialTheme.typography.bodyMedium,
@@ -379,7 +395,7 @@ private fun ExpandableBio(text: String, modifier: Modifier = Modifier) {
             overflow = TextOverflow.Ellipsis
         )
         TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) {
-            Text(if (expanded) "Show less" else "Read more")
+            Text(if (expanded) stringResource(R.string.person_show_less) else stringResource(R.string.person_read_more))
         }
     }
 }
@@ -405,14 +421,15 @@ private fun PersonFilterRow(
     // low alpha, or surfaceVariant when no tone was sampled) so the filters read as one unit. In the
     // two-chip horizontal layout a hairline divider in the palette tone splits the two chips
     // (B2 — see Progress.md; B3 is the standing fallback if B2 doesn't look right).
-    val labelOf: (CreditBucket) -> String = { bucket ->
-        when (bucket.role to bucket.media) {
-            RoleTab.ACTOR to MediaTab.MOVIES -> "Acting - Movies"
-            RoleTab.ACTOR to MediaTab.TV -> "Acting - TV Shows"
-            RoleTab.DIRECTOR to MediaTab.MOVIES -> "Directed - Movies"
-            RoleTab.DIRECTOR to MediaTab.TV -> "Directed - TV Shows"
-            else -> ""
+    val labelOf: @Composable (CreditBucket) -> String = { bucket ->
+        val labelRes: Int? = when (bucket.role to bucket.media) {
+            RoleTab.ACTOR to MediaTab.MOVIES -> R.string.person_acting_movies
+            RoleTab.ACTOR to MediaTab.TV -> R.string.person_acting_tv_shows
+            RoleTab.DIRECTOR to MediaTab.MOVIES -> R.string.person_directed_movies
+            RoleTab.DIRECTOR to MediaTab.TV -> R.string.person_directed_tv_shows
+            else -> null
         }
+        labelRes?.let { stringResource(it) } ?: ""
     }
 
     val vertical = buckets.size > 2
@@ -454,11 +471,9 @@ private fun PersonFilterRow(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     chip(buckets[0])
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .rotate(45f)
-                            .background(tone ?: MaterialTheme.colorScheme.secondary)
+                    SeparatorDiamond(
+                        size = 6.dp,
+                        color = tone ?: MaterialTheme.colorScheme.secondary
                     )
                     chip(buckets[1])
                 }
@@ -544,7 +559,7 @@ private fun PersonCreditChip(
  */
 @Composable
 private fun FilmographyYearHeader(year: String, tone: Color?) {
-    val label = if (year.toIntOrNull() != null) year else "Unknown year"
+    val label = if (year.toIntOrNull() != null) year else stringResource(R.string.person_unknown_year)
     val bandStart = tone ?: MaterialTheme.colorScheme.secondary
     val bandEnd = (tone?.let { lerp(it, Color.Black, 0.25f) }) ?: MaterialTheme.colorScheme.primary
     val textColor = if ((tone?.luminance() ?: 0f) > 0.5f) Color(0xFF111111) else Color.White

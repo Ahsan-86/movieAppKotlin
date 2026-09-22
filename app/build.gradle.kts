@@ -30,8 +30,8 @@ android {
         applicationId = "com.ahsan.movieapp"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 1 // or 3, 4, 5… any higher number
+        versionName = "1.0" // optional, just for you 1.0.1
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")

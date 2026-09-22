@@ -19,8 +19,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.GenreChip
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.HeroMovieCarousel
@@ -81,9 +83,9 @@ fun HomeScreen(
                 ExploreGenreChipsRow(genres = state.genreChips, onGenreClick = onGenreClick)
             }
 
-            items(state.sections, key = { it.title }) { section ->
+            items(state.sections, key = { it.labelRes }) { section ->
                 MovieCarouselSection(
-                    title = section.title,
+                    title = stringResource(section.labelRes),
                     movies = section.movies,
                     isLoading = section.isLoading,
                     errorMessage = section.errorMessage.takeIf { section.movies.isEmpty() },
@@ -106,7 +108,7 @@ private fun ExploreGenreChipsRow(genres: List<GenreChip>, onGenreClick: (GenreCh
     if (genres.isEmpty()) return
     Column {
         androidx.compose.material3.Text(
-            text = "Categories",
+            text = stringResource(R.string.categories),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 16.dp)
         )

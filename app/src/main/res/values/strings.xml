@@ -10,11 +10,11 @@
 
     <!-- Home / Explore -->
     <string name="section_trending_today">Trending Today</string>
-    <string name="section_popular">Popular</string>
-    <string name="section_top_rated">Top Rated</string>
-    <string name="section_now_playing">Now Playing</string>
-    <string name="section_upcoming">Upcoming</string>
-    <string name="section_for_you">For You</string>
+    <string name="section_popular">Popular - Movies</string>
+    <string name="section_top_rated">Top Rated - Movies</string>
+    <string name="section_now_playing">Now Playing - Movies</string>
+    <string name="section_upcoming">Upcoming - Movies</string>
+    <string name="section_for_you">For You - Movies</string>
     <string name="see_all">See all</string>
 
     <!-- Offline -->
@@ -53,4 +53,160 @@
     <string name="retry">Retry</string>
     <string name="error_generic">Something went wrong</string>
     <string name="loading">Loading…</string>
+
+    <!-- Common (shared across screens) -->
+    <string name="back">Back</string>
+    <string name="movies">Movies</string>
+    <string name="tv_shows">TV Shows</string>
+    <string name="unknown">Unknown</string>
+    <string name="nothing_here">Nothing here</string>
+    <string name="categories">Categories</string>
+
+    <!-- Common (shared across screens) -->
+    <string name="home_popular_tv_shows">Popular - TV Shows</string>
+    <string name="home_trending_tv_shows">Trending - TV Shows</string>
+    <string name="nav_movie_app">Movie App</string>
+    <string name="person_movies">movies</string>
+    <string name="person_tv_credits">TV credits</string>
+    <string name="person_years_old">%1$d years old</string>
+    <string name="person_gender_female">Female</string>
+    <string name="person_gender_male">Male</string>
+    <string name="person_gender_nonbinary">Non-binary</string>
+
+    <!-- Trending -->
+    <string name="trending_couldnt_load_trending_movies">Couldn\'t load trending movies</string>
+
+    <!-- Search -->
+    <string name="search_couldnt_load_results">Couldn\'t load results</string>
+    <string name="search_no_matches">No matches</string>
+    <string name="search_no_matches_body">Nothing matched that combination of filters.</string>
+    <string name="search_failed">Search failed</string>
+    <string name="search_no_results">No results</string>
+    <string name="search_no_results_body">Nothing matched \"%1$s\" — no movies, TV shows, or people.</string>
+    <string name="search_list_view">List view</string>
+    <string name="search_grid_view">Grid view</string>
+    <string name="search_dense_grid_view">Dense grid view</string>
+    <string name="search_tmdb">Search TMDB</string>
+    <string name="search_tmdb_body">Find a movie, an actor, or a director by name.</string>
+    <string name="search_recent_searches">Recent searches</string>
+    <string name="search_clear_all">Clear all</string>
+    <string name="search_browse_by_genre">Browse by genre</string>
+    <string name="search_people">People</string>
+
+    <!-- Genre -->
+    <string name="genre_no_movies_found">No movies found for %1$s.</string>
+    <string name="genre_no_tv_shows_found">No TV shows found for %1$s.</string>
+
+    <!-- Filter panel -->
+    <string name="filter_filters">Filters</string>
+    <string name="filter_filters_active">Filters (%1$d)</string>
+    <string name="filter_collapse_filters">Collapse filters</string>
+    <string name="filter_expand_filters">Expand filters</string>
+    <string name="filter_genre">Genre</string>
+    <string name="filter_release_year">Release year</string>
+    <string name="filter_language">Language</string>
+    <string name="filter_any">Any</string>
+    <string name="filter_reset">Reset</string>
+    <string name="filter_show_results">Show results</string>
+    <string name="filter_edit">Edit</string>
+    <string name="filter_clear">Clear</string>
+    <string name="filter_filtered_filters">Filtered · %1$d filters</string>
+    <string name="filter_results_found">%1$d results found</string>
+    <string name="filter_minimum_rating">Minimum rating: %1$s</string>
+    <string name="filter_english">English</string>
+    <string name="filter_spanish">Spanish</string>
+    <string name="filter_french">French</string>
+    <string name="filter_german">German</string>
+    <string name="filter_hindi">Hindi</string>
+    <string name="filter_japanese">Japanese</string>
+    <string name="filter_korean">Korean</string>
+    <string name="filter_chinese">Chinese</string>
+    <string name="filter_italian">Italian</string>
+    <string name="filter_portuguese">Portuguese</string>
+
+    <!-- Person -->
+    <string name="person_directed">directed</string>
+    <string name="person_appeared_in">appeared in</string>
+    <string name="person_no_known_credits">No known %1$s %2$s for %3$s.</string>
+    <string name="person_show_less">Show less</string>
+    <string name="person_read_more">Read more</string>
+    <string name="person_acting_movies">Acting - Movies</string>
+    <string name="person_acting_tv_shows">Acting - TV Shows</string>
+    <string name="person_directed_movies">Directed - Movies</string>
+    <string name="person_directed_tv_shows">Directed - TV Shows</string>
+    <string name="person_unknown_year">Unknown year</string>
+    <string name="person_load_error">Couldn\'t load this person</string>
+
+    <!-- Movie Detail -->
+    <string name="detail_couldnt_load_movie">Couldn\'t load this movie</string>
+    <string name="detail_no_description">No description available.</string>
+    <string name="detail_part_of_collection">Part of a collection</string>
+    <string name="detail_view_collection">View collection</string>
+    <string name="detail_where_to_watch">Where to Watch</string>
+    <string name="detail_not_available_in_region">Not available to stream, rent, or buy in %1$s.</string>
+    <string name="detail_provider_stream">Stream</string>
+    <string name="detail_provider_rent">Rent</string>
+    <string name="detail_provider_buy">Buy</string>
+    <string name="detail_provider_attribution">Streaming data provided by JustWatch.</string>
+    <string name="detail_change_region">Change region</string>
+    <string name="detail_information">Information</string>
+    <string name="detail_info_original_title">Original Title</string>
+    <string name="detail_info_status">Status</string>
+    <string name="detail_info_release_date">Release Date</string>
+    <string name="detail_info_runtime">Runtime</string>
+    <string name="detail_info_countries">Countries</string>
+    <string name="detail_info_production_companies">Production Companies</string>
+    <string name="detail_info_budget">Budget</string>
+    <string name="detail_info_revenue">Revenue</string>
+    <string name="detail_info_website">Website</string>
+
+    <!-- TV Detail -->
+    <string name="tv_couldnt_load_show">Couldn\'t load this show</string>
+    <string name="tv_seasons">Seasons</string>
+    <string name="tv_episodes">Episodes</string>
+    <string name="tv_season_count_one">%1$d Season</string>
+    <string name="tv_season_count_other">%1$d Seasons</string>
+    <string name="tv_collapse_seasons">Collapse seasons</string>
+    <string name="tv_expand_seasons">Expand seasons</string>
+    <string name="tv_info_original_name">Original Name</string>
+    <string name="tv_info_first_air_date">First Air Date</string>
+    <string name="tv_info_episode_runtime">Episode Runtime</string>
+    <string name="tv_info_networks">Networks</string>
+
+    <!-- Cast & Crew -->
+    <string name="castcrew_title">Cast &amp; Crew</string>
+    <string name="castcrew_view_all">View all cast &amp; crew</string>
+    <string name="castcrew_couldnt_load">Couldn\'t load cast &amp; crew</string>
+    <string name="castcrew_empty_body">No cast or crew information available.</string>
+    <string name="castcrew_director">Director</string>
+
+    <!-- Collection -->
+    <string name="collection_couldnt_load">Couldn\'t load this collection</string>
+    <string name="collection_empty_body">No movies found in this collection.</string>
+
+    <!-- Season episodes -->
+    <string name="season_couldnt_load">Couldn\'t load episodes</string>
+    <string name="season_empty_title">No episodes yet</string>
+    <string name="season_empty_body">TMDB doesn\'t have episode data for this season yet.</string>
+
+    <!-- Trailer / Share -->
+    <string name="trailer_watch_trailer">Watch Trailer</string>
+    <string name="trailer_share">Share</string>
+    <string name="trailer_title">Trailer</string>
+    <string name="trailer_exit_fullscreen">Exit full screen</string>
+    <string name="trailer_fullscreen">Full screen</string>
+    <string name="trailer_youtube">YouTube</string>
+    <string name="trailer_error_unavailable">This trailer is no longer available on YouTube.</string>
+    <string name="trailer_error_embedding_disabled">This trailer\'s owner has disabled embedded playback — tap the button next to the player to open it in YouTube instead.</string>
+    <string name="trailer_error_playback">Couldn\'t play this trailer. (YouTube error %1$d)</string>
+
+    <!-- Account -->
+    <string name="account_guest_message">You\'re browsing as a guest.</string>
+    <string name="account_signed_in">Signed in.</string>
+    <string name="account_signed_out">You\'re not signed in yet.</string>
+    <string name="account_log_in_coming_soon">Log In (coming soon)</string>
+    <string name="account_sign_up_coming_soon">Sign Up (coming soon)</string>
+
+    <!-- Components -->
+    <string name="component_could_not_load_more">Couldn\'t load more</string>
 </resources>

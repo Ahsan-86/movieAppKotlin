@@ -4,6 +4,7 @@ import com.ahsan.movieapp.data.local.dao.MovieCategoryRow
 import com.ahsan.movieapp.data.local.entity.CastMemberEntity
 import com.ahsan.movieapp.data.local.entity.MovieDetailsEntity
 import com.ahsan.movieapp.data.local.entity.MovieEntity
+import com.ahsan.movieapp.data.local.entity.TvShowEntity
 import com.ahsan.movieapp.data.remote.dto.CastMemberDto
 import com.ahsan.movieapp.data.remote.dto.CollectionDetailsDto
 import com.ahsan.movieapp.data.remote.dto.CombinedCreditDto
@@ -459,5 +460,37 @@ fun TvShowDto.toMovie(): Movie = Movie(
     voteAverage = voteAverage ?: 0.0,
     voteCount = voteCount ?: 0,
     genreIds = genreIds.orEmpty(),
+    isFavorite = false
+)
+
+/** Phase 2.6 Session 3 — a TV row into the Room `tv_shows` cache table, the [MovieDto.toEntity]
+ *  counterpart for TV. Kept in its own table (never the movie `movies`/`favorites` tables) because
+ *  TMDB reuses one numeric ID range across movies and TV. */
+fun TvShowDto.toTvEntity(cachedAt: Long): TvShowEntity = TvShowEntity(
+    id = id,
+    name = name,
+    overview = overview.orEmpty(),
+    posterPath = posterPath,
+    backdropPath = backdropPath,
+    firstAirDate = firstAirDate.orEmpty(),
+    voteAverage = voteAverage ?: 0.0,
+    voteCount = voteCount ?: 0,
+    genreIds = genreIds.orEmpty(),
+    cachedAt = cachedAt
+)
+
+/** Phase 2.6 Session 3 — a cached `tv_shows` row back into the [Movie] shape the carousels render.
+ *  Always `isFavorite = false`: TV ids share TMDB's numeric range with movies, so a cross-media
+ *  `favorites` match would be wrong — TV favorites wait for Session 6's composite-key migration. */
+fun TvShowEntity.toDomain(): Movie = Movie(
+    id = id,
+    title = name,
+    overview = overview,
+    posterUrl = Constants.posterUrl(posterPath),
+    backdropUrl = Constants.backdropUrl(backdropPath),
+    releaseDate = firstAirDate,
+    voteAverage = voteAverage,
+    voteCount = voteCount,
+    genreIds = genreIds,
     isFavorite = false
 )

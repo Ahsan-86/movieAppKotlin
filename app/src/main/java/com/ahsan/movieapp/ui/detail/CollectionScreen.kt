@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.ui.detail
 
+import com.ahsan.movieapp.R
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ahsan.movieapp.domain.model.Movie
@@ -53,7 +56,7 @@ fun CollectionScreen(
                 title = { Text(state.name) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -63,8 +66,8 @@ fun CollectionScreen(
             when {
                 state.isLoading -> FullScreenLoading()
                 state.movies.isEmpty() && state.errorMessage != null ->
-                    FullScreenError(message = state.errorMessage ?: "Couldn't load this collection")
-                state.movies.isEmpty() -> EmptyState(title = "Nothing here", body = "No movies found in this collection.")
+                    FullScreenError(message = state.errorMessage ?: stringResource(R.string.collection_couldnt_load))
+                state.movies.isEmpty() -> EmptyState(title = stringResource(R.string.nothing_here), body = stringResource(R.string.collection_empty_body))
                 else -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 128.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),

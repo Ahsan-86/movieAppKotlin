@@ -50,7 +50,7 @@ class SeasonEpisodesViewModel @Inject constructor(
                     _uiState.update { it.copy(episodes = season.episodes, isLoading = false, errorMessage = null) }
                 }
                 .onFailure { throwable ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = throwable.message ?: "Couldn't load episodes") }
+                    _uiState.update { it.copy(isLoading = false, errorMessage = throwable.message) }
                 }
         }
     }

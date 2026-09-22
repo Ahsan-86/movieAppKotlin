@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.ui.components
 
+import com.ahsan.movieapp.R
+
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -64,6 +66,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -116,11 +119,11 @@ fun TrailerShareRow(
         if (trailerKey != null) {
             OutlinedButton(onClick = { onWatchTrailer(trailerKey) }) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                Text(text = "Watch Trailer", modifier = Modifier.padding(start = 4.dp))
+                Text(text = stringResource(R.string.trailer_watch_trailer), modifier = Modifier.padding(start = 4.dp))
             }
         }
         IconButton(onClick = { shareText(context, shareTitle, shareUrl) }) {
-            Icon(Icons.Filled.Share, contentDescription = "Share")
+            Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.trailer_share))
         }
     }
 }
@@ -251,10 +254,10 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
             // states without any manual padding math.
             if (!isFullscreen) {
                 TopAppBar(
-                    title = { Text("Trailer") },
+                    title = { Text(stringResource(R.string.trailer_title)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
                     },
                     actions = {
@@ -297,7 +300,7 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
             ) {
                 Icon(
                     imageVector = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                    contentDescription = if (isFullscreen) "Exit full screen" else "Full screen",
+                    contentDescription = if (isFullscreen) stringResource(R.string.trailer_exit_fullscreen) else stringResource(R.string.trailer_fullscreen),
                     tint = Color.White
                 )
             }
@@ -331,7 +334,7 @@ private fun YoutubeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             modifier = Modifier.size(22.dp)
         )
         Text(
-            text = "YouTube",
+            text = stringResource(R.string.trailer_youtube),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold
         )
@@ -599,10 +602,11 @@ private fun playerOrigin(context: Context): String =
  * Ahsan (and eventually end users) whether this is a permanent, nothing-to-fix-in-app restriction
  * (embedding disabled) or a more generic failure.
  */
+@Composable
 private fun youtubePlaybackErrorMessage(code: Int): String = when (code) {
-    100 -> "This trailer is no longer available on YouTube."
-    101, 150 -> "This trailer's owner has disabled embedded playback — tap the button next to the player to open it in YouTube instead."
-    else -> "Couldn't play this trailer. (YouTube error $code)"
+    100 -> stringResource(R.string.trailer_error_unavailable)
+    101, 150 -> stringResource(R.string.trailer_error_embedding_disabled)
+    else -> stringResource(R.string.trailer_error_playback, code)
 }
 
 /**

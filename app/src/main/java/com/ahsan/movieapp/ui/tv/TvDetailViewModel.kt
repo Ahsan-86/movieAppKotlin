@@ -37,8 +37,8 @@ data class TvDetailUiState(
  * Trailer button (Session 2). Network-only for every fetch, no Room cache — same one-shot,
  * failure-tolerant convention as [com.ahsan.movieapp.ui.detail.CastCrewListViewModel] and the
  * newer network-only calls on [MovieRepository] ([MovieRepository.getMovieCredits],
- * [MovieRepository.getCollectionDetails]), since this app doesn't persist TV data yet (see
- * [MovieRepository.getPopularTv]'s doc). Unlike
+ * [MovieRepository.getCollectionDetails]), since TV detail data has no offline table of its own
+ * (only the curated TV carousels are cached — see [MovieRepository.getCategoryTv]). Unlike
  * [com.ahsan.movieapp.ui.detail.MovieDetailViewModel], there's no networkBoundResource/offline-first
  * path and no favorite toggle here — TV favoriting needs the Favorites schema migration, which is
  * Session 6, not this round.
@@ -68,7 +68,7 @@ class TvDetailViewModel @Inject constructor(
                     _uiState.update { it.copy(details = details, isLoading = false, errorMessage = null) }
                 }
                 .onFailure { throwable ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = throwable.message ?: "Couldn't load this show") }
+                    _uiState.update { it.copy(isLoading = false, errorMessage = throwable.message) }
                 }
         }
         viewModelScope.launch {

@@ -9,26 +9,31 @@ import com.ahsan.movieapp.data.mapper.toEntity
 import com.ahsan.movieapp.data.remote.TmdbApi
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.Movie
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 
 /**
- * Phase 4 (pagination) Round 4 — the search screen's filter-panel Discover results (Phase 2.5).
- * Network-only, straight over [TmdbApi.discoverMovies] with whichever filter combination was last
- * Applied. No Room cache by filter combination (there are too many combinations to usefully cache
- * each one) and so no [androidx.paging.RemoteMediator] — same reasoning as [SearchMoviesPagingSource]
+ * Phase 4 (pagination) Round 4 — the search screen's filter-panel Discover results (Phase 2.5),
+ * also reused by the genre screen's filtered Movies tab. Network-only, straight over
+ * [TmdbApi.discoverMovies] with whichever filter combination was last Applied. No Room cache by
+ * filter combination (there are too many combinations to usefully cache each one) and so no
+ * [androidx.paging.RemoteMediator] — same reasoning as [SearchMoviesPagingSource]
  * and [com.ahsan.movieapp.data.paging.TvGenrePagingSource].
  *
  * Every returned movie still gets upserted into the shared `movies` table. Favorite status is
  * resolved the same way as [SearchMoviesPagingSource] — a one-time snapshot per `load()` call via
  * `favoriteDao.observeFavoriteMovies().first()`, not a live `combine()` — see that class's doc for
  * why (a `combine()`-based live flow over this pager's [androidx.paging.PagingData] crashed with
- * `IllegalStateException: Attempt to collect twice from pageEventFlow`).
+ * `IllegalStateException: Attempt to collect twice from pageEventFlow`). Each loaded page's
+ * [com.ahsan.movieapp.data.remote.dto.PagedResponseDto.totalResults] is written into [totalResults]
+ * (when provided) so screens can show "N results found" without a second call.
  */
 class DiscoverPagingSource(
     private val api: TmdbApi,
     private val movieDao: MovieDao,
     private val favoriteDao: FavoriteDao,
-    private val filters: DiscoverFilters
+    private val filters: DiscoverFilters,
+    private val totalResults: MutableStateFlow<Int?>? = null
 ) : PagingSource<Int, Movie>() {
 
     // Same defensive guard as SearchMoviesPagingSource — TMDB's page boundaries aren't guaranteed
@@ -46,6 +51,7 @@ class DiscoverPagingSource(
                 minRating = filters.minRating,
                 page = page
             )
+            totalResults?.value = response.totalResults
             val results = response.results.filter { seenMovieIds.add(it.id) }
             val now = System.currentTimeMillis()
             if (results.isNotEmpty()) {

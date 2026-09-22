@@ -17,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -25,6 +26,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.ahsan.movieapp.R
 import com.ahsan.movieapp.data.repository.SessionState
 import com.ahsan.movieapp.domain.model.GenreChip
 import com.ahsan.movieapp.domain.model.Movie
@@ -307,9 +309,9 @@ private fun MovieTopBar(navController: NavHostController, tabReselectBus: TabRes
     // Trending and Favorites show their own tab name as the title; every other top-level tab
     // (Explore, Search, Account) keeps the app-wide "Movie App" title, same as before.
     val title = when (currentRoute) {
-        Destination.Trending.route -> "Trending"
-        Destination.Favorites.route -> "Favorites"
-        else -> "Movie App"
+        Destination.Trending.route -> stringResource(R.string.nav_trending)
+        Destination.Favorites.route -> stringResource(R.string.nav_favorites)
+        else -> stringResource(R.string.nav_movie_app)
     }
 
     TopAppBar(
@@ -322,7 +324,7 @@ private fun MovieTopBar(navController: NavHostController, tabReselectBus: TabRes
                     navController.navigate(Destination.Search.route)
                 }
             }) {
-                Icon(Icons.Filled.Search, contentDescription = "Search")
+                Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.nav_search))
             }
             IconButton(onClick = {
                 if (currentRoute != Destination.Account.route) {
@@ -331,7 +333,7 @@ private fun MovieTopBar(navController: NavHostController, tabReselectBus: TabRes
                 // Account has no scrollable content to reset, so re-tapping it while already
                 // there is simply a no-op — unlike Search, there's nothing to signal.
             }) {
-                Icon(Icons.Filled.AccountCircle, contentDescription = "Account")
+                Icon(Icons.Filled.AccountCircle, contentDescription = stringResource(R.string.nav_account))
             }
         }
     )
@@ -380,10 +382,10 @@ private fun MovieBottomBar(navController: NavHostController, tabReselectBus: Tab
                 icon = {
                     Icon(
                         imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.label
+                        contentDescription = stringResource(item.labelRes)
                     )
                 },
-                label = { androidx.compose.material3.Text(item.label) }
+                label = { androidx.compose.material3.Text(stringResource(item.labelRes)) }
             )
         }
     }

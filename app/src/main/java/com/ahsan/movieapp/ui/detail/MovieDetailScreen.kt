@@ -163,7 +163,7 @@ fun MovieDetailScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = barContentColor)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = barContentColor)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = barColor)
@@ -192,7 +192,7 @@ fun MovieDetailScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 state.isLoading -> FullScreenLoading()
-                state.details == null -> FullScreenError(message = state.errorMessage ?: "Couldn't load this movie")
+                state.details == null -> FullScreenError(message = state.errorMessage ?: stringResource(R.string.detail_couldnt_load_movie))
                 else -> {
                     val details = state.details!!
                     Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -228,9 +228,9 @@ fun MovieDetailScreen(
                         // Overview sits directly below the hero poster, per 2026-09-22 feedback; the
                         // Watch Trailer + Share row lives at the end of this section.
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(text = "Overview", style = MaterialTheme.typography.titleLarge)
+                            Text(text = stringResource(R.string.overview_title), style = MaterialTheme.typography.titleLarge)
                             Text(
-                                text = details.overview.ifBlank { "No description available." },
+                                text = details.overview.ifBlank { stringResource(R.string.detail_no_description) },
                                 style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.padding(top = 8.dp)
                             )
@@ -293,20 +293,20 @@ private fun InformationSection(details: MovieDetails) {
     val website = details.homepageIfPresent
 
     val rows = buildList {
-        details.originalTitleIfPresent?.let { add("Original Title" to it) }
-        details.statusIfPresent?.let { add("Status" to it) }
-        details.releaseDate.takeIf { it.isNotBlank() }?.let { add("Release Date" to it) }
-        details.runtimeFormatted?.let { add("Runtime" to it) }
-        details.countriesFormatted?.let { add("Countries" to it) }
-        details.productionCompaniesFormatted?.let { add("Production Companies" to it) }
-        details.budgetFormatted?.let { add("Budget" to it) }
-        details.revenueFormatted?.let { add("Revenue" to it) }
+        details.originalTitleIfPresent?.let { add(stringResource(R.string.detail_info_original_title) to it) }
+        details.statusIfPresent?.let { add(stringResource(R.string.detail_info_status) to it) }
+        details.releaseDate.takeIf { it.isNotBlank() }?.let { add(stringResource(R.string.detail_info_release_date) to it) }
+        details.runtimeFormatted?.let { add(stringResource(R.string.detail_info_runtime) to it) }
+        details.countriesFormatted?.let { add(stringResource(R.string.detail_info_countries) to it) }
+        details.productionCompaniesFormatted?.let { add(stringResource(R.string.detail_info_production_companies) to it) }
+        details.budgetFormatted?.let { add(stringResource(R.string.detail_info_budget) to it) }
+        details.revenueFormatted?.let { add(stringResource(R.string.detail_info_revenue) to it) }
     }
 
     if (rows.isEmpty() && website == null) return
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(text = "Information", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
+        Text(text = stringResource(R.string.detail_information), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
 
         rows.forEach { (label, value) -> InfoRow(label = label, value = value) }
 
@@ -314,7 +314,7 @@ private fun InformationSection(details: MovieDetails) {
             val uriHandler = LocalUriHandler.current
             // The Website value is the one row whose value can be a long unbroken URL — run it
             // through UrlAutoSizeText so it shrinks to fit the row instead of clipping.
-            InfoRow(label = "Website", value = website, onClick = { uriHandler.openUri(website) }, autoShrink = true)
+            InfoRow(label = stringResource(R.string.detail_info_website), value = website, onClick = { uriHandler.openUri(website) }, autoShrink = true)
         }
     }
 }
@@ -387,7 +387,7 @@ private fun CollectionTeaser(collection: CollectionSummary, onClick: () -> Unit)
         }
         Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
             Text(
-                text = "Part of a collection",
+                text = stringResource(R.string.detail_part_of_collection),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -399,7 +399,7 @@ private fun CollectionTeaser(collection: CollectionSummary, onClick: () -> Unit)
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "View collection")
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.detail_view_collection))
     }
 }
 
@@ -430,13 +430,13 @@ private fun WatchProvidersSection(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Where to Watch", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(text = stringResource(R.string.detail_where_to_watch), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             RegionDropdown(selectedRegion = selectedRegion, availableRegions = availableRegions, onRegionChange = onRegionChange)
         }
 
         if (region == null || region.isEmpty) {
             Text(
-                text = "Not available to stream, rent, or buy in $selectedRegion.",
+                text = stringResource(R.string.detail_not_available_in_region, selectedRegion),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
@@ -447,11 +447,11 @@ private fun WatchProvidersSection(
                 ?.takeIf { it.isNotBlank() }
                 ?.let { link -> { uriHandler.openUri(link) } }
 
-            ProviderRow(label = "Stream", providers = region.flatrate, onProviderClick = onOpenProviders)
-            ProviderRow(label = "Rent", providers = region.rent, onProviderClick = onOpenProviders)
-            ProviderRow(label = "Buy", providers = region.buy, onProviderClick = onOpenProviders)
+            ProviderRow(label = stringResource(R.string.detail_provider_stream), providers = region.flatrate, onProviderClick = onOpenProviders)
+            ProviderRow(label = stringResource(R.string.detail_provider_rent), providers = region.rent, onProviderClick = onOpenProviders)
+            ProviderRow(label = stringResource(R.string.detail_provider_buy), providers = region.buy, onProviderClick = onOpenProviders)
             Text(
-                text = "Streaming data provided by JustWatch.",
+                text = stringResource(R.string.detail_provider_attribution),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (onOpenProviders != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 textDecoration = if (onOpenProviders != null) TextDecoration.Underline else null,
@@ -472,7 +472,7 @@ private fun RegionDropdown(selectedRegion: String, availableRegions: List<String
         AssistChip(
             onClick = { expanded = true },
             label = { Text(selectedRegion) },
-            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = "Change region") }
+            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(R.string.detail_change_region)) }
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             availableRegions.forEach { code ->
@@ -575,9 +575,9 @@ private fun CastCrewSection(
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Cast & Crew", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(text = stringResource(R.string.castcrew_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             IconButton(onClick = onViewAll) {
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "View all cast & crew")
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.castcrew_view_all))
             }
         }
 

@@ -135,7 +135,6 @@ class PersonViewModel @Inject constructor(
                     errorMessage = if (details == null && credits == null) {
                         detailsResult.exceptionOrNull()?.message
                             ?: creditsResult.exceptionOrNull()?.message
-                            ?: "Couldn't load this person"
                     } else null
                 )
             }

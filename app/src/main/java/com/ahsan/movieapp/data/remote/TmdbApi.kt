@@ -29,10 +29,12 @@ interface TmdbApi {
     @GET("3/trending/movie/day")
     suspend fun getTrendingToday(@Query("page") page: Int = 1): PagedResponseDto<MovieDto>
 
+    @GET("3/trending/tv/day")
+    suspend fun getTrendingTv(@Query("page") page: Int = 1): PagedResponseDto<TvShowDto>
+
     @GET("3/movie/popular")
     suspend fun getPopular(@Query("page") page: Int = 1): PagedResponseDto<MovieDto>
 
-    /** Backs the Explore screen's "Popular TV Shows" carousel — network-only, same as [discoverTvByGenres]. */
     @GET("3/tv/popular")
     suspend fun getPopularTv(@Query("page") page: Int = 1): PagedResponseDto<TvShowDto>
 
@@ -70,10 +72,18 @@ interface TmdbApi {
         @Query("page") page: Int = 1
     ): PagedResponseDto<MovieDto>
 
-    /** TV counterpart of [discoverByGenres] — backs the genre screen's TV tab. */
+    /**
+     * TV counterpart of [discoverByGenres] — backs the genre screen's TV tab. The year/language/
+     * minimum-rating params mirror [discoverMovies]'s filter set so the genre screen's filter
+     * section can page TV results just like Movies. TV uses `first_air_date_year` (TMDB's TV
+     * counterpart of `primary_release_year`).
+     */
     @GET("3/discover/tv")
     suspend fun discoverTvByGenres(
         @Query("with_genres") genreIds: String,
+        @Query("first_air_date_year") year: Int? = null,
+        @Query("with_original_language") language: String? = null,
+        @Query("vote_average.gte") minRating: Float? = null,
         @Query("sort_by") sortBy: String = "popularity.desc",
         @Query("page") page: Int = 1
     ): PagedResponseDto<TvShowDto>

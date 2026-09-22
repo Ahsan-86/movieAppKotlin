@@ -18,7 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -133,24 +132,14 @@ fun DetailHeroCaption(
                     )
                 }
                 if (showMetaDiamond) {
-                    // B3 separator (2026-09-26) between the rating and the first meta label: a
-                    // small rotated-square diamond in the caption color. Detail heroes opt in too,
-                    // so rating ◆ year ◆ duration reads as its own dotted meta line.
-                    Box(
-                        modifier = Modifier
-                            .size(4.dp)
-                            .rotate(45f)
-                            .background(Color.White.copy(alpha = 0.6f))
-                    )
+                    // B3 separator (2026-09-26) between the rating and the first meta label: the
+                    // shared diamond in the caption color. Detail heroes opt in too, so
+                    // rating ◆ year ◆ duration reads as its own dotted meta line.
+                    SeparatorDiamond(size = 4.dp, color = Color.White.copy(alpha = 0.6f))
                 }
                 metaLabels.forEachIndexed { index, label ->
                     if (showMetaDiamond && index > 0) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .rotate(45f)
-                                .background(Color.White.copy(alpha = 0.6f))
-                        )
+                        SeparatorDiamond(size = 4.dp, color = Color.White.copy(alpha = 0.6f))
                     }
                     Text(
                         text = label,
@@ -174,12 +163,7 @@ fun DetailHeroCaption(
                     ) {
                         genres.forEachIndexed { index, genre ->
                             if (index > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(3.dp)
-                                        .rotate(45f)
-                                        .background(Color.White.copy(alpha = 0.55f))
-                                )
+                                SeparatorDiamond(size = 3.dp, color = Color.White.copy(alpha = 0.55f))
                             }
                             Text(
                                 text = genre,
@@ -194,7 +178,7 @@ fun DetailHeroCaption(
                     }
                 } else {
                     Text(
-                        text = genres.joinToString(" • "),
+                        text = genres.joinToString(DOT_SEPARATOR),
                         style = MaterialTheme.typography.labelMedium,
                         color = Color.White.copy(alpha = 0.85f),
                         modifier = Modifier.padding(top = 4.dp)

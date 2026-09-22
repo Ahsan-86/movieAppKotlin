@@ -23,7 +23,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.Movie
 
 /**
@@ -95,7 +97,7 @@ private fun CarouselErrorRow(message: String, onRetry: (() -> Unit)?) {
             modifier = Modifier.weight(1f)
         )
         if (onRetry != null) {
-            TextButton(onClick = onRetry) { Text("Retry") }
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
         }
     }
 }
@@ -130,7 +132,7 @@ fun SectionHeader(
         Text(text = title, style = MaterialTheme.typography.titleLarge)
         if (onSeeAll != null) {
             TextButton(onClick = onSeeAll) {
-                Text(text = "See all", style = MaterialTheme.typography.labelLarge)
+                Text(text = stringResource(R.string.see_all), style = MaterialTheme.typography.labelLarge)
             }
         }
     }

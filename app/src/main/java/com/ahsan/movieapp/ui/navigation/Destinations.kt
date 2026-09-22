@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.ahsan.movieapp.R
 
 /** Every screen the app can navigate to, with its route pattern in one place. */
 sealed class Destination(val route: String) {
@@ -103,13 +104,13 @@ sealed class Destination(val route: String) {
 
 data class BottomNavItem(
     val destination: Destination,
-    val label: String,
+    val labelRes: Int,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem(Destination.Explore, "Explore", Icons.Filled.Explore, Icons.Outlined.Explore),
-    BottomNavItem(Destination.Trending, "Trending", Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment),
-    BottomNavItem(Destination.Favorites, "Favorites", Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder)
+    BottomNavItem(Destination.Explore, R.string.nav_explore, Icons.Filled.Explore, Icons.Outlined.Explore),
+    BottomNavItem(Destination.Trending, R.string.nav_trending, Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment),
+    BottomNavItem(Destination.Favorites, R.string.nav_favorites, Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder)
 )

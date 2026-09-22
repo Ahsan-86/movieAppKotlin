@@ -4,19 +4,26 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.ahsan.movieapp.data.mapper.toMovie
 import com.ahsan.movieapp.data.remote.TmdbApi
+import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.Movie
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Phase 4 (pagination) Round 3 — the genre screen's TV tab. Network-only, straight over
  * [TmdbApi.discoverTvByGenres] with no Room table and no [androidx.paging.RemoteMediator] behind
- * it, unlike [CategoryRemoteMediator]'s offline-first pattern: this app doesn't persist TV data
- * yet (same one-screen exception as
- * [com.ahsan.movieapp.data.repository.MovieRepository.getPopularTv]), so there's nothing for a
+ * it, unlike [CategoryRemoteMediator]'s offline-first pattern: a genre+filter TV search has no
+ * cache table of its own (only the curated TV carousels are cached — see
+ * [com.ahsan.movieapp.data.repository.MovieRepository.getCategoryTv]), so there's nothing for a
  * mediator to page into — a plain [PagingSource] reading TMDB pages directly is the whole story.
+ * [filters] (year/language/minimum rating — the genre is already [genreId]) fold into the discover
+ * call: a [DiscoverFilters] with nothing set pages the plain genre list, so the genre screen's
+ * filter section can switch between the two without swapping sources.
  */
 class TvGenrePagingSource(
     private val api: TmdbApi,
-    private val genreId: Int
+    private val genreId: Int,
+    private val filters: DiscoverFilters = DiscoverFilters(),
+    private val totalResults: MutableStateFlow<Int?>? = null
 ) : PagingSource<Int, Movie>() {
 
     // Same defensive guard as SearchMoviesPagingSource/DiscoverPagingSource — TMDB's
@@ -33,7 +40,14 @@ class TvGenrePagingSource(
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Movie> {
         val page = params.key ?: 1
         return try {
-            val response = api.discoverTvByGenres(genreId.toString(), page = page)
+            val response = api.discoverTvByGenres(
+                genreId.toString(),
+                year = filters.year,
+                language = filters.language,
+                minRating = filters.minRating,
+                page = page
+            )
+            totalResults?.value = response.totalResults
             LoadResult.Page(
                 data = response.results
                     .map { it.toMovie() }

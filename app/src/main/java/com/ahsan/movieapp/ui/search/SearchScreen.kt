@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.ui.search
 
+import com.ahsan.movieapp.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,25 +34,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,6 +62,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -80,20 +74,20 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import coil.compose.AsyncImage
-import java.util.Locale
 import com.ahsan.movieapp.data.repository.SearchViewMode
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.ui.components.EmptyState
+import com.ahsan.movieapp.ui.components.FilterPanelSection
+import com.ahsan.movieapp.ui.components.FilterSummaryBar
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MovieListRow
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.PagingAppendFooter
 import kotlinx.coroutines.flow.Flow
-import java.util.Calendar
 
 @Composable
 fun SearchScreen(
@@ -118,6 +112,11 @@ fun SearchScreen(
     // on PagingData.empty() until its query/filters are non-null.
     val pagedSearchMovies = viewModel.pagedSearchMovies.collectAsLazyPagingItems()
     val pagedFilteredMovies = viewModel.pagedFilteredMovies.collectAsLazyPagingItems()
+
+    // Live favorite-id set + the applied filters' total — see SearchViewModel; the filtered branch
+    // consumes both below (count via FilterSummaryBar, ids via the grid/list re-stamping).
+    val favoriteIds by viewModel.favoriteIds.collectAsState(emptySet())
+    val filteredResultCount by viewModel.filteredResultCount.collectAsState()
 
     // One state per Lazy container this screen can show — only one is ever composed at a time
     // (they're mutually exclusive branches below), so it's safe to reuse each across every mode
@@ -153,7 +152,7 @@ fun SearchScreen(
             value = state.query,
             onValueChange = viewModel::onQueryChanged,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search movies, cast, anything…") },
+            placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
                 // The movie grid has its own loadState-driven loading UI (FullScreenLoading /
@@ -176,17 +175,22 @@ fun SearchScreen(
 
         when {
             state.query.isBlank() && state.isFilterApplied -> Column(modifier = Modifier.fillMaxSize()) {
-                FilterSummaryBar(filters = state.filters, onEdit = viewModel::onEditFilters, onClear = viewModel::onClearFilters)
+                FilterSummaryBar(
+                    filters = state.filters,
+                    onEdit = viewModel::onEditFilters,
+                    onClear = viewModel::onClearFilters,
+                    resultCount = filteredResultCount
+                )
                 val refreshState = pagedFilteredMovies.loadState.refresh
                 when {
                     refreshState is LoadState.Loading && pagedFilteredMovies.itemCount == 0 -> FullScreenLoading()
                     refreshState is LoadState.Error && pagedFilteredMovies.itemCount == 0 -> FullScreenError(
-                        message = refreshState.error.message ?: "Couldn't load results",
+                        message = refreshState.error.message ?: stringResource(R.string.search_couldnt_load_results),
                         onRetry = { pagedFilteredMovies.retry() }
                     )
                     pagedFilteredMovies.itemCount == 0 -> EmptyState(
-                        title = "No matches",
-                        body = "Nothing matched that combination of filters."
+                        title = stringResource(R.string.search_no_matches),
+                        body = stringResource(R.string.search_no_matches_body)
                     )
                     else -> {
                         ViewModeRow(selected = state.viewMode, onSelected = viewModel::onViewModeSelected)
@@ -199,7 +203,8 @@ fun SearchScreen(
                                 onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
-                                listState = resultsListState
+                                listState = resultsListState,
+                                favoriteIds = favoriteIds
                             )
                             else -> SearchResultsGrid(
                                 movies = pagedFilteredMovies,
@@ -211,7 +216,8 @@ fun SearchScreen(
                                 onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
-                                gridState = resultsGridState
+                                gridState = resultsGridState,
+                                favoriteIds = favoriteIds
                             )
                         }
                     }
@@ -239,12 +245,12 @@ fun SearchScreen(
                 when {
                     nothingLoadedYet && (moviesRefresh is LoadState.Loading || state.isSearchingPeople || state.isSearchingTv) -> FullScreenLoading()
                     nothingLoadedYet && moviesRefresh is LoadState.Error -> FullScreenError(
-                        message = moviesRefresh.error.message ?: "Search failed",
+                        message = moviesRefresh.error.message ?: stringResource(R.string.search_failed),
                         onRetry = { pagedSearchMovies.retry() }
                     )
                     nothingLoadedYet -> EmptyState(
-                        title = "No results",
-                        body = "Nothing matched \"${state.query}\" — no movies, TV shows, or people."
+                        title = stringResource(R.string.search_no_results),
+                        body = stringResource(R.string.search_no_results_body, state.query)
                     )
                     else -> {
                         // The view-mode toggle only makes sense once there's something to lay out —
@@ -260,7 +266,8 @@ fun SearchScreen(
                                 onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
-                                listState = resultsListState
+                                listState = resultsListState,
+                                favoriteIds = favoriteIds
                             )
                             SearchViewMode.GRID -> SearchResultsGrid(
                                 movies = pagedSearchMovies,
@@ -272,7 +279,8 @@ fun SearchScreen(
                                 onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
-                                gridState = resultsGridState
+                                gridState = resultsGridState,
+                                favoriteIds = favoriteIds
                             )
                             SearchViewMode.GRID_DENSE -> SearchResultsGrid(
                                 movies = pagedSearchMovies,
@@ -284,7 +292,8 @@ fun SearchScreen(
                                 onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
-                                gridState = resultsGridState
+                                gridState = resultsGridState,
+                                favoriteIds = favoriteIds
                             )
                         }
                     }
@@ -335,13 +344,13 @@ private fun ViewModeRow(selected: SearchViewMode, onSelected: (SearchViewMode) -
             .padding(top = 4.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.End
     ) {
-        ViewModeButton(icon = Icons.AutoMirrored.Filled.List, contentDescription = "List view", isSelected = selected == SearchViewMode.LIST) {
+        ViewModeButton(icon = Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.search_list_view), isSelected = selected == SearchViewMode.LIST) {
             onSelected(SearchViewMode.LIST)
         }
-        ViewModeButton(icon = Icons.Filled.GridView, contentDescription = "Grid view", isSelected = selected == SearchViewMode.GRID) {
+        ViewModeButton(icon = Icons.Filled.GridView, contentDescription = stringResource(R.string.search_grid_view), isSelected = selected == SearchViewMode.GRID) {
             onSelected(SearchViewMode.GRID)
         }
-        ViewModeButton(icon = GridFourByFourIcon, contentDescription = "Dense grid view", isSelected = selected == SearchViewMode.GRID_DENSE) {
+        ViewModeButton(icon = GridFourByFourIcon, contentDescription = stringResource(R.string.search_dense_grid_view), isSelected = selected == SearchViewMode.GRID_DENSE) {
             onSelected(SearchViewMode.GRID_DENSE)
         }
     }
@@ -394,15 +403,21 @@ private fun BlankSearchContent(
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         item {
             FilterPanelSection(
-                genres = genreChips,
                 filters = filters,
                 isExpanded = isFilterPanelExpanded,
                 onToggleExpanded = onToggleFilterPanel,
-                onGenreSelected = onGenreFilterSelected,
                 onYearSelected = onYearFilterSelected,
                 onLanguageSelected = onLanguageFilterSelected,
                 onMinRatingChanged = onMinRatingFilterChanged,
-                onApply = onApplyFilters
+                onApply = onApplyFilters,
+                onReset = {
+                    onGenreFilterSelected(null)
+                    onYearFilterSelected(null)
+                    onLanguageFilterSelected(null)
+                    onMinRatingFilterChanged(null)
+                },
+                genres = genreChips,
+                onGenreSelected = onGenreFilterSelected
             )
         }
         if (recentSearches.isNotEmpty()) {
@@ -415,195 +430,9 @@ private fun BlankSearchContent(
         }
         if (recentSearches.isEmpty() && genreChips.isEmpty()) {
             item {
-                EmptyState(title = "Search TMDB", body = "Find a movie, an actor, or a director by name.")
+                EmptyState(title = stringResource(R.string.search_tmdb), body = stringResource(R.string.search_tmdb_body))
             }
         }
-    }
-}
-
-/**
- * A short summary row shown above filtered results (in place of the search field's usual blank
- * state) so the applied criteria stay visible and adjustable without needing to scroll back up
- * into the (now-collapsed) filter panel every time.
- */
-@Composable
-private fun FilterSummaryBar(filters: DiscoverFilters, onEdit: () -> Unit, onClear: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Filtered · ${filters.activeCount} " + if (filters.activeCount == 1) "filter" else "filters",
-            style = MaterialTheme.typography.titleMedium
-        )
-        Row {
-            TextButton(onClick = onEdit) { Text("Edit") }
-            TextButton(onClick = onClear) { Text("Clear") }
-        }
-    }
-}
-
-private val FILTER_LANGUAGES = listOf(
-    "en" to "English",
-    "es" to "Spanish",
-    "fr" to "French",
-    "de" to "German",
-    "hi" to "Hindi",
-    "ja" to "Japanese",
-    "ko" to "Korean",
-    "zh" to "Chinese",
-    "it" to "Italian",
-    "pt" to "Portuguese"
-)
-
-private const val FILTER_EARLIEST_YEAR = 1950
-
-/**
- * Collapsible "Filters" section for the blank/first-open search state — genre, release year,
- * original language, and a minimum-rating slider, all optional and combinable. Deliberately a
- * single flat panel (no nested lazy content) so it's safe as one `item {}` inside the outer
- * LazyColumn above, same reasoning as [GenreChipsSection].
- */
-@Composable
-private fun FilterPanelSection(
-    genres: List<GenreChip>,
-    filters: DiscoverFilters,
-    isExpanded: Boolean,
-    onToggleExpanded: () -> Unit,
-    onGenreSelected: (Int?) -> Unit,
-    onYearSelected: (Int?) -> Unit,
-    onLanguageSelected: (String?) -> Unit,
-    onMinRatingChanged: (Float?) -> Unit,
-    onApply: () -> Unit
-) {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(onClick = onToggleExpanded)
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.FilterList, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text(
-                    text = if (filters.isEmpty) "Filters" else "Filters (${filters.activeCount})",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-            Icon(
-                imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = if (isExpanded) "Collapse filters" else "Expand filters"
-            )
-        }
-        if (isExpanded) {
-            Column(modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)) {
-                val genreOptions = genres.mapNotNull { genre -> genre.movieGenreId?.let { it to genre.name } }
-                FilterDropdown(
-                    label = "Genre",
-                    selectedLabel = genreOptions.firstOrNull { it.first == filters.genreId }?.second ?: "Any",
-                    options = genreOptions,
-                    onSelected = onGenreSelected
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                val currentYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
-                val yearOptions = (currentYear downTo FILTER_EARLIEST_YEAR).map { it to it.toString() }
-                FilterDropdown(
-                    label = "Release year",
-                    selectedLabel = filters.year?.toString() ?: "Any",
-                    options = yearOptions,
-                    onSelected = onYearSelected
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                FilterDropdown(
-                    label = "Language",
-                    selectedLabel = FILTER_LANGUAGES.firstOrNull { it.first == filters.language }?.second ?: "Any",
-                    options = FILTER_LANGUAGES,
-                    onSelected = onLanguageSelected
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                MinRatingSlider(minRating = filters.minRating, onMinRatingChanged = onMinRatingChanged)
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = {
-                            onGenreSelected(null)
-                            onYearSelected(null)
-                            onLanguageSelected(null)
-                            onMinRatingChanged(null)
-                        },
-                        enabled = !filters.isEmpty
-                    ) { Text("Reset") }
-                    Button(onClick = onApply, enabled = !filters.isEmpty, modifier = Modifier.weight(1f)) {
-                        Text("Show results")
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * A read-only text field that opens a [DropdownMenu] on tap. `OutlinedTextField(readOnly = true)`
- * still consumes taps for cursor placement, so a transparent clickable [Box] is layered on top to
- * actually open the menu — a plain [DropdownMenu] rather than `ExposedDropdownMenuBox` to avoid
- * depending on that API's exact shape in whatever Material3 version this project is on.
- */
-@Composable
-private fun <T> FilterDropdown(
-    label: String,
-    selectedLabel: String,
-    options: List<Pair<T, String>>,
-    onSelected: (T?) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = selectedLabel,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clickable(onClick = { expanded = true })
-        )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text("Any") }, onClick = { onSelected(null); expanded = false })
-            options.forEach { (value, optionLabel) ->
-                DropdownMenuItem(text = { Text(optionLabel) }, onClick = { onSelected(value); expanded = false })
-            }
-        }
-    }
-}
-
-/** 0 means "no minimum" (Any); the slider otherwise runs 1.0–9.0 in half-point steps. */
-@Composable
-private fun MinRatingSlider(minRating: Float?, onMinRatingChanged: (Float?) -> Unit) {
-    val sliderValue = minRating ?: 0f
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Minimum rating: " + if (minRating == null) "Any" else String.format(Locale.US, "%.1f", minRating),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Slider(
-            value = sliderValue,
-            onValueChange = { onMinRatingChanged(if (it <= 0f) null else it) },
-            valueRange = 0f..9f,
-            steps = 17 // 0.5-point increments across the 0..9 range
-        )
     }
 }
 
@@ -619,8 +448,8 @@ private fun RecentSearchesSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = "Recent searches", style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = onClearAll) { Text("Clear all") }
+            Text(text = stringResource(R.string.search_recent_searches), style = MaterialTheme.typography.titleMedium)
+            TextButton(onClick = onClearAll) { Text(stringResource(R.string.search_clear_all)) }
         }
         FlowRow(
             modifier = Modifier.padding(top = 8.dp),
@@ -665,7 +494,7 @@ private val GENRE_CARD_HEIGHT = 108.dp
 private fun GenreChipsSection(genres: List<GenreChip>, onGenreClick: (GenreChip) -> Unit) {
     if (genres.isEmpty()) return
     Column(modifier = Modifier.padding(top = 24.dp)) {
-        Text("Browse by genre", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.search_browse_by_genre), style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(12.dp))
         genres.chunked(2).forEach { pair ->
             Row(
@@ -745,7 +574,11 @@ private fun SearchResultsGrid(
     onTvClick: (Movie) -> Unit,
     onPersonClick: (Person) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
-    gridState: LazyGridState
+    gridState: LazyGridState,
+    // Live favorites set — the paged Movie snapshot's isFavorite goes stale after a toggle in
+    // this screen, so each item re-stamps itself against this set at render time. See
+    // SearchViewModel.favoriteIds for why.
+    favoriteIds: Set<Int>
 ) {
     LazyVerticalGrid(
         columns = columns,
@@ -769,7 +602,7 @@ private fun SearchResultsGrid(
             if (people.isNotEmpty() || tvShows.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
-                        text = "Movies",
+                        text = stringResource(R.string.movies),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                     )
@@ -777,10 +610,11 @@ private fun SearchResultsGrid(
             }
             items(count = movies.itemCount, key = movies.itemKey { it.id }) { index ->
                 val movie = movies[index] ?: return@items
+                val displayMovie = if (movie.isFavorite == (movie.id in favoriteIds)) movie else movie.copy(isFavorite = movie.id in favoriteIds)
                 MoviePosterCard(
-                    movie = movie,
-                    onClick = { onMovieClick(movie) },
-                    onToggleFavorite = { onToggleFavorite(movie) },
+                    movie = displayMovie,
+                    onClick = { onMovieClick(displayMovie) },
+                    onToggleFavorite = { onToggleFavorite(displayMovie) },
                     width = posterWidth
                 )
             }
@@ -791,7 +625,7 @@ private fun SearchResultsGrid(
     }
 }
 
-/** List-view mode: a LazyColumn of full-width rows instead of a poster grid. See [SearchResultsGrid]'s doc for [movies]/[people]/[tvShows]. */
+/** List-view mode: a LazyColumn of full-width rows instead of a poster grid. See [SearchResultsGrid]'s doc for [movies]/[people]/[tvShows] and [favoriteIds]. */
 @Composable
 private fun SearchResultsList(
     movies: LazyPagingItems<Movie>,
@@ -801,7 +635,8 @@ private fun SearchResultsList(
     onTvClick: (Movie) -> Unit,
     onPersonClick: (Person) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
-    listState: LazyListState
+    listState: LazyListState,
+    favoriteIds: Set<Int>
 ) {
     LazyColumn(
         state = listState,
@@ -818,7 +653,7 @@ private fun SearchResultsList(
             if (people.isNotEmpty() || tvShows.isNotEmpty()) {
                 item {
                     Text(
-                        text = "Movies",
+                        text = stringResource(R.string.movies),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                     )
@@ -826,7 +661,8 @@ private fun SearchResultsList(
             }
             items(count = movies.itemCount, key = movies.itemKey { it.id }) { index ->
                 val movie = movies[index] ?: return@items
-                MovieListRow(movie = movie, onClick = { onMovieClick(movie) }, onToggleFavorite = { onToggleFavorite(movie) })
+                val displayMovie = if (movie.isFavorite == (movie.id in favoriteIds)) movie else movie.copy(isFavorite = movie.id in favoriteIds)
+                MovieListRow(movie = displayMovie, onClick = { onMovieClick(displayMovie) }, onToggleFavorite = { onToggleFavorite(displayMovie) })
             }
             item { PagingAppendFooter(pagingItems = movies) }
         }
@@ -838,7 +674,7 @@ private fun SearchResultsList(
 private fun PeopleResultsRow(people: List<Person>, onPersonClick: (Person) -> Unit) {
     Column {
         Text(
-            text = "People",
+            text = stringResource(R.string.search_people),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -859,7 +695,7 @@ private fun PeopleResultsRow(people: List<Person>, onPersonClick: (Person) -> Un
 private fun TvShowsResultsRow(tvShows: List<Movie>, onTvClick: (Movie) -> Unit) {
     Column {
         Text(
-            text = "TV Shows",
+            text = stringResource(R.string.tv_shows),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
         )

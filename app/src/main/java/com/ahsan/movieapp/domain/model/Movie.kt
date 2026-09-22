@@ -27,3 +27,12 @@ enum class MovieCategory(val apiPath: String, val storageKey: String) {
     UPCOMING("movie/upcoming", "upcoming"),
     FOR_YOU("discover/movie", "for_you")
 }
+
+/** Phase 2.6 Session 3 — the TV lists Room-caches, the [MovieCategory] equivalent for TV. Stored
+ *  in their own `tv_shows`/`category_tv_shows` tables (never `movies`/`favorites`): TMDB reuses
+ *  one numeric ID range across movies and TV, so a TV id must never collide with the movie-only
+ *  `favorites` table until Session 6's composite-key migration. */
+enum class TvCategory(val apiPath: String, val storageKey: String) {
+    TRENDING_TV("trending/tv/day", "trending_tv"),
+    POPULAR_TV("tv/popular", "popular_tv")
+}

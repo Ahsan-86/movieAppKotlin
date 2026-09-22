@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.ui.detail
 
+import com.ahsan.movieapp.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -57,10 +60,10 @@ fun CastCrewListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Cast & Crew") },
+                title = { Text(stringResource(R.string.castcrew_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -70,14 +73,14 @@ fun CastCrewListScreen(
             when {
                 state.isLoading -> FullScreenLoading()
                 state.isEmpty && state.errorMessage != null ->
-                    FullScreenError(message = state.errorMessage ?: "Couldn't load cast & crew")
-                state.isEmpty -> EmptyState(title = "Nothing here", body = "No cast or crew information available.")
+                    FullScreenError(message = state.errorMessage ?: stringResource(R.string.castcrew_couldnt_load))
+                state.isEmpty -> EmptyState(title = stringResource(R.string.nothing_here), body = stringResource(R.string.castcrew_empty_body))
                 else -> LazyColumn(
                     contentPadding = PaddingValues(bottom = 24.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     state.director?.let { director ->
-                        item { SectionHeading("Director") }
+                        item { SectionHeading(stringResource(R.string.castcrew_director)) }
                         item {
                             PersonRow(
                                 name = director.name,
@@ -90,7 +93,7 @@ fun CastCrewListScreen(
                     }
 
                     if (state.cast.isNotEmpty()) {
-                        item { SectionHeading("Cast") }
+                        item { SectionHeading(stringResource(R.string.cast_title)) }
                         items(state.cast, key = { it.id }) { member ->
                             PersonRow(
                                 name = member.name,

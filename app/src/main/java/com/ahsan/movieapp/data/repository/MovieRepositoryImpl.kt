@@ -9,6 +9,7 @@ import com.ahsan.movieapp.data.local.AppDatabase
 import com.ahsan.movieapp.data.local.dao.FavoriteDao
 import com.ahsan.movieapp.data.local.dao.MovieDao
 import com.ahsan.movieapp.data.local.dao.SearchHistoryDao
+import com.ahsan.movieapp.data.local.dao.TvShowDao
 import com.ahsan.movieapp.data.local.entity.FavoriteEntity
 import com.ahsan.movieapp.data.local.entity.MovieEntity
 import com.ahsan.movieapp.data.local.entity.SearchHistoryEntity
@@ -19,14 +20,17 @@ import com.ahsan.movieapp.data.mapper.toMovie
 import com.ahsan.movieapp.data.mapper.toMovieEntity
 import com.ahsan.movieapp.data.mapper.toPersonDto
 import com.ahsan.movieapp.data.mapper.toPerson
+import com.ahsan.movieapp.data.mapper.toTvEntity
 import com.ahsan.movieapp.data.mapper.toTvShowDto
 import com.ahsan.movieapp.data.paging.CategoryRemoteMediator
 import com.ahsan.movieapp.data.paging.DiscoverPagingSource
 import com.ahsan.movieapp.data.paging.SearchMoviesPagingSource
+import com.ahsan.movieapp.data.paging.TvCategoryRemoteMediator
 import com.ahsan.movieapp.data.paging.TvGenrePagingSource
 import com.ahsan.movieapp.data.remote.TmdbApi
 import com.ahsan.movieapp.data.remote.dto.MovieDto
 import com.ahsan.movieapp.data.remote.dto.PagedResponseDto
+import com.ahsan.movieapp.data.remote.dto.TvShowDto
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
@@ -40,12 +44,14 @@ import com.ahsan.movieapp.domain.model.PersonCredits
 import com.ahsan.movieapp.data.mapper.bestYoutubeTrailerKey
 import com.ahsan.movieapp.domain.model.PersonDetails
 import com.ahsan.movieapp.domain.model.SeasonDetails
+import com.ahsan.movieapp.domain.model.TvCategory
 import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.domain.model.WatchProviders
 import com.ahsan.movieapp.util.Constants
 import com.ahsan.movieapp.util.Resource
 import com.ahsan.movieapp.util.networkBoundResource
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -58,7 +64,8 @@ class MovieRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val movieDao: MovieDao,
     private val favoriteDao: FavoriteDao,
-    private val searchHistoryDao: SearchHistoryDao
+    private val searchHistoryDao: SearchHistoryDao,
+    private val tvShowDao: TvShowDao
 ) : MovieRepository {
 
     override fun getCategory(category: MovieCategory): Flow<Resource<List<Movie>>> =
@@ -91,14 +98,21 @@ class MovieRepositoryImpl @Inject constructor(
         )
 
     /**
-     * Phase 4 (pagination) Round 3 — the genre screen's TV tab. No Room table for TV data, so
+     * Phase 4 (pagination) Round 3 — the genre screen's TV tab. No Room table keyed by a
+     * genre+filter combo for TV (only the curated carousels are cached — see [getCategoryTv]), so
      * unlike [getPagedGenre] this [Pager] has no [androidx.paging.RemoteMediator]: just
-     * [TvGenrePagingSource] reading TMDB pages directly, one TMDB page per Paging 3 page.
+     * [TvGenrePagingSource] reading TMDB pages directly, one TMDB page per Paging 3 page. The
+     * genre screen's filtered state passes filters through to that source (see its class doc);
+     * [totalResults] is forwarded so the screen can display a filtered-results count.
      */
-    override fun getPagedGenreTv(genreId: Int): Flow<PagingData<Movie>> =
+    override fun getPagedGenreTv(
+        genreId: Int,
+        filters: DiscoverFilters,
+        totalResults: MutableStateFlow<Int?>?
+    ): Flow<PagingData<Movie>> =
         Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
-            pagingSourceFactory = { TvGenrePagingSource(api, genreId) }
+            pagingSourceFactory = { TvGenrePagingSource(api, genreId, filters, totalResults) }
         ).flow
 
     /**
@@ -126,8 +140,8 @@ class MovieRepositoryImpl @Inject constructor(
     /**
      * The TV half of a search query — the "TV Shows" row, same one-shot/capped/net-only shape as
      * [searchPeople]. Deliberately NOT upserted into the shared `movies` table (a TV id there
-     * could clobber a same-numbered movie, and this app doesn't persist TV data at all — see
-     * [getPopularTv]'s doc), so TV search rows always come back `isFavorite = false`.
+     * could clobber a same-numbered movie), and search queries have no cache table of their own,
+     * so TV search rows always come back `isFavorite = false`.
      */
     override suspend fun searchTvShows(query: String): Result<List<Movie>> = runCatching {
         api.searchMulti(query).results
@@ -139,12 +153,16 @@ class MovieRepositoryImpl @Inject constructor(
     /**
      * Phase 4 (pagination) Round 4 — the search screen's filter-panel Discover results. Same
      * no-`RemoteMediator` shape as [getPagedSearchMovies]/[getPagedGenreTv]: [DiscoverPagingSource]
-     * reads TMDB pages directly, since filter combinations aren't cached by key.
+     * reads TMDB pages directly, since filter combinations aren't cached by key. [totalResults]
+     * (optional) is forwarded to that source so screens can display a filtered-results count.
      */
-    override fun getPagedDiscoverMovies(filters: DiscoverFilters): Flow<PagingData<Movie>> =
+    override fun getPagedDiscoverMovies(
+        filters: DiscoverFilters,
+        totalResults: MutableStateFlow<Int?>?
+    ): Flow<PagingData<Movie>> =
         Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
-            pagingSourceFactory = { DiscoverPagingSource(api, movieDao, favoriteDao, filters) }
+            pagingSourceFactory = { DiscoverPagingSource(api, movieDao, favoriteDao, filters, totalResults) }
         ).flow
 
     /**
@@ -288,9 +306,21 @@ class MovieRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getGenreChips(): Result<List<GenreChip>> = runCatching {
-        // Reuses whatever's already cached from Explore's Popular carousel — zero extra image
-        // network calls, and every image is guaranteed to be a real, valid TMDB poster.
-        val popularMovies = movieDao.observeCategory(MovieCategory.POPULAR.storageKey).first()
+        // Reuses whatever's already cached from Explore's carousels — zero extra image network
+        // calls, and every image is guaranteed to be a real, valid TMDB poster. Pooling *all*
+        // cached categories (not just Popular) matters: Popular skews blockbuster-heavy
+        // (Action/Adventure/Sci-Fi), so Crime/Drama and other genre chips frequently found no
+        // representative there and rendered text-only. Now Playing / Top Rated / Upcoming drag in
+        // dramas, crime films, etc., so every chip gets a poster. Ordered Popular-first so the
+        // hero's source stays the default pick when a genre appears in several lists.
+        val cachedMovies = listOf(
+            MovieCategory.POPULAR,
+            MovieCategory.NOW_PLAYING,
+            MovieCategory.TOP_RATED,
+            MovieCategory.UPCOMING
+        ).flatMap { category ->
+            movieDao.observeCategory(category.storageKey).first()
+        }.distinctBy { it.id }
         // Popular is dominated by a handful of multi-genre blockbusters (a single tentpole is
         // routinely tagged Action + Adventure + Science Fiction all at once), so always taking
         // the *first* match per genre made those genres' chips all pick the same movie, and so
@@ -300,7 +330,7 @@ class MovieRepositoryImpl @Inject constructor(
         val usedMovieIds = mutableSetOf<Int>()
         CURATED_GENRES.map { curated ->
             val candidates = curated.movieGenreId?.let { movieGenreId ->
-                popularMovies.filter { movieGenreId in it.genreIds }
+                cachedMovies.filter { movieGenreId in it.genreIds }
             }.orEmpty()
             val representative = candidates.firstOrNull { it.id !in usedMovieIds } ?: candidates.firstOrNull()
             representative?.let { usedMovieIds += it.id }
@@ -319,9 +349,22 @@ class MovieRepositoryImpl @Inject constructor(
             fetch = { api.discoverByGenres(genreId.toString()).results }
         )
 
-    override suspend fun getPopularTv(): Result<List<Movie>> = runCatching {
-        api.getPopularTv().results.map { it.toMovie() }
-    }
+    /** Phase 2.6 Session 3 — see the interface doc. Same offline-first mechanism as [getCategory],
+     *  over the new `tv_shows` cache tables; never combines with the movie favorite table (TV rows
+     *  are always `isFavorite = false` — cross-media id collision, see [TvShowEntity.toDomain]). */
+    override fun getCategoryTv(category: TvCategory): Flow<Resource<List<Movie>>> =
+        cachedCategoryTvFlow(
+            storageKey = category.storageKey,
+            fetch = { fetchCategoryTvFromNetwork(category) }
+        )
+
+    /** Phase 2.6 Session 3 — see the interface doc. Forwards to [pagedCategoryTvFlow], the TV
+     *  mirror of [pagedCategoryFlow] ([TvCategoryRemoteMediator] over the `tv_remote_keys` table). */
+    override fun getPagedCategoryTv(category: TvCategory): Flow<PagingData<Movie>> =
+        pagedCategoryTvFlow(
+            storageKey = category.storageKey,
+            fetchPage = { page -> fetchCategoryTvFromNetworkPaged(category, page) }
+        )
 
     override fun observeRecentSearches(limit: Int): Flow<List<String>> =
         searchHistoryDao.observeRecent(limit).map { entries -> entries.map { it.query } }
@@ -424,6 +467,12 @@ class MovieRepositoryImpl @Inject constructor(
             val movies = fetchCategoryFromNetwork(category)
             movieDao.replaceCategory(category.storageKey, movies.map { it.toEntity(System.currentTimeMillis()) }, System.currentTimeMillis())
         }
+        // Phase 2.6 Session 3 — the background sync refreshes the two cached TV carousels too,
+        // so Explore's TV rows stay available offline like the movie rows.
+        TvCategory.entries.forEach { category ->
+            val shows = fetchCategoryTvFromNetwork(category)
+            tvShowDao.replaceCategoryTv(category.storageKey, shows.map { it.toTvEntity(System.currentTimeMillis()) }, System.currentTimeMillis())
+        }
     }
 
     private suspend fun fetchCategoryFromNetwork(category: MovieCategory): List<MovieDto> = when (category) {
@@ -446,6 +495,21 @@ class MovieRepositoryImpl @Inject constructor(
             MovieCategory.NOW_PLAYING -> api.getNowPlaying(page)
             MovieCategory.UPCOMING -> api.getUpcoming(page)
             MovieCategory.FOR_YOU -> api.getPopular(page)
+        }
+
+    /** Phase 2.6 Session 3 — [fetchCategoryFromNetwork]'s TV counterpart. */
+    private suspend fun fetchCategoryTvFromNetwork(category: TvCategory): List<TvShowDto> = when (category) {
+        TvCategory.TRENDING_TV -> api.getTrendingTv().results
+        TvCategory.POPULAR_TV -> api.getPopularTv().results
+    }
+
+    /** [fetchCategoryTvFromNetwork]'s paged counterpart for [getPagedCategoryTv] — same as
+     * [fetchCategoryFromNetworkPaged] on the movie side: keeps the full [PagedResponseDto] that
+     * [TvCategoryRemoteMediator] needs. */
+    private suspend fun fetchCategoryTvFromNetworkPaged(category: TvCategory, page: Int): PagedResponseDto<TvShowDto> =
+        when (category) {
+            TvCategory.TRENDING_TV -> api.getTrendingTv(page)
+            TvCategory.POPULAR_TV -> api.getPopularTv(page)
         }
 
     /** Shared plumbing for every screen that's "just a list of movies under some cache key". */
@@ -474,6 +538,55 @@ class MovieRepositoryImpl @Inject constructor(
 
     private suspend fun isStale(storageKey: String): Boolean {
         val fetchedAt = movieDao.categoryFetchedAt(storageKey) ?: return true
+        return System.currentTimeMillis() - fetchedAt > STALE_THRESHOLD_MS
+    }
+
+    /**
+     * Phase 2.6 Session 3 — [cachedCategoryFlow]'s TV counterpart, over the `tv_shows` tables.
+     * Same offline-first/staleness behavior, with two deliberate differences: no favorites `combine`
+     * (TV rows are always `isFavorite = false` — cross-media id collision, see [TvShowDao]), and a
+     * room-table row maps straight back to [Movie] via [com.ahsan.movieapp.data.mapper.toDomain].
+     */
+    private fun cachedCategoryTvFlow(
+        storageKey: String,
+        fetch: suspend () -> List<TvShowDto>
+    ): Flow<Resource<List<Movie>>> = networkBoundResource(
+        query = { tvShowDao.observeCategoryTv(storageKey).map { shows -> shows.map { it.toDomain() } } },
+        fetch = fetch,
+        saveFetchResult = { dtos ->
+            val now = System.currentTimeMillis()
+            tvShowDao.replaceCategoryTv(storageKey, dtos.map { it.toTvEntity(now) }, now)
+        },
+        shouldFetch = { cached ->
+            cached.isEmpty() || isStaleTv(storageKey)
+        }
+    )
+
+    /**
+     * Phase 2.6 Session 3 — [pagedCategoryFlow]'s TV counterpart. Nothing a caller has to think
+     * about: [TvCategoryRemoteMediator] does the offline-first staleness check + TMDB paging and
+     * [TvShowDao.pagingSourceForCategoryTv] is what [Pager] reads from (see [TvCategoryRemoteMediator]
+     * for why there's no favorites join on the TV side).
+     */
+    @OptIn(ExperimentalPagingApi::class)
+    private fun pagedCategoryTvFlow(
+        storageKey: String,
+        fetchPage: suspend (page: Int) -> PagedResponseDto<TvShowDto>
+    ): Flow<PagingData<Movie>> =
+        Pager(
+            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
+            remoteMediator = TvCategoryRemoteMediator(
+                category = storageKey,
+                staleThresholdMs = STALE_THRESHOLD_MS,
+                fetchPage = fetchPage,
+                database = database,
+                tvShowDao = tvShowDao
+            ),
+            pagingSourceFactory = { tvShowDao.pagingSourceForCategoryTv(storageKey) }
+        ).flow.map { pagingData -> pagingData.map { it.toDomain() } }
+
+    private suspend fun isStaleTv(storageKey: String): Boolean {
+        val fetchedAt = tvShowDao.categoryTvFetchedAt(storageKey) ?: return true
         return System.currentTimeMillis() - fetchedAt > STALE_THRESHOLD_MS
     }
 

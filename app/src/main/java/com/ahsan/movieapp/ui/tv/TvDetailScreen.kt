@@ -170,7 +170,7 @@ fun TvDetailScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = barContentColor)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = barContentColor)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = barColor)
@@ -186,7 +186,7 @@ fun TvDetailScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 state.isLoading -> FullScreenLoading()
-                state.details == null -> FullScreenError(message = state.errorMessage ?: "Couldn't load this show")
+                state.details == null -> FullScreenError(message = state.errorMessage ?: stringResource(R.string.tv_couldnt_load_show))
                 else -> {
                     val details = state.details!!
                     Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -223,9 +223,9 @@ fun TvDetailScreen(
                         // Overview sits directly below the hero poster, per 2026-09-22 feedback; the
                         // Watch Trailer + Share row lives at the end of this section.
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(text = "Overview", style = MaterialTheme.typography.titleLarge)
+                            Text(text = stringResource(R.string.overview_title), style = MaterialTheme.typography.titleLarge)
                             Text(
-                                text = details.overview.ifBlank { "No description available." },
+                                text = details.overview.ifBlank { stringResource(R.string.detail_no_description) },
                                 style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.padding(top = 8.dp)
                             )
@@ -283,9 +283,9 @@ private fun TvCastCrewSection(
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Cast & Crew", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(text = stringResource(R.string.castcrew_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             IconButton(onClick = onViewAll) {
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "View all cast & crew")
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.castcrew_view_all))
             }
         }
 
@@ -357,19 +357,23 @@ private fun TvSeasonsSection(seasons: List<Season>, onSeasonClick: (Season) -> U
             }
             Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
                 Text(
-                    text = "Seasons",
+                    text = stringResource(R.string.tv_seasons),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "${seasons.size} Season${if (seasons.size != 1) "s" else ""}",
+                    text = if (seasons.size == 1) {
+                        stringResource(R.string.tv_season_count_one, seasons.size)
+                    } else {
+                        stringResource(R.string.tv_season_count_other, seasons.size)
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium
                 )
             }
             Icon(
                 imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = if (expanded) "Collapse seasons" else "Expand seasons"
+                contentDescription = if (expanded) stringResource(R.string.tv_collapse_seasons) else stringResource(R.string.tv_expand_seasons)
             )
         }
         if (expanded) {
@@ -439,21 +443,21 @@ private fun TvInformationSection(details: TvShowDetails) {
     val website = details.homepageIfPresent
 
     val rows = buildList {
-        details.originalNameIfPresent?.let { add("Original Name" to it) }
-        details.statusIfPresent?.let { add("Status" to it) }
-        details.firstAirDate.takeIf { it.isNotBlank() }?.let { add("First Air Date" to it) }
-        details.episodeRuntimeFormatted?.let { add("Episode Runtime" to it) }
-        details.seasonsFormatted?.let { add("Seasons" to it) }
-        details.numberOfEpisodes?.takeIf { it > 0 }?.let { add("Episodes" to it.toString()) }
-        details.countriesFormatted?.let { add("Countries" to it) }
-        details.networksFormatted?.let { add("Networks" to it) }
-        details.productionCompaniesFormatted?.let { add("Production Companies" to it) }
+        details.originalNameIfPresent?.let { add(stringResource(R.string.tv_info_original_name) to it) }
+        details.statusIfPresent?.let { add(stringResource(R.string.detail_info_status) to it) }
+        details.firstAirDate.takeIf { it.isNotBlank() }?.let { add(stringResource(R.string.tv_info_first_air_date) to it) }
+        details.episodeRuntimeFormatted?.let { add(stringResource(R.string.tv_info_episode_runtime) to it) }
+        details.seasonsFormatted?.let { add(stringResource(R.string.tv_seasons) to it) }
+        details.numberOfEpisodes?.takeIf { it > 0 }?.let { add(stringResource(R.string.tv_episodes) to it.toString()) }
+        details.countriesFormatted?.let { add(stringResource(R.string.detail_info_countries) to it) }
+        details.networksFormatted?.let { add(stringResource(R.string.tv_info_networks) to it) }
+        details.productionCompaniesFormatted?.let { add(stringResource(R.string.detail_info_production_companies) to it) }
     }
 
     if (rows.isEmpty() && website == null) return
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(text = "Information", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
+        Text(text = stringResource(R.string.detail_information), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
 
         rows.forEach { (label, value) -> TvInfoRow(label = label, value = value) }
 
@@ -461,7 +465,7 @@ private fun TvInformationSection(details: TvShowDetails) {
             val uriHandler = LocalUriHandler.current
             // The Website value is the one row whose value can be a long unbroken URL — run it
             // through UrlAutoSizeText so it shrinks to fit the row instead of clipping.
-            TvInfoRow(label = "Website", value = website, onClick = { uriHandler.openUri(website) }, autoShrink = true)
+            TvInfoRow(label = stringResource(R.string.detail_info_website), value = website, onClick = { uriHandler.openUri(website) }, autoShrink = true)
         }
     }
 }

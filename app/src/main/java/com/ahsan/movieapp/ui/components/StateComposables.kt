@@ -23,10 +23,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
+import com.ahsan.movieapp.R
 
 @Composable
 fun FullScreenLoading(modifier: Modifier = Modifier) {
@@ -66,7 +68,7 @@ fun FullScreenError(
         }
         if (onRetry != null) {
             Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) {
-                Text("Retry")
+                Text(stringResource(R.string.retry))
             }
         }
     }
@@ -118,11 +120,11 @@ fun <T : Any> PagingAppendFooter(pagingItems: LazyPagingItems<T>, modifier: Modi
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Couldn't load more",
+                text = stringResource(R.string.component_could_not_load_more),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            TextButton(onClick = { pagingItems.retry() }) { Text("Retry") }
+            TextButton(onClick = { pagingItems.retry() }) { Text(stringResource(R.string.retry)) }
         }
         is LoadState.NotLoading -> Unit
     }
@@ -155,7 +157,7 @@ fun OfflineBanner(visible: Boolean, modifier: Modifier = Modifier) {
                 modifier = Modifier.size(16.dp)
             )
             Text(
-                text = "You're offline — showing saved movies",
+                text = stringResource(R.string.offline_banner),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.padding(start = 8.dp)

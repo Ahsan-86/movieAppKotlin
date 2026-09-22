@@ -1,5 +1,7 @@
 package com.ahsan.movieapp.ui.genre
 
+import com.ahsan.movieapp.R
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.LoadState
@@ -33,6 +36,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.EmptyState
+import com.ahsan.movieapp.ui.components.FilterPanelSection
+import com.ahsan.movieapp.ui.components.FilterSummaryBar
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.FullScreenLoading
 import com.ahsan.movieapp.ui.components.MoviePosterCard
@@ -63,13 +68,19 @@ fun GenreScreen(
     val pagedMovies = viewModel.pagedMovies?.collectAsLazyPagingItems()
     val pagedTvShows = viewModel.pagedTvShows?.collectAsLazyPagingItems()
 
+    // Live favorites set (see SearchViewModel.favoriteIds — same re-stamp trick) and per-tab
+    // filtered totals; both consumed below (ids by the grid, count by the summary line).
+    val favoriteIds by viewModel.favoriteIds.collectAsState(emptySet())
+    val movieFilteredTotal by viewModel.movieFilteredTotal.collectAsState()
+    val tvFilteredTotal by viewModel.tvFilteredTotal.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(state.genreName) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -86,16 +97,45 @@ fun GenreScreen(
                         selected = state.selectedMediaType == MediaTab.MOVIES,
                         onClick = { viewModel.onMediaTabSelected(MediaTab.MOVIES) },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text("Movies") }
+                    ) { Text(stringResource(R.string.movies)) }
                     SegmentedButton(
                         selected = state.selectedMediaType == MediaTab.TV,
                         onClick = { viewModel.onMediaTabSelected(MediaTab.TV) },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text("TV Shows") }
+                    ) { Text(stringResource(R.string.tv_shows)) }
                 }
             }
 
             val isTv = state.selectedMediaType == MediaTab.TV
+            // Only the active tab's total shows, since that's the grid being composed underneath —
+            // movieFilteredTotal/tvFilteredTotal are per-tab by design (see GenreViewModel).
+            val activeFilteredTotal = if (isTv) tvFilteredTotal else movieFilteredTotal
+
+            // Same collapsible filter panel as the search screen, minus the genre dropdown (this
+            // screen pins its genre): year/language/minimum-rating, applying to whichever tab is
+            // showing. Once applied, a FilterSummaryBar replaces the panel the same way Search
+            // does, with Edit (back to the panel, draft kept) / Clear.
+            if (state.isFilterApplied) {
+                FilterSummaryBar(
+                    filters = state.filters,
+                    onEdit = viewModel::onEditFilters,
+                    onClear = viewModel::onClearFilters,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    resultCount = activeFilteredTotal
+                )
+            } else {
+                FilterPanelSection(
+                    filters = state.filters,
+                    isExpanded = state.isFilterPanelExpanded,
+                    onToggleExpanded = viewModel::onToggleFilterPanel,
+                    onYearSelected = viewModel::onYearFilterSelected,
+                    onLanguageSelected = viewModel::onLanguageFilterSelected,
+                    onMinRatingChanged = viewModel::onMinRatingFilterChanged,
+                    onApply = viewModel::onApplyFilters,
+                    onReset = viewModel::resetFiltersDraft,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
 
             // Boxed in its own weighted slot rather than left as a bare Column sibling — each of
             // these states fills its container, and without a bounded slot to fill that would
@@ -104,17 +144,20 @@ fun GenreScreen(
                 if (isTv && pagedTvShows != null) {
                     GenrePagedGrid(
                         pagingItems = pagedTvShows,
-                        emptyBody = "No TV shows found for ${state.genreName}.",
+                        emptyBody = stringResource(R.string.genre_no_tv_shows_found, state.genreName),
                         onItemClick = onTvClick,
                         // TV shows can't be favorited yet — no schema support for TV favorites.
-                        onToggleFavorite = null
+                        onToggleFavorite = null,
+                        // No heart to flip on this grid, so no live set to stamp against.
+                        favoriteIds = emptySet()
                     )
                 } else if (!isTv && pagedMovies != null) {
                     GenrePagedGrid(
                         pagingItems = pagedMovies,
-                        emptyBody = "No movies found for ${state.genreName}.",
+                        emptyBody = stringResource(R.string.genre_no_movies_found, state.genreName),
                         onItemClick = onMovieClick,
-                        onToggleFavorite = { movie -> viewModel.toggleFavorite(movie) }
+                        onToggleFavorite = { movie -> viewModel.toggleFavorite(movie) },
+                        favoriteIds = favoriteIds
                     )
                 }
             }
@@ -124,22 +167,25 @@ fun GenreScreen(
 
 /** Shared grid for both of [GenreScreen]'s tabs — same loading/error/empty/append handling,
  *  paging library, and layout either way, just a different [LazyPagingItems] source, empty-state
- *  message, click handler, and favoriting behavior. */
+ *  message, click handler, and favoriting behavior. [favoriteIds] re-stamps each movie's
+ *  isFavorite at render time (see SearchViewModel.favoriteIds for the why) so the movies tab's
+ *  hearts flip immediately on toggle; the TV tab passes an empty set since it has no hearts. */
 @Composable
 private fun GenrePagedGrid(
     pagingItems: LazyPagingItems<Movie>,
     emptyBody: String,
     onItemClick: (Movie) -> Unit,
-    onToggleFavorite: ((Movie) -> Unit)?
+    onToggleFavorite: ((Movie) -> Unit)?,
+    favoriteIds: Set<Int>
 ) {
     val refreshState = pagingItems.loadState.refresh
     when {
         refreshState is LoadState.Loading && pagingItems.itemCount == 0 -> FullScreenLoading()
         refreshState is LoadState.Error && pagingItems.itemCount == 0 -> FullScreenError(
-            message = refreshState.error.message ?: "Something went wrong",
+            message = refreshState.error.message ?: stringResource(R.string.error_generic),
             onRetry = { pagingItems.retry() }
         )
-        pagingItems.itemCount == 0 -> EmptyState(title = "Nothing here", body = emptyBody)
+        pagingItems.itemCount == 0 -> EmptyState(title = stringResource(R.string.nothing_here), body = emptyBody)
         else -> LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 128.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
@@ -149,10 +195,11 @@ private fun GenrePagedGrid(
         ) {
             items(count = pagingItems.itemCount, key = pagingItems.itemKey { it.id }) { index ->
                 val movie = pagingItems[index] ?: return@items
+                val displayMovie = if (movie.isFavorite == (movie.id in favoriteIds)) movie else movie.copy(isFavorite = movie.id in favoriteIds)
                 MoviePosterCard(
-                    movie = movie,
-                    onClick = { onItemClick(movie) },
-                    onToggleFavorite = onToggleFavorite?.let { toggle -> { toggle(movie) } },
+                    movie = displayMovie,
+                    onClick = { onItemClick(displayMovie) },
+                    onToggleFavorite = onToggleFavorite?.let { toggle -> { toggle(displayMovie) } },
                     width = null
                 )
             }

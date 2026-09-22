@@ -31,6 +31,7 @@ import androidx.compose.ui.util.lerp
 import coil.compose.AsyncImage
 import com.ahsan.movieapp.domain.model.Movie
 import kotlin.math.abs
+import kotlin.math.min
 import kotlinx.coroutines.delay
 
 /**
@@ -42,8 +43,10 @@ import kotlinx.coroutines.delay
  * ~90% for depth as you swipe. Horizontal insets (42dp) keep a clear **peek of the previous and
  * next card visible on both sides** while the current card is in focus. Below sits a row of M3-style
  * dots (an active pill that widens 6→14dp and slides smoothly between pages as you swipe, driven by
- * [PagerState.currentPageOffsetFraction]). The banner sits above the genre chips row and the rest
- * of Explore's carousel sections.
+ * [PagerState.currentPageOffsetFraction]). The pager is **truly infinite** (Session 4): it starts at a
+ * huge virtual page index and reads cards via `page % movies.size`, so there is no first or last page —
+ * swipe either direction forever, and auto-advance just flows on. The banner sits above the genre chips
+ * row and the rest of Explore's carousel sections.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -56,24 +59,34 @@ fun HeroMovieCarousel(
     genreNameById: Map<Int, String> = emptyMap()
 ) {
     if (movies.isEmpty()) return
-    val pagerState = rememberPagerState(pageCount = { movies.size })
+
+    // True infinite loop: a virtual page index instead of a real one, so the pager never has a
+    // first/last page to bounce off. Two pieces must agree for this to hold:
+    //  - pageCount must be the huge virtual constant (NOT movies.size — otherwise only pages
+    //    0..size-1 exist, initialPage gets clamped, and currentPage+1 walks off the end).
+    //  - Cards map to pages with page % movies.size, and the only transition that ever happens is
+    //    "current + 1" — the old scrollToPage(0) wrap jump is gone.
+    // Starting at ~Int.MAX_VALUE/2 leaves ~1 billion virtual pages to go through at one per
+    // AUTO_ADVANCE_MS (~a century of idle auto-play) before the index ever wraps around. The start
+    // is rounded down to a multiple of the item count so page % size == 0 — otherwise the raw
+    // Int.MAX_VALUE/2 residue (e.g. 1073741823 % 8 == 7) would open the hero on the LAST card.
+    val itemCount = movies.size
+    val startingPage = INFINITE_INITIAL_PAGE - (INFINITE_INITIAL_PAGE % itemCount)
+    val pagerState = rememberPagerState(
+        initialPage = startingPage,
+        pageCount = { INFINITE_PAGE_COUNT }
+    )
 
     // Auto-advances through the hero pages every AUTO_ADVANCE_MS, pausing while the user is
     // dragging. The leading delay is important: isScrollInProgress is also true while our own
     // animateScrollToPage() runs, so checking it right when this effect starts would read that
-    // animation and leave the carousel advancing itself forever. Animate normally between
-    // pages, but jump instantly back to the first page when wrapping past the last.
+    // animation and leave the carousel advancing itself forever.
     LaunchedEffect(movies.size) {
         if (movies.size <= 1) return@LaunchedEffect
         while (true) {
             delay(AUTO_ADVANCE_MS)
             if (pagerState.isScrollInProgress) continue
-            val next = pagerState.currentPage + 1
-            if (next >= pagerState.pageCount) {
-                pagerState.scrollToPage(0)
-            } else {
-                pagerState.animateScrollToPage(next)
-            }
+            pagerState.animateScrollToPage(pagerState.currentPage + 1)
         }
     }
 
@@ -84,7 +97,9 @@ fun HeroMovieCarousel(
             pageSpacing = 12.dp,
             modifier = Modifier.fillMaxWidth()
         ) { page ->
-            val movie = movies[page]
+            // Virtual page → real card: the modulo read is what turns the unbounded pager into a
+            // seamless loop, keeping the swipe/parallax math below purely relative.
+            val movie = movies[page % movies.size]
             // Relative offset of this page from the focused one (-1..1); drives the parallax/scale:
             // the focused card is full size, neighbors shrink to ~90% as they slide away.
             val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
@@ -139,6 +154,9 @@ fun HeroMovieCarousel(
  * A row of M3-style page dots — one 6dp circle per page, with the current page's dot widening
  * into a 14dp pill. The active pill widens continuously mid-swipe and hands off to the next dot
  * because it reads [PagerState.currentPageOffsetFraction], not just [PagerState.currentPage].
+ * Because the pager is infinite, the pill's position is [dotWidthFraction]'s ring distance — it
+ * sees dot 0 as sitting next to the last dot, so the last→first wrap hands off like any adjacent
+ * pair (the last dot fades as the first rises) instead of the pill glitching or skipping across.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -155,10 +173,9 @@ private fun DotsPageIndicator(
         verticalAlignment = Alignment.CenterVertically
     ) {
         repeat(pageCount) { index ->
-            // 1 for the settled page, falling to 0 once the next page has fully arrived; the
-            // neighbor on the other side rises symmetrically as it slides away.
-            val widthFraction = (1f - abs(pagerState.currentPage - index + pagerState.currentPageOffsetFraction))
-                .coerceIn(0f, 1f)
+            // 1 for the settled page and its neighbor in the travel direction, falling to 0 as the
+            // pill moves on; all other dots stay dim (ring distance > 1).
+            val widthFraction = dotWidthFraction(pagerState, index, pageCount)
             Box(
                 modifier = Modifier
                     .width(DOT_WIDTH + (ACTIVE_DOT_WIDTH - DOT_WIDTH) * widthFraction)
@@ -176,8 +193,31 @@ private fun DotsPageIndicator(
     }
 }
 
+/**
+ * How lit dot [index] should be while the pager settles, on a 0..[pageCount] ring. The virtual page
+ * index grows forever, so the raw position is `currentPage % pageCount + currentPageOffsetFraction`;
+ * distance to the dot is measured the short way *around the ring* (min of the two wraps). That short
+ * way flips the last dot and the first dot into ring-neighbors, which is exactly what makes the
+ * infinite loop's wrap hand off smoothly in both swipe directions.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private fun dotWidthFraction(pagerState: PagerState, index: Int, pageCount: Int): Float {
+    val position = pagerState.currentPage % pageCount + pagerState.currentPageOffsetFraction
+    val ringDistance = min(abs(position - index), pageCount - abs(position - index)).coerceIn(0f, 1f)
+    return 1f - ringDistance
+}
+
 private val DOT_WIDTH = 6.dp
 private val ACTIVE_DOT_WIDTH = 14.dp
 private val DOT_HEIGHT = 6.dp
 private val DOT_SPACING = 5.dp
 private const val AUTO_ADVANCE_MS = 3_000L
+private const val INFINITE_INITIAL_PAGE = Int.MAX_VALUE / 2
+
+/**
+ * The total number of virtual pages the pager owns. Deliberately NOT the item count: the infinite
+ * loop lives in an unbounded page space that the items are modded into, so advancing the page index
+ * always has a valid next page to land on. `Int.MAX_VALUE` covers ~1 billion trips around the loop
+ * from [INFINITE_INITIAL_PAGE] before exhausting itself.
+ */
+private const val INFINITE_PAGE_COUNT = Int.MAX_VALUE

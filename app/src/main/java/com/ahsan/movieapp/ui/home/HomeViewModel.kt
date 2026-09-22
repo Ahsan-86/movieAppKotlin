@@ -46,11 +46,15 @@ data class HomeUiState(
     val isOffline: Boolean = false
 )
 
-/** One row in [HomeViewModel.sectionSources] — where a carousel's movies come from. */
+/** One row in [HomeViewModel.sectionSources] — where a carousel's movies come from. [genreMovieId]
+ *  and [genreTvId] back the curated genre rows (TMDB `/discover`), mutually exclusive with [category]/
+ *  [categoryTv] and with each other. */
 private data class HomeSectionSource(
     val labelRes: Int,
     val category: MovieCategory? = null,
     val categoryTv: TvCategory? = null,
+    val genreMovieId: Int? = null,
+    val genreTvId: Int? = null,
     val isTv: Boolean = false
 )
 
@@ -61,19 +65,21 @@ class HomeViewModel @Inject constructor(
     connectivityObserver: NetworkConnectivityObserver
 ) : ViewModel() {
 
-    // "Popular" doubles as the hero banner's source (see heroSectionIndex below) — its own row
-    // still shows further down, same as a Netflix-style hero-plus-shelf layout. The TV rows
-    // ("Popular TV Shows" moved to the bottom and switched to real TV data on request, Phase 2.6
-    // Session 3 adds the "Trending TV Shows" row to it) are backed by the new offline-first
-    // `tv_shows` Room cache (see MovieRepository.getCategoryTv), same as every movie carousel.
+    // Session 4's agreed Explore reorder: movies on top (hero + Popular row, For You, Upcoming,
+    // then a curated Sci-Fi movie row), TV below (Popular, On The Air — the natural TV analog of
+    // Upcoming, since there's no `/tv/upcoming` — then curated Sci-Fi TV). Now Playing, Top Rated
+    // and the Trending TV row dropped from Explore (Trending keeps its own screen), and For You
+    // stays movies-only — there's no mixed movie+TV data source to back a hybrid row, and we don't
+    // fake one. The TV rows are backed by the offline-first `tv_shows` Room cache (see
+    // MovieRepository.getCategoryTv), same as every movie carousel.
     private val sectionSources = listOf(
         HomeSectionSource(R.string.section_popular, category = MovieCategory.POPULAR),
         HomeSectionSource(R.string.section_for_you),
-        HomeSectionSource(R.string.section_now_playing, category = MovieCategory.NOW_PLAYING),
-        HomeSectionSource(R.string.section_top_rated, category = MovieCategory.TOP_RATED),
         HomeSectionSource(R.string.section_upcoming, category = MovieCategory.UPCOMING),
+        HomeSectionSource(R.string.section_sci_fi_movies, genreMovieId = SCI_FI_MOVIE_GENRE_ID),
         HomeSectionSource(R.string.home_popular_tv_shows, categoryTv = TvCategory.POPULAR_TV, isTv = true),
-        HomeSectionSource(R.string.home_trending_tv_shows, categoryTv = TvCategory.TRENDING_TV, isTv = true)
+        HomeSectionSource(R.string.home_on_the_air_tv_shows, categoryTv = TvCategory.ON_THE_AIR, isTv = true),
+        HomeSectionSource(R.string.home_sci_fi_tv_shows, genreTvId = SCI_FI_TV_GENRE_ID, isTv = true)
     )
 
     private val heroSectionIndex = sectionSources.indexOfFirst { it.category == MovieCategory.POPULAR }
@@ -88,8 +94,10 @@ class HomeViewModel @Inject constructor(
 
     private fun currentSectionFlows(): List<Flow<Resource<List<Movie>>>> = sectionSources.map { source ->
         when {
+            source.genreTvId != null -> repository.browseGenreTv(source.genreTvId)
             source.isTv -> repository.getCategoryTv(source.categoryTv!!)
             source.category != null -> repository.getCategory(source.category)
+            source.genreMovieId != null -> repository.browseGenre(source.genreMovieId)
             else -> repository.getForYou()
         }
     }
@@ -144,6 +152,11 @@ class HomeViewModel @Inject constructor(
     }
 
     companion object {
+        // The Sci-Fi movie and TV rows reuse the same curated genre ids as the Science Fiction
+        // genre chip (see MovieRepositoryImpl.CURATED_GENRES) — "/discover" with genre 878 (movies)
+        // and 10765 (TV).
+        private const val SCI_FI_MOVIE_GENRE_ID = 878
+        private const val SCI_FI_TV_GENRE_ID = 10765
         private const val HERO_MOVIE_COUNT = 8
     }
 }

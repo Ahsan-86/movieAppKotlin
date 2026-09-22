@@ -108,6 +108,12 @@ class SearchViewModel @Inject constructor(
     private val filteredTotal = MutableStateFlow<Int?>(null)
     val filteredResultCount: StateFlow<Int?> = filteredTotal.asStateFlow()
 
+    // Same count pattern for text-search results ([SearchMoviesPagingSource] writes its total
+    // here); the screen shows the line above the results grid. Reset to null whenever the query
+    // changes so a stale count never lingers until the next page 1 arrives.
+    private val searchTotal = MutableStateFlow<Int?>(null)
+    val searchResultCount: StateFlow<Int?> = searchTotal.asStateFlow()
+
     // Live set of favorited movie ids (from Room's favorites table). The UI re-stamps each
     // paginated movie's isFavorite against this set at render time, which is what makes toggling a
     // favorite here flip the heart immediately instead of waiting for the next re-page (see
@@ -120,7 +126,7 @@ class SearchViewModel @Inject constructor(
         .debounce(350)
         .distinctUntilChanged()
         .flatMapLatest { query ->
-            if (query.isBlank()) flowOf(PagingData.empty()) else repository.getPagedSearchMovies(query)
+            if (query.isBlank()) flowOf(PagingData.empty()) else repository.getPagedSearchMovies(query, searchTotal)
         }
         .cachedIn(viewModelScope)
 
@@ -158,6 +164,7 @@ class SearchViewModel @Inject constructor(
     fun onQueryChanged(query: String) {
         _uiState.update { it.copy(query = query) }
         queryFlow.value = query
+        searchTotal.value = null
     }
 
     /** Called when the user explicitly commits a search (IME search action) — this is what gets recorded to history, not every debounced keystroke. */
@@ -171,6 +178,7 @@ class SearchViewModel @Inject constructor(
     fun onRecentSearchClick(query: String) {
         _uiState.update { it.copy(query = query) }
         queryFlow.value = query
+        searchTotal.value = null
         viewModelScope.launch { repository.recordSearch(query) }
     }
 

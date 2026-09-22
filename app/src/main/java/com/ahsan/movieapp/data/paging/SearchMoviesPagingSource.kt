@@ -9,6 +9,7 @@ import com.ahsan.movieapp.data.mapper.toEntity
 import com.ahsan.movieapp.data.mapper.toMovieDto
 import com.ahsan.movieapp.data.remote.TmdbApi
 import com.ahsan.movieapp.domain.model.Movie
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 
 /**
@@ -32,6 +33,9 @@ import kotlinx.coroutines.flow.first
  * at once — Paging 3 explicitly disallows that. The trade-off of the snapshot approach: toggling a
  * favorite from Search/Discover results doesn't flip the heart icon live the way Trending/Genre's
  * Room-`LEFT JOIN`-based reactivity does — it's correct again next time this screen re-queries.
+ * Each loaded page's [com.ahsan.movieapp.data.remote.dto.PagedResponseDto.totalResults] is also
+ * written into [totalResults] (when provided) so the search screen can show "N results found" like
+ * the filtered branch does — same shape as [DiscoverPagingSource].
  *
  * Falls back to a local `LIKE` match, but ONLY on page 1 and ONLY when the network call fails
  * outright — the same "search still half-works offline" behavior this app has always had — and
@@ -44,7 +48,8 @@ class SearchMoviesPagingSource(
     private val api: TmdbApi,
     private val movieDao: MovieDao,
     private val favoriteDao: FavoriteDao,
-    private val query: String
+    private val query: String,
+    private val totalResults: MutableStateFlow<Int?>? = null
 ) : PagingSource<Int, Movie>() {
 
     // TMDB's `/search/multi` pages aren't guaranteed disjoint for a given query — the same movie can
@@ -60,6 +65,7 @@ class SearchMoviesPagingSource(
         val page = params.key ?: 1
         return try {
             val response = api.searchMulti(query, page = page)
+            totalResults?.value = response.totalResults
             val movieDtos = response.results
                 .filter { it.mediaType == "movie" }
                 .map { it.toMovieDto() }

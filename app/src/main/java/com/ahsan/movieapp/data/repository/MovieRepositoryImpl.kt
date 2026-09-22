@@ -120,10 +120,13 @@ class MovieRepositoryImpl @Inject constructor(
      * shape as [getPagedGenreTv]: [SearchMoviesPagingSource] reads TMDB pages (with a page-1-only
      * local fallback) directly, since there's no Room cache table keyed by arbitrary search text.
      */
-    override fun getPagedSearchMovies(query: String): Flow<PagingData<Movie>> =
+    override fun getPagedSearchMovies(
+        query: String,
+        totalResults: MutableStateFlow<Int?>?
+    ): Flow<PagingData<Movie>> =
         Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
-            pagingSourceFactory = { SearchMoviesPagingSource(api, movieDao, favoriteDao, query) }
+            pagingSourceFactory = { SearchMoviesPagingSource(api, movieDao, favoriteDao, query, totalResults) }
         ).flow
 
     /**
@@ -349,9 +352,16 @@ class MovieRepositoryImpl @Inject constructor(
             fetch = { api.discoverByGenres(genreId.toString()).results }
         )
 
+    /** Phase 2.6 Session 4 — see the interface doc. [browseGenre]'s TV mirror over the `tv_shows` tables. */
+    override fun browseGenreTv(genreId: Int): Flow<Resource<List<Movie>>> =
+        cachedCategoryTvFlow(
+            storageKey = "genre_tv_$genreId",
+            fetch = { api.discoverTvByGenres(genreId.toString()).results }
+        )
+
     /** Phase 2.6 Session 3 — see the interface doc. Same offline-first mechanism as [getCategory],
      *  over the new `tv_shows` cache tables; never combines with the movie favorite table (TV rows
-     *  are always `isFavorite = false` — cross-media id collision, see [TvShowEntity.toDomain]). */
+     *  are always `isFavorite = false` — cross-media id collision, see `TvShowEntity.toDomain`). */
     override fun getCategoryTv(category: TvCategory): Flow<Resource<List<Movie>>> =
         cachedCategoryTvFlow(
             storageKey = category.storageKey,
@@ -501,6 +511,7 @@ class MovieRepositoryImpl @Inject constructor(
     private suspend fun fetchCategoryTvFromNetwork(category: TvCategory): List<TvShowDto> = when (category) {
         TvCategory.TRENDING_TV -> api.getTrendingTv().results
         TvCategory.POPULAR_TV -> api.getPopularTv().results
+        TvCategory.ON_THE_AIR -> api.getOnTheAirTv().results
     }
 
     /** [fetchCategoryTvFromNetwork]'s paged counterpart for [getPagedCategoryTv] — same as
@@ -510,6 +521,7 @@ class MovieRepositoryImpl @Inject constructor(
         when (category) {
             TvCategory.TRENDING_TV -> api.getTrendingTv(page)
             TvCategory.POPULAR_TV -> api.getPopularTv(page)
+            TvCategory.ON_THE_AIR -> api.getOnTheAirTv(page)
         }
 
     /** Shared plumbing for every screen that's "just a list of movies under some cache key". */

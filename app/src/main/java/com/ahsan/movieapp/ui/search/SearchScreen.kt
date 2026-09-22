@@ -50,9 +50,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -117,6 +114,7 @@ fun SearchScreen(
     // consumes both below (count via FilterSummaryBar, ids via the grid/list re-stamping).
     val favoriteIds by viewModel.favoriteIds.collectAsState(emptySet())
     val filteredResultCount by viewModel.filteredResultCount.collectAsState()
+    val searchResultCount by viewModel.searchResultCount.collectAsState()
 
     // One state per Lazy container this screen can show — only one is ever composed at a time
     // (they're mutually exclusive branches below), so it's safe to reuse each across every mode
@@ -256,6 +254,15 @@ fun SearchScreen(
                         // The view-mode toggle only makes sense once there's something to lay out —
                         // it used to sit above the search field permanently, which showed it even on
                         // the blank first-open screen with no results to switch the layout of.
+                        if (searchResultCount != null) {
+                            val count = searchResultCount
+                            Text(
+                                text = stringResource(R.string.filter_results_found, count!!),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 12.dp)
+                            )
+                        }
                         ViewModeRow(selected = state.viewMode, onSelected = viewModel::onViewModeSelected)
                         when (state.viewMode) {
                             SearchViewMode.LIST -> SearchResultsList(

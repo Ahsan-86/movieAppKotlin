@@ -32,9 +32,9 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * The "Explore" home: a hero banner of the top popular movies, a text-only genre chips row, then
- * a stack of themed, horizontally-scrolling carousels (Popular, For You, Now Playing, Top Rated,
- * Upcoming, Popular TV Shows). No heading text of its own — the persistent "Movie App" top bar
- * covers that, so this screen's whole content area is the hero-first layout described above.
+ * a stack of themed, horizontally-scrolling carousels (Popular, For You, Upcoming, Sci-Fi Movies,
+ * then Popular/On The Air/Sci-Fi TV Shows). No heading text of its own — the persistent "Movie App"
+ * top bar covers that, so this screen's whole content area is the hero-first layout described above.
  */
 @Composable
 fun HomeScreen(

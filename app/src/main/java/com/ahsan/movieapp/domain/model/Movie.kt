@@ -19,20 +19,21 @@ data class Movie(
     val ratingOutOfTen: String get() = String.format(Locale.US, "%.1f", voteAverage)
 }
 
-enum class MovieCategory(val apiPath: String, val storageKey: String) {
-    TRENDING_TODAY("trending/movie/day", "trending_today"),
-    POPULAR("movie/popular", "popular"),
-    TOP_RATED("movie/top_rated", "top_rated"),
-    NOW_PLAYING("movie/now_playing", "now_playing"),
-    UPCOMING("movie/upcoming", "upcoming"),
-    FOR_YOU("discover/movie", "for_you")
+enum class MovieCategory(val storageKey: String) {
+    TRENDING_TODAY("trending_today"),
+    POPULAR("popular"),
+    TOP_RATED("top_rated"),
+    NOW_PLAYING("now_playing"),
+    UPCOMING("upcoming"),
+    FOR_YOU("for_you")
 }
 
 /** Phase 2.6 Session 3 — the TV lists Room-caches, the [MovieCategory] equivalent for TV. Stored
  *  in their own `tv_shows`/`category_tv_shows` tables (never `movies`/`favorites`): TMDB reuses
  *  one numeric ID range across movies and TV, so a TV id must never collide with the movie-only
  *  `favorites` table until Session 6's composite-key migration. */
-enum class TvCategory(val apiPath: String, val storageKey: String) {
-    TRENDING_TV("trending/tv/day", "trending_tv"),
-    POPULAR_TV("tv/popular", "popular_tv")
+enum class TvCategory(val storageKey: String) {
+    TRENDING_TV("trending_tv"),
+    POPULAR_TV("popular_tv"),
+    ON_THE_AIR("on_the_air_tv")
 }

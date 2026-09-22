@@ -3,7 +3,6 @@ package com.ahsan.movieapp.data.remote
 import com.ahsan.movieapp.data.remote.dto.CollectionDetailsDto
 import com.ahsan.movieapp.data.remote.dto.CombinedCreditsDto
 import com.ahsan.movieapp.data.remote.dto.CreditsDto
-import com.ahsan.movieapp.data.remote.dto.GenreListDto
 import com.ahsan.movieapp.data.remote.dto.MovieDetailsDto
 import com.ahsan.movieapp.data.remote.dto.MovieDto
 import com.ahsan.movieapp.data.remote.dto.MultiSearchResultDto
@@ -38,6 +37,14 @@ interface TmdbApi {
     @GET("3/tv/popular")
     suspend fun getPopularTv(@Query("page") page: Int = 1): PagedResponseDto<TvShowDto>
 
+    /**
+     * Phase 2.6 Session 4 — TMDB's TV analog of "Upcoming": every currently-airing series. Feeds
+     * the home screen's "On The Air - TV Shows" row (there is no `/tv/upcoming`; on_the_air is the
+     * natural TV counterpart of the movie Upcoming list).
+     */
+    @GET("3/tv/on_the_air")
+    suspend fun getOnTheAirTv(@Query("page") page: Int = 1): PagedResponseDto<TvShowDto>
+
     @GET("3/movie/top_rated")
     suspend fun getTopRated(@Query("page") page: Int = 1): PagedResponseDto<MovieDto>
 
@@ -53,9 +60,6 @@ interface TmdbApi {
         @Query("sort_by") sortBy: String = "popularity.desc",
         @Query("page") page: Int = 1
     ): PagedResponseDto<MovieDto>
-
-    @GET("3/genre/movie/list")
-    suspend fun getGenres(): GenreListDto
 
     /**
      * Backs the search screen's collapsible filter panel (Phase 2.5) — every param is optional so

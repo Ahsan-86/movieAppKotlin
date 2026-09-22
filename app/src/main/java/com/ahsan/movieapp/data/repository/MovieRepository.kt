@@ -46,7 +46,7 @@ interface MovieRepository {
 /**
      * Phase 4 (pagination) Round 3 — the genre screen's TV tab. No Room table keyed by genre+filter
      * for TV (same convention as [getPagedGenre]'s filter-only caveats on the movie side), so
-     * unlike [getPagedGenre] this [Pager] has no [androidx.paging.RemoteMediator]: just
+     * unlike [getPagedGenre] this `Pager` has no [androidx.paging.RemoteMediator]: just
      * [com.ahsan.movieapp.data.paging.TvGenrePagingSource] reading TMDB pages directly, one TMDB
      * page per Paging 3 page. The genre screen's filtered state passes filters through to that
      * source (see its class doc); [totalResults] is forwarded so the screen can display a
@@ -106,7 +106,7 @@ interface MovieRepository {
      * call fails outright, so search never goes fully blank just because the device is offline. See
      * [com.ahsan.movieapp.data.paging.SearchMoviesPagingSource].
      */
-    fun getPagedSearchMovies(query: String): Flow<PagingData<Movie>>
+    fun getPagedSearchMovies(query: String, totalResults: MutableStateFlow<Int?>? = null): Flow<PagingData<Movie>>
 
     /**
      * The people half of a `/search/multi` query — one-shot, capped, and NOT paginated (unlike
@@ -151,6 +151,14 @@ interface MovieRepository {
 
     /** Offline-first browse of a single genre (TMDB `/discover/movie`) — used by the genre screen. */
     fun browseGenre(genreId: Int): Flow<Resource<List<Movie>>>
+
+    /**
+     * Phase 2.6 Session 4 — the TV counterpart of [browseGenre]: one cached page of TV shows for a
+     * genre (TMDB `/discover/tv`). Same offline-first mechanism as [getCategoryTv] over the `tv_shows`
+     * cache tables — backs the home screen's curated genre TV rows (e.g. Sci-Fi) with the standard
+     * single-page carousel flow, not the genre screen's filter/result-count paging machinery.
+     */
+    fun browseGenreTv(genreId: Int): Flow<Resource<List<Movie>>>
 
     /**
      * Phase 2.6 Session 3 — the TV counterpart of [getCategory], backing the Explore screen's TV

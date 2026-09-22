@@ -15,6 +15,7 @@
     <string name="section_now_playing">Now Playing - Movies</string>
     <string name="section_upcoming">Upcoming - Movies</string>
     <string name="section_for_you">For You - Movies</string>
+    <string name="section_sci_fi_movies">Sci-Fi - Movies</string>
     <string name="see_all">See all</string>
 
     <!-- Offline -->
@@ -64,6 +65,8 @@
 
     <!-- Common (shared across screens) -->
     <string name="home_popular_tv_shows">Popular - TV Shows</string>
+    <string name="home_on_the_air_tv_shows">On The Air - TV Shows</string>
+    <string name="home_sci_fi_tv_shows">Sci-Fi - TV Shows</string>
     <string name="home_trending_tv_shows">Trending - TV Shows</string>
     <string name="nav_movie_app">Movie App</string>
     <string name="person_movies">movies</string>

@@ -1,15 +1,13 @@
 package com.ahsan.movieapp.ui.favorites
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -27,13 +25,15 @@ import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.EmptyState
-import com.ahsan.movieapp.ui.components.MoviePosterCard
+import com.ahsan.movieapp.ui.components.MovieListRow
 import kotlinx.coroutines.flow.Flow
 
 /**
  * The Favorites tab. Session 6 — now a Movies / TV Shows segmented-toggle screen (same control as
- * Genre/Person): each tab shows that media type's saved favorites as a poster grid, newest-added
- * first. A TV card routes to the real TV detail screen via [onTvClick]; a movie card goes through
+ * Genre/Person): each tab shows that media type's saved favorites. On Ahsan's request (Session 7
+ * working-tree round) the two tabs render as full-width list rows via [MovieListRow] — the same
+ * list row the search screen's list-view mode and the person filmography use — instead of a poster
+ * grid. A TV row routes to the real TV detail screen via [onTvClick]; a movie row goes through
  * [onMovieClick]. Empty states are per-tab since the two are independent lists now.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,18 +51,18 @@ fun FavoritesScreen(
     val favoriteMovies by viewModel.favoriteMovies.collectAsState()
     val favoriteTvShows by viewModel.favoriteTvShows.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
-    val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
 
     val shownMovies = if (selectedTab == FavoritesTab.MOVIES) favoriteMovies else favoriteTvShows
     val isTvTab = selectedTab == FavoritesTab.TV
 
     LaunchedEffect(scrollToTopEvents) {
-        scrollToTopEvents?.collect { gridState.animateScrollToItem(0) }
+        scrollToTopEvents?.collect { listState.animateScrollToItem(0) }
     }
     // Switching tab shows a different list — snap back to the top so the user never lands in the
-    // middle of the other tab's grid.
+    // middle of the other tab's rows.
     LaunchedEffect(selectedTab) {
-        gridState.scrollToItem(0)
+        listState.scrollToItem(0)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -93,15 +93,12 @@ fun FavoritesScreen(
                 )
             )
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 128.dp),
-                state = gridState,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                items(shownMovies, key = { it.id }) { movie ->
-                    MoviePosterCard(
+                items(shownMovies, key = { it.id to it.mediaType }) { movie ->
+                    MovieListRow(
                         movie = movie,
                         onClick = {
                             if (movie.mediaType == MediaType.TV) {

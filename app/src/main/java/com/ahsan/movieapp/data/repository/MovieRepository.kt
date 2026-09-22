@@ -182,15 +182,29 @@ interface MovieRepository {
     fun getPagedCategoryTv(category: TvCategory): Flow<PagingData<Movie>>
 
     /**
-     * Phase 4 (pagination) Round 4 — infinite-scroll counterpart of the search screen's filter
-     * panel (genre/year/language/minimum rating — any subset), driven by TMDB `/discover/movie`.
-     * Network-only, no offline cache by filter combination (there are too many combinations to
-     * usefully cache each one) and so no [androidx.paging.RemoteMediator] — every returned movie
-     * still gets upserted into the shared `movies` table like any other fetch. [totalResults]
-     * (optional) receives each loaded page's total so screens can show a results count. See
-     * [com.ahsan.movieapp.data.paging.DiscoverPagingSource].
+     * Phase 4 (pagination) Round 4, rewritten in Session 7 — infinite-scroll counterpart of the
+     * search screen's filter panel (genre/year/language/minimum rating — any subset) and the genre
+     * screen's filtered Movies tab, driven by TMDB `/discover/movie`. Since Session 7 the result
+     * *is* cached offline per applied filter combination: a `Pager` over the Room-backed
+     * [com.ahsan.movieapp.data.paging.DiscoverRemoteMediator], keyed by this filter set's
+     * normalized `comboKey` (movies live in the shared `movies` table, the combo's ordered page
+     * list in `discover_combo_movies` with resume/`totalResults` bookkeeping in
+     * `discover_combo_remote_keys`). Staleness follows the carousel convention (skip re-fetch for
+     * combos seen within the 2h window); combos beyond the newest few are LRU-evicted. The matching
+     * "N results found" count is now read by [observeDiscoverResultTotal] from that Room row — no
+     * per-page flow plumbing, and it survives cached/offline reads.
      */
-    fun getPagedDiscoverMovies(filters: DiscoverFilters, totalResults: MutableStateFlow<Int?>? = null): Flow<PagingData<Movie>>
+    fun getPagedDiscoverMovies(filters: DiscoverFilters): Flow<PagingData<Movie>>
+
+    /**
+     * Session 7 — the "N results found" count for a cached Discover combo, emitted straight from
+     * the combo's `discover_combo_remote_keys` row (i.e. whatever the last network page for this
+     * filter set reported). Null until that combo has been fetched at least once (or when no
+     * filters are applied and there's no combo to count). On the genre screen the Movies tab's
+     * filter entry point is `{genre, filters…}`, so it observes with `filters.copy(genreId = …)`
+     * to build the same key the pager used.
+     */
+    fun observeDiscoverResultTotal(filters: DiscoverFilters): Flow<Int?>
 
     /** All saved favorites — movies and TV shows together, each stamped `isFavorite = true` (their
      *  [com.ahsan.movieapp.domain.model.MediaType] keeps the two apart even with shared TMDB ids).

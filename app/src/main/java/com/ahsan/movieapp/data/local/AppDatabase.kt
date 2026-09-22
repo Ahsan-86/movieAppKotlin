@@ -13,6 +13,8 @@ import com.ahsan.movieapp.data.local.entity.CastMemberEntity
 import com.ahsan.movieapp.data.local.entity.CategoryMovieCrossRef
 import com.ahsan.movieapp.data.local.entity.CategoryRemoteKeys
 import com.ahsan.movieapp.data.local.entity.CategoryTvShowCrossRef
+import com.ahsan.movieapp.data.local.entity.DiscoverComboMovieCrossRef
+import com.ahsan.movieapp.data.local.entity.DiscoverComboRemoteKeys
 import com.ahsan.movieapp.data.local.entity.FavoriteEntity
 import com.ahsan.movieapp.data.local.entity.MovieDetailsEntity
 import com.ahsan.movieapp.data.local.entity.MovieEntity
@@ -31,7 +33,9 @@ import com.ahsan.movieapp.data.local.entity.TvShowEntity
         CategoryRemoteKeys::class,
         TvShowEntity::class,
         CategoryTvShowCrossRef::class,
-        TvRemoteKeys::class
+        TvRemoteKeys::class,
+        DiscoverComboMovieCrossRef::class,
+        DiscoverComboRemoteKeys::class
     ],
     // Bumped 2 -> 3 for Phase 3's Information-section fields on MovieDetailsEntity
     // (originalTitle, status, homepage, budget, revenue, productionCountries,
@@ -46,7 +50,11 @@ import com.ahsan.movieapp.data.local.entity.TvShowEntity
     // via fallbackToDestructiveMigration), this one is a real Migration — MIGRATION_6_7 rebuilds
     // the favorites table and replays existing movie favorites into it, so users keep their saved
     // movies.
-    version = 7,
+    // Bumped 7 -> 8 for Session 7's cached Discover combos: two new tables
+    // (discover_combo_movies, discover_combo_remote_keys) cache the search/Genre screen's filtered
+    // Discover results per applied Genres-Year-Language-Rating combination, with present-on-install
+    // tables only.
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -81,6 +89,36 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL("DROP TABLE `favorites`")
                 db.execSQL("ALTER TABLE `favorites_new` RENAME TO `favorites`")
+            }
+        }
+
+        // Session 7 — pure table creations for the cached Discover combos, mirroring the themed
+        // carousel caches. Strings to match the exported 8.json (Room/FTS tables would need the
+        // `CREATE VIRTUAL TABLE` variants; these are plain b-tree tables).
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `discover_combo_movies` (
+                        `comboKey` TEXT NOT NULL,
+                        `movieId` INTEGER NOT NULL,
+                        `position` INTEGER NOT NULL,
+                        `fetchedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`comboKey`, `movieId`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `discover_combo_remote_keys` (
+                        `comboKey` TEXT NOT NULL,
+                        `nextPage` INTEGER,
+                        `totalResults` INTEGER,
+                        `fetchedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`comboKey`)
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

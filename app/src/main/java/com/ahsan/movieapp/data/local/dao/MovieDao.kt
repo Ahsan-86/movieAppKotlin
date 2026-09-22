@@ -10,6 +10,8 @@ import androidx.room.Transaction
 import com.ahsan.movieapp.data.local.entity.CastMemberEntity
 import com.ahsan.movieapp.data.local.entity.CategoryMovieCrossRef
 import com.ahsan.movieapp.data.local.entity.CategoryRemoteKeys
+import com.ahsan.movieapp.data.local.entity.DiscoverComboMovieCrossRef
+import com.ahsan.movieapp.data.local.entity.DiscoverComboRemoteKeys
 import com.ahsan.movieapp.data.local.entity.MovieDetailsEntity
 import com.ahsan.movieapp.data.local.entity.MovieEntity
 import kotlinx.coroutines.flow.Flow
@@ -99,6 +101,88 @@ interface MovieDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertRemoteKeys(keys: CategoryRemoteKeys)
+
+    // --- Session 7: cached Discover filter-panel combos (see DiscoverComboMovieCrossRef /
+    // DiscoverComboRemoteKeys). Same page-list machinery as the category carousels, keyed by a
+    // DiscoverFilters.comboKey() string instead of a curated category name. ---
+
+    /**
+     * The same listing as the category pager, but for one Discover combo — favorite status computed
+     * inline via the same `LEFT JOIN favorites` (see [MovieCategoryRow]) so hearts stay live.
+     */
+    @Query(
+        """
+        SELECT movies.*, CASE WHEN favorites.id IS NOT NULL THEN 1 ELSE 0 END AS isFavorite
+        FROM movies
+        INNER JOIN discover_combo_movies ON movies.id = discover_combo_movies.movieId
+        LEFT JOIN favorites ON movies.id = favorites.id AND favorites.mediaType = 'movie'
+        WHERE discover_combo_movies.comboKey = :comboKey
+        ORDER BY discover_combo_movies.position ASC
+        """
+    )
+    fun pagingSourceForDiscover(comboKey: String): PagingSource<Int, MovieCategoryRow>
+
+    @Query("SELECT MIN(fetchedAt) FROM discover_combo_movies WHERE comboKey = :comboKey")
+    suspend fun discoverComboFetchedAt(comboKey: String): Long?
+
+    @Query("SELECT MAX(position) FROM discover_combo_movies WHERE comboKey = :comboKey")
+    suspend fun maxDiscoverPosition(comboKey: String): Int?
+
+    @Query("DELETE FROM discover_combo_movies WHERE comboKey = :comboKey")
+    suspend fun clearDiscoverCombo(comboKey: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDiscoverComboRefs(refs: List<DiscoverComboMovieCrossRef>)
+
+    @Transaction
+    suspend fun replaceDiscoverCombo(comboKey: String, movies: List<MovieEntity>, fetchedAt: Long) {
+        upsertMovies(movies)
+        clearDiscoverCombo(comboKey)
+        insertDiscoverComboRefs(
+            movies.mapIndexed { index, movie ->
+                DiscoverComboMovieCrossRef(comboKey = comboKey, movieId = movie.id, position = index, fetchedAt = fetchedAt)
+            }
+        )
+    }
+
+    @Transaction
+    suspend fun appendDiscoverCombo(comboKey: String, movies: List<MovieEntity>, startPosition: Int, fetchedAt: Long) {
+        upsertMovies(movies)
+        insertDiscoverComboRefs(
+            movies.mapIndexed { index, movie ->
+                DiscoverComboMovieCrossRef(comboKey = comboKey, movieId = movie.id, position = startPosition + index, fetchedAt = fetchedAt)
+            }
+        )
+    }
+
+    @Query("SELECT * FROM discover_combo_remote_keys WHERE comboKey = :comboKey")
+    suspend fun discoverRemoteKeys(comboKey: String): DiscoverComboRemoteKeys?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertDiscoverRemoteKeys(keys: DiscoverComboRemoteKeys)
+
+    @Query("SELECT totalResults FROM discover_combo_remote_keys WHERE comboKey = :comboKey")
+    fun observeDiscoverTotal(comboKey: String): Flow<Int?>
+
+    /** LRU bound for the cached combos — deletes every combo beyond the [keepCount] most recently
+     *  fetched (by remote-keys `fetchedAt`). Call inside the same transaction that wrote a combo. */
+    @Query(
+        """
+        DELETE FROM discover_combo_movies WHERE comboKey NOT IN (
+            SELECT comboKey FROM discover_combo_remote_keys ORDER BY fetchedAt DESC LIMIT :keepCount
+        )
+        """
+    )
+    suspend fun evictDiscoverComboMovies(keepCount: Int)
+
+    @Query(
+        """
+        DELETE FROM discover_combo_remote_keys WHERE comboKey NOT IN (
+            SELECT comboKey FROM discover_combo_remote_keys ORDER BY fetchedAt DESC LIMIT :keepCount
+        )
+        """
+    )
+    suspend fun evictDiscoverComboKeys(keepCount: Int)
 
     @Query("SELECT * FROM movies WHERE id = :movieId")
     fun observeMovie(movieId: Int): Flow<MovieEntity?>

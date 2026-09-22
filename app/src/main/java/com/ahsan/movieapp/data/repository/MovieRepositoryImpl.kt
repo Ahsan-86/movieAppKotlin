@@ -24,7 +24,7 @@ import com.ahsan.movieapp.data.mapper.toPerson
 import com.ahsan.movieapp.data.mapper.toTvEntity
 import com.ahsan.movieapp.data.mapper.toTvShowDto
 import com.ahsan.movieapp.data.paging.CategoryRemoteMediator
-import com.ahsan.movieapp.data.paging.DiscoverPagingSource
+import com.ahsan.movieapp.data.paging.DiscoverRemoteMediator
 import com.ahsan.movieapp.data.paging.SearchMoviesPagingSource
 import com.ahsan.movieapp.data.paging.TvCategoryRemoteMediator
 import com.ahsan.movieapp.data.paging.TvGenrePagingSource
@@ -49,6 +49,7 @@ import com.ahsan.movieapp.domain.model.SeasonDetails
 import com.ahsan.movieapp.domain.model.TvCategory
 import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.domain.model.WatchProviders
+import com.ahsan.movieapp.domain.model.comboKey
 import com.ahsan.movieapp.util.Constants
 import com.ahsan.movieapp.util.Resource
 import com.ahsan.movieapp.util.networkBoundResource
@@ -156,19 +157,34 @@ class MovieRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Phase 4 (pagination) Round 4 — the search screen's filter-panel Discover results. Same
-     * no-`RemoteMediator` shape as [getPagedSearchMovies]/[getPagedGenreTv]: [DiscoverPagingSource]
-     * reads TMDB pages directly, since filter combinations aren't cached by key. [totalResults]
-     * (optional) is forwarded to that source so screens can display a filtered-results count.
+     * Phase 4 (pagination) Round 4, rewritten in Session 7 — the search screen's filter-panel
+     * Discover results (also the genre screen's filtered Movies tab). Now Room-cached per applied
+     * filter combination: [DiscoverRemoteMediator] decides when to hit TMDB (offline-first, 2h
+     * staleness, resumable next page, LRU-bounded cache), and [MovieDao.pagingSourceForDiscover]
+     * is what [Pager] actually reads from — so re-applying an identical combo renders from Room
+     * instantly, and favorites stay live through the same `LEFT JOIN`. The "N results found" count
+     * is queryable separately via [observeDiscoverResultTotal].
      */
-    override fun getPagedDiscoverMovies(
-        filters: DiscoverFilters,
-        totalResults: MutableStateFlow<Int?>?
-    ): Flow<PagingData<Movie>> =
-        Pager(
+    @OptIn(ExperimentalPagingApi::class)
+    override fun getPagedDiscoverMovies(filters: DiscoverFilters): Flow<PagingData<Movie>> {
+        val comboKey = filters.comboKey()
+        return Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
-            pagingSourceFactory = { DiscoverPagingSource(api, movieDao, favoriteDao, filters, totalResults) }
-        ).flow
+            remoteMediator = DiscoverRemoteMediator(
+                comboKey = comboKey,
+                staleThresholdMs = STALE_THRESHOLD_MS,
+                keepCount = DISCOVER_COMBO_KEEP,
+                fetchPage = { page -> api.discoverMovies(filters.genreId?.toString(), filters.year, filters.language, filters.minRating, page = page) },
+                database = database,
+                movieDao = movieDao
+            ),
+            pagingSourceFactory = { movieDao.pagingSourceForDiscover(comboKey) }
+        ).flow.map { pagingData -> pagingData.map { row -> row.toDomain() } }
+    }
+
+    /** Session 7 — see the interface doc: reads the cached combo's `totalResults` from Room. */
+    override fun observeDiscoverResultTotal(filters: DiscoverFilters): Flow<Int?> =
+        movieDao.observeDiscoverTotal(filters.comboKey())
 
     /**
      * Shared plumbing for every paginated "just a list of movies under some cache key" screen —
@@ -673,6 +689,12 @@ class MovieRepositoryImpl @Inject constructor(
         // Matches TMDB's own fixed page size, so one Paging 3 "page" load is exactly one TMDB
         // request — no partial-page bookkeeping needed.
         private const val PAGE_SIZE = 20
+
+        // Session 7 — LRU bound on the cached Discover combos: every cache write keeps only the
+        // most-recently-fetched combos and evicts the rest (see MovieDao.evictDiscoverCombo…).
+        // Combo space is small (curated genres × years × languages × rating steps) so 8 covers a
+        // realistic mix of filter panels the user cycles through while keeping the tables bounded.
+        private const val DISCOVER_COMBO_KEEP = 8
 
         // Curated first-open genre chips. Most genres share the same id between movie and TV;
         // a few don't exist for one media type at all (Horror/Romance/Thriller have no TV

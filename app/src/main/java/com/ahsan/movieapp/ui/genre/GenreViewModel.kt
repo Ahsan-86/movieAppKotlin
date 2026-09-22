@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -52,13 +53,14 @@ data class GenreUiState(
  * The filter section (year/language/minimum rating — the genre itself is fixed by this screen)
  * borrows the search screen's Phase 2.5 panel + summary-bar pattern, 2026-09-21. Each paged flow
  * `flatMapLatest`s over an applied-filters flow: no filters → Movies keeps its offline-first Room
- * browse; filters applied → Movies pages network-only via [MovieRepository.getPagedDiscoverMovies]
+ * browse; filters applied → Movies pages via [MovieRepository.getPagedDiscoverMovies]
  * (the fixed genre is folded into the filters as `genreId`), TV pages via
- * [MovieRepository.getPagedGenreTv]'s filter param. Empty [DiscoverFilters] on the TV side pages
- * plain, so the same `TvGenrePagingSource` covers both. Because the filtered Movies path goes
- * through [com.ahsan.movieapp.data.paging.DiscoverPagingSource], favorite hearts stamp from a
- * one-time snapshot per page (not the live Room join the unfiltered path uses) — heart flips only
- * land the next time this screen re-pages, same documented trade-off as search's Discover results.
+ * [MovieRepository.getPagedGenreTv]'s filter param. Since Session 7 the filtered Movies path has
+ * its OWN Room cache (per `{genreId, filters} combos`, see [MovieRepository.observeDiscoverResultTotal]):
+ * [MovieRepository.getPagedDiscoverMovies] pages through `DiscoverRemoteMediator` into
+ * `discover_combo_movies`, so hearts come from the live `LEFT JOIN favorites` — flips land
+ * immediately, same as the unfiltered browse. The TV tab stays a plain TvGenrePagingSource
+ * (network-only, no table to page into) and re-stamps hearts against [favoriteIds] at render time.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -75,13 +77,23 @@ class GenreViewModel @Inject constructor(
     // via onApplyFilters(). Drives both paged flows below (flatMapLatest, same pattern as SearchViewModel).
     private val appliedFiltersFlow = MutableStateFlow<DiscoverFilters?>(null)
 
-    // Per-tab filtered-total flows ([DiscoverPagingSource]/[TvGenrePagingSource] write page-1
-    // totals into the active tab's). Separate per tab because both tabs are collected at once even
-    // though only one grid ever composes — a single shared flow could end up showing the inactive
-    // tab's count. Reset to null whenever the filter set changes.
-    private val movieTotal = MutableStateFlow<Int?>(null)
+    // Movie-total: since Session 7 the filtered Movies path's count comes straight from the combo's
+    // Room cache keyed by `{genreId, filters}` (so it survives offline and needs no per-page flow
+    // plumbing); null until that combo has been fetched at least once (and always null while no
+    // filters are applied, since the screen only shows the count while isFilterApplied). The TV
+    // total below is still a MutableStateFlow ([TvGenrePagingSource] writes page-1 totals into it).
+    val movieFilteredTotal: StateFlow<Int?> =
+        movieGenreId?.let { id ->
+            appliedFiltersFlow
+                .flatMapLatest { filters ->
+                    if (filters == null) flowOf(null) else repository.observeDiscoverResultTotal(filters.copy(genreId = id))
+                }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        } ?: MutableStateFlow(null)
+
+    // Same count pattern for the TV tab ([TvGenrePagingSource] writes its total here). Reset to
+    // null whenever the filter set changes so a stale count never lingers until the next page 1.
     private val tvTotal = MutableStateFlow<Int?>(null)
-    val movieFilteredTotal: StateFlow<Int?> = movieTotal.asStateFlow()
     val tvFilteredTotal: StateFlow<Int?> = tvTotal.asStateFlow()
 
     // Live set of favorited (id, mediaType) pairs — the UI re-stamps each paginated item's
@@ -99,7 +111,7 @@ class GenreViewModel @Inject constructor(
                 if (filters == null) {
                     repository.getPagedGenre(id)
                 } else {
-                    repository.getPagedDiscoverMovies(filters.copy(genreId = id), movieTotal)
+                    repository.getPagedDiscoverMovies(filters.copy(genreId = id))
                 }
             }.cachedIn(viewModelScope)
         }
@@ -130,13 +142,11 @@ class GenreViewModel @Inject constructor(
     }
 
     fun toggleFavorite(movie: Movie) {
-        // No optimistic state update needed here: the unfiltered Movies tab reads through Room,
-        // whose PagingSource query already joins `favorites` — a toggle re-invalidates it
-        // automatically and Paging 3 diffs in just the changed row. The TV tab (Session 6) and the
-        // filtered Movies path re-stamp against the live [favoriteIds] set at render time instead,
-        // so those hearts flip immediately too (the filtered path does follow
-        // DiscoverPagingSource's snapshot trade-off when the generic grid first pages, noted in
-        // the class doc).
+        // No optimistic state update needed: the unfiltered Movies tab reads through Room, and the
+        // filtered Movies path is itself Room-cached via a `LEFT JOIN favorites` since Session 7 —
+        // either way a toggle re-invalidates the PagingSource query and Paging 3 diffs in just the
+        // changed row. The TV tab (Session 6) re-stamps against the live [favoriteIds] set at
+        // render time instead, so those hearts flip immediately too.
         viewModelScope.launch { repository.toggleFavorite(movie) }
     }
 
@@ -168,7 +178,6 @@ class GenreViewModel @Inject constructor(
         val filters = _uiState.value.filters
         if (filters.isEmpty) return
         _uiState.update { it.copy(isFilterApplied = true, isFilterPanelExpanded = false) }
-        movieTotal.value = null
         tvTotal.value = null
         appliedFiltersFlow.value = filters
     }
@@ -180,7 +189,6 @@ class GenreViewModel @Inject constructor(
 
     fun onClearFilters() {
         appliedFiltersFlow.value = null
-        movieTotal.value = null
         tvTotal.value = null
         _uiState.update { it.copy(filters = DiscoverFilters(), isFilterApplied = false) }
     }

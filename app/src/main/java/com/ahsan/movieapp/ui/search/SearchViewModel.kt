@@ -66,25 +66,23 @@ data class SearchUiState(
 /**
  * Phase 2 redo, extended, now Phase 4 Round 4 (pagination): the movie grid — both text-search
  * results and the filter panel's Discover results — is Paging 3 infinite scroll, backed by
- * [MovieRepository.getPagedSearchMovies]/[MovieRepository.getPagedDiscoverMovies]. Neither has a
- * Room cache table (arbitrary search text and arbitrary filter combinations both have too many
- * possible keys to usefully cache), so unlike Trending/Genre's Movies tab, favorite status isn't
- * resolved via a Room `LEFT JOIN` inside the paging query itself — instead each `PagingSource`
- * (`SearchMoviesPagingSource`/`DiscoverPagingSource`) takes a one-time snapshot of the favorites
- * table on every `load()` call and stamps `isFavorite` from that.
+ * [MovieRepository.getPagedSearchMovies]/[MovieRepository.getPagedDiscoverMovies]. Arbitrary search
+ * text still has no Room cache table, so only [MovieRepository.getPagedSearchMovies] resolves favorite
+ * status via a per-load snapshot inside its `PagingSource` (`SearchMoviesPagingSource`).
  *
- * [pagedSearchMovies] and [pagedFilteredMovies] used to `combine()` their raw [PagingData] with a
- * live [MovieRepository.observeFavorites] flow instead, re-mapping every item's `isFavorite` flag on
- * every favorites change — that crashed (`IllegalStateException: Attempt to collect twice from
- * pageEventFlow`): `combine()` re-invokes `.map{}` on the same underlying `PagingData` every time the
- * side flow emits, not just when the paging flow itself emits, so two overlapping generations ended
- * up trying to collect the same page-event flow at once. Do NOT reintroduce a `combine()` (or
- * `zip()`) of a live side flow against a `Flow<PagingData<*>>` before `cachedIn()` — see
- * `SearchMoviesPagingSource`'s class doc for the fix that replaced it. The remaining visible
- * trade-off — toggling a favorite from these two screens didn't flip the heart icon live — was
- * closed on 2026-09-21 with a render-time overlay ([favoriteIds]): each grid/list item re-stamps
- * its `isFavorite` against the live favorites set as it's composed, so hearts flip immediately
- * even though the underlying page was stamped from a snapshot.
+ * Session 7 — the filter panel's Discover results are different now: [MovieRepository.getPagedDiscoverMovies]
+ * is Room-cached per applied filter combination (`comboKey`), so favorites on that grid are computed
+ * by the same live `LEFT JOIN favorites` as the Trending/Genre carousels — hearts flip without any
+ * overlay. The stamped-snapshot trade-off and the combine-vs-`cachedIn` crash it caused only apply
+ * to [pagedSearchMovies]'s text results now: `combine()` re-invokes `.map{}` on the same underlying
+ * `PagingData` every time the side flow emits, so two overlapping generations ended up trying to
+ * collect the same page-event flow at once (`IllegalStateException: Attempt to collect twice from
+ * pageEventFlow`). Do NOT reintroduce a `combine()` (or `zip()`) of a live side flow against a
+ * `Flow<PagingData<*>>` before `cachedIn()` — see `SearchMoviesPagingSource`'s class doc for the
+ * fix that replaced it. The remaining visible trade-off — toggling a favorite from the text-search
+ * grid didn't flip the heart icon live — is closed with a render-time overlay ([favoriteIds]): each
+ * grid item re-stamps its `isFavorite` against the live favorites set as it's composed, so hearts
+ * flip immediately even though the underlying page was stamped from a snapshot.
  *
  * The people row stays a small one-shot fetch per submitted query (see [SearchUiState.people]) —
  * only the first handful of people a query returns are ever shown, so there's nothing to paginate
@@ -114,11 +112,14 @@ class SearchViewModel @Inject constructor(
     private var peopleJob: Job? = null
     private var tvJob: Job? = null
 
-    // Page-1 Discover responses write their total into this flow ([DiscoverPagingSource]); the
-    // screen shows it only while filters are Applied. Reset to null whenever the filter set
-    // changes so a stale count never lingers until the next page 1 arrives.
-    private val filteredTotal = MutableStateFlow<Int?>(null)
-    val filteredResultCount: StateFlow<Int?> = filteredTotal.asStateFlow()
+    // Clear the committed text query only; the discover filter flow is cleared separately.
+    // No longer a MutableStateFlow-bound filtered total — the "N results found" line for the
+    // filter panel's Discover results comes straight from the combo's Room cache (Session 7).
+    val filteredResultCount: StateFlow<Int?> = appliedFiltersFlow
+        .flatMapLatest { filters ->
+            if (filters == null) flowOf(null) else repository.observeDiscoverResultTotal(filters)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     // Same count pattern for text-search results ([SearchMoviesPagingSource] writes its total
     // here); the screen shows the line above the results grid. Reset to null whenever the query
@@ -126,12 +127,13 @@ class SearchViewModel @Inject constructor(
     private val searchTotal = MutableStateFlow<Int?>(null)
     val searchResultCount: StateFlow<Int?> = searchTotal.asStateFlow()
 
-    // Live set of favorited (id, mediaType) pairs (from Room's favorites table). The UI re-stamps each
-    // paginated movie's AND the TV row's isFavorite against this set at render time, which is what
-    // makes toggling a favorite here flip the heart immediately instead of waiting for the next
-    // re-page (see DiscoverPagingSource/SearchMoviesPagingSource class docs for why the snapshot
-    // can't). Keyed by mediaType too — a favorite movie and a same-numbered favorite TV show are
-    // separate rows (Session 6), so re-stamping must distinguish them.
+    // Live set of favorited (id, mediaType) pairs (from Room's favorites table). The UI re-stamps
+    // the text-search grid items' AND the TV row's isFavorite against this set at render time,
+    // which is what makes toggling a favorite here flip the heart immediately instead of waiting
+    // for the next re-page (see SearchMoviesPagingSource's class doc for why that snapshot can't).
+    // The filter-panel Discover grid needs no such overlay since Session 7 — the paging query joins
+    // Room's favorites table live. Keyed by mediaType too — a favorite movie and a same-numbered
+    // favorite TV show are separate rows (Session 6), so re-stamping must distinguish them.
     val favoriteIds: StateFlow<Set<Pair<Int, MediaType>>> = repository.observeFavorites()
         .map { favorites -> favorites.mapTo(mutableSetOf()) { it.id to it.mediaType } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
@@ -144,7 +146,7 @@ class SearchViewModel @Inject constructor(
 
     val pagedFilteredMovies: Flow<PagingData<Movie>> = appliedFiltersFlow
         .flatMapLatest { filters ->
-            if (filters == null) flowOf(PagingData.empty()) else repository.getPagedDiscoverMovies(filters, filteredTotal)
+            if (filters == null) flowOf(PagingData.empty()) else repository.getPagedDiscoverMovies(filters)
         }
         .cachedIn(viewModelScope)
 
@@ -215,11 +217,11 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setSearchViewMode(mode) }
     }
 
-    /** Unlike Trending/Genre, this doesn't live-update the grid: [pagedSearchMovies] and
-     *  [pagedFilteredMovies] stamp `isFavorite` from a one-time snapshot inside their
-     *  `PagingSource`s (see the class doc), not a live favorites flow, so the heart icon here
-     *  only reflects the change the next time this screen re-queries (new search text, or
-     *  re-applying filters) — not instantly on tap. */
+    /** Only the text-search grid ([pagedSearchMovies]) stamps `isFavorite` from a one-time snapshot
+     *  inside its `PagingSource` — so its heart icon reflects a change the next time the query
+     *  re-runs, not instantly (re-stamped visually by [favoriteIds] at render time). The filter
+     *  panel's Discover grid is Room-backed with a live favorites join (Session 7), so its hearts
+     *  follow toggles immediately. */
     fun toggleFavorite(movie: Movie) {
         viewModelScope.launch { repository.toggleFavorite(movie) }
     }
@@ -251,7 +253,6 @@ class SearchViewModel @Inject constructor(
         val filters = _uiState.value.filters
         if (filters.isEmpty) return
         _uiState.update { it.copy(isFilterApplied = true) }
-        filteredTotal.value = null
         appliedFiltersFlow.value = filters
     }
 
@@ -262,7 +263,6 @@ class SearchViewModel @Inject constructor(
 
     fun onClearFilters() {
         appliedFiltersFlow.value = null
-        filteredTotal.value = null
         _uiState.update { it.copy(filters = DiscoverFilters(), isFilterApplied = false) }
     }
 

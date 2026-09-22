@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.first
  * people a query returns are ever shown, so there's nothing worth paginating there.
  *
  * Every returned movie still gets upserted into the shared `movies` table, same convention as
- * [DiscoverPagingSource] and every other network fetch in this app. Favorite status is resolved
+ * every other network fetch in this app. Favorite status is resolved
  * with a one-time snapshot per `load()` call (`favoriteDao.observeFavoriteMovies().first()`), the
  * same pattern already used by `getCollectionDetails()`/`getPersonCredits()` in
  * `MovieRepositoryImpl` — NOT a live `combine()` against this pager's output. An earlier version of
@@ -34,8 +34,9 @@ import kotlinx.coroutines.flow.first
  * favorite from Search/Discover results doesn't flip the heart icon live the way Trending/Genre's
  * Room-`LEFT JOIN`-based reactivity does — it's correct again next time this screen re-queries.
  * Each loaded page's [com.ahsan.movieapp.data.remote.dto.PagedResponseDto.totalResults] is also
- * written into [totalResults] (when provided) so the search screen can show "N results found" like
- * the filtered branch does — same shape as [DiscoverPagingSource].
+ * written into [totalResults] (when provided) so the search screen can show "N results found".
+ * (The filter panel's Discover results show the same line, but theirs is Room-backed since
+ * Session 7 — see `MovieRepository.observeDiscoverResultTotal` rather than a per-page write.)
  *
  * Falls back to a local `LIKE` match, but ONLY on page 1 and ONLY when the network call fails
  * outright — the same "search still half-works offline" behavior this app has always had — and

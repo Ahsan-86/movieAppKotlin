@@ -26,7 +26,7 @@ class TvGenrePagingSource(
     private val totalResults: MutableStateFlow<Int?>? = null
 ) : PagingSource<Int, Movie>() {
 
-    // Same defensive guard as SearchMoviesPagingSource/DiscoverPagingSource — TMDB's
+    // Same defensive guard as SearchMoviesPagingSource — TMDB's
     // `/discover/tv` page boundaries aren't guaranteed disjoint when results tie on the sort key
     // (popularity), so the same show can come back on more than one page. The genre grid keys
     // every cell with itemKey{ it.id }, which requires every key in the whole list to be unique —

@@ -185,8 +185,20 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
     val view = LocalView.current
     val configuration = LocalConfiguration.current
 
+    val portraitReleaser = remember(activity) { activity?.let { PortraitReleaser(it) } }
+
     fun restorePortrait() {
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+
+    // Leaving fullscreen (or this screen) while the phone is still sideways: force portrait until
+    // the phone is physically upright, instead of leaving the portrait layout stretched in landscape.
+    fun exitToPortrait() {
+        val isLandscape = activity?.resources?.configuration?.orientation == Configuration.ORIENTATION_LANDSCAPE
+        when {
+            isLandscape && portraitReleaser != null -> portraitReleaser.start()
+            portraitReleaser?.pending != true -> restorePortrait()
+        }
     }
 
     // Orientation drives fullscreen both ways (round #10): landscape enters, portrait exits. The
@@ -202,6 +214,7 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
         var landscapeUnlocker: OrientationEventListener? = null
 
         if (isFullscreen) {
+            portraitReleaser?.cancel()
             // Button-entered from portrait: force landscape, then hand control back to the sensor
             // once the phone is physically landscape, so rotating back to portrait exits. A
             // rotation-entered fullscreen is never locked.
@@ -222,7 +235,7 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             bars?.hide(WindowInsetsCompat.Type.systemBars())
         } else {
-            restorePortrait()
+            exitToPortrait()
             bars?.show(WindowInsetsCompat.Type.systemBars())
         }
 
@@ -238,7 +251,7 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
     // would stay stuck landscape/edge-to-edge after returning to Detail.
     DisposableEffect(Unit) {
         onDispose {
-            restorePortrait()
+            exitToPortrait()
             activity?.window?.let {
                 WindowCompat.setDecorFitsSystemWindows(it, true)
                 WindowCompat.getInsetsController(it, view).show(WindowInsetsCompat.Type.systemBars())
@@ -297,6 +310,46 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
                         .background(Color.Black)
                 }
             )
+        }
+    }
+}
+
+/**
+ * Holds the Activity in portrait after fullscreen is left while the phone is still sideways, then
+ * hands orientation back to the system once the phone is physically upright. Deliberately outlives
+ * [TrailerPlayerScreen]: backing out sideways must not leave Detail/Explore in landscape. Stops
+ * itself once upright, on [cancel], or when the Activity is finishing.
+ */
+private class PortraitReleaser(private val activity: Activity) : OrientationEventListener(activity) {
+    var pending = false
+        private set
+
+    // Temporary lock, released as soon as the phone is upright (Android 16 ignores it on large screens).
+    @SuppressLint("SourceLockedOrientationActivity")
+    fun start() {
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        if (canDetectOrientation()) {
+            pending = true
+            enable()
+        } else {
+            release()
+        }
+    }
+
+    fun cancel() {
+        pending = false
+        disable()
+    }
+
+    private fun release() {
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        cancel()
+    }
+
+    override fun onOrientationChanged(degrees: Int) {
+        when {
+            activity.isFinishing || activity.isDestroyed -> cancel()
+            degrees in 0..30 || degrees in 330..359 -> release()
         }
     }
 }

@@ -1,12 +1,15 @@
 package com.ahsan.movieapp.di
 
+import android.content.Context
 import com.ahsan.movieapp.BuildConfig
 import com.ahsan.movieapp.data.remote.TmdbApi
 import com.ahsan.movieapp.util.Constants
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Cache
 import okhttp3.Dispatcher
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -14,6 +17,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
@@ -57,7 +61,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideOkHttpClient(@ApplicationContext context: Context): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
         }
@@ -66,7 +70,12 @@ object NetworkModule {
         // behind the others — one more small contributor to "first load feels slow." Raised here
         // so all of them go out together.
         val dispatcher = Dispatcher().apply { maxRequestsPerHost = 10 }
+        // HTTP disk cache: honors TMDB's own Cache-Control (search/discover ~4 h, details ~6 h,
+        // trending ~2 min) and revalidates expired entries via ETag (304). Not an offline cache —
+        // an expired entry still needs the network.
+        val httpCache = Cache(File(context.cacheDir, "http"), 10L * 1024 * 1024)
         return OkHttpClient.Builder()
+            .cache(httpCache)
             .dispatcher(dispatcher)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)

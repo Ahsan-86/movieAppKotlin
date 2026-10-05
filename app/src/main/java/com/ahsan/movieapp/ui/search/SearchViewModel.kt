@@ -192,16 +192,22 @@ class SearchViewModel @Inject constructor(
         val query = _uiState.value.query.trim()
         if (query.isBlank()) return
         _uiState.update { it.copy(query = query, committedQuery = query) }
-        queryFlow.value = query
-        searchTotal.value = null
+        commitQuery(query)
         viewModelScope.launch { repository.recordSearch(query) }
     }
 
     fun onRecentSearchClick(query: String) {
         _uiState.update { it.copy(query = query, committedQuery = query) }
-        queryFlow.value = query
-        searchTotal.value = null
+        commitQuery(query)
         viewModelScope.launch { repository.recordSearch(query) }
+    }
+
+    /** Publishes [query] to the pager. The "N results found" total is only reset when the query
+     *  actually changes: queryFlow is a StateFlow, so re-submitting the same text doesn't re-run the
+     *  pager, and clearing the total then would leave the count line blank until the next new query. */
+    private fun commitQuery(query: String) {
+        if (queryFlow.value != query) searchTotal.value = null
+        queryFlow.value = query
     }
 
     fun clearSearchHistory() {

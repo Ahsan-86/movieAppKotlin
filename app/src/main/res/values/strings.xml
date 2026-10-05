@@ -203,7 +203,6 @@
     <string name="trailer_title">Trailer</string>
     <string name="trailer_exit_fullscreen">Exit full screen</string>
     <string name="trailer_fullscreen">Full screen</string>
-    <string name="trailer_youtube">YouTube</string>
     <string name="trailer_error_unavailable">This trailer is no longer available on YouTube.</string>
     <string name="trailer_error_embedding_disabled">This trailer\'s owner has disabled embedded playback — tap the button next to the player to open it in YouTube instead.</string>
     <string name="trailer_error_playback">Couldn\'t play this trailer. (YouTube error %1$d)</string>

@@ -5,6 +5,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Package visibility (Android 11+): lets "Watch on YouTube" in the trailer player hand off to
+         the YouTube app instead of the browser. -->
+    <queries>
+        <package android:name="com.google.android.youtube" />
+    </queries>
+
     <application
         android:name=".MovieApp"
         android:allowBackup="true"

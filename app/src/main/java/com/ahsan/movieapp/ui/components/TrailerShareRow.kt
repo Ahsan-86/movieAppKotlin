@@ -2,13 +2,15 @@ package com.ahsan.movieapp.ui.components
 
 import com.ahsan.movieapp.R
 
+import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
+import android.view.OrientationEventListener
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
@@ -20,33 +22,22 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -57,28 +48,25 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.app.Activity
 import android.content.pm.ActivityInfo
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.text.font.FontWeight
 
 
 /**
@@ -170,12 +158,11 @@ fun TrailerShareRow(
  *    responding to an explicit tap — this only auto-ENTERS: once fullscreen forces
  *    `SENSOR_LANDSCAPE`, the device can't report a portrait configuration again until fullscreen is
  *    explicitly exited, so leaving fullscreen stays an explicit tap (matches most video apps'
- *    behavior once landscape is force-locked).
- * 3. The old plain "Open in YouTube" icon-only action is now YoutubeButton — an icon+text chip,
- *    per Ahsan's ask — still the same openInYoutube call underneath, and the IFrame player's own
- *    native YouTube-branding button (which duplicated that same action inside the video itself) is
- *    now suppressed via `playerVars.modestbranding` in iframePlayerHtml, since this app-level
- *    button already covers it.
+ *    behavior once landscape is force-locked). Superseded by round #10: rotating back to portrait
+ *    now exits too, and the landscape lock is only applied (and then released) for button entry.
+ * 3. The app-bar "Open in YouTube" action was later removed (Ahsan, 2026-10-05): the embed's own
+ *    "Watch on YouTube" button already hands off to the YouTube app / browser (see
+ *    openYoutubeExternally), so a second app-level copy was redundant.
  * 4. **Fixes a real bug this screen had since round #6**: the fullscreen/non-fullscreen branches
  *    used to each call EmbeddedYouTubePlayer from a DIFFERENT call site (one inside `if
  *    (isFullscreen)`, one inside the `else`) — Compose treats those as two unrelated composables,
@@ -202,21 +189,35 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     }
 
-    // Auto-enter fullscreen the moment the device is physically rotated to landscape — see this
-    // composable's doc, round #7 point 2. Only entering is automatic; exiting is still explicit.
+    // Orientation drives fullscreen both ways (round #10): landscape enters, portrait exits. The
+    // embed's button and system back write the same isFullscreen state.
     LaunchedEffect(configuration.orientation) {
-        if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && !isFullscreen) {
-            isFullscreen = true
-        }
+        isFullscreen = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     }
 
     DisposableEffect(isFullscreen) {
         val window = activity?.window
         window?.let { WindowCompat.setDecorFitsSystemWindows(it, !isFullscreen) }
         val bars = window?.let { WindowCompat.getInsetsController(it, view) }
+        var landscapeUnlocker: OrientationEventListener? = null
 
         if (isFullscreen) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            // Button-entered from portrait: force landscape, then hand control back to the sensor
+            // once the phone is physically landscape, so rotating back to portrait exits. A
+            // rotation-entered fullscreen is never locked.
+            if (configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                landscapeUnlocker = object : OrientationEventListener(context) {
+                    override fun onOrientationChanged(degrees: Int) {
+                        if (degrees in 70..110 || degrees in 250..290) {
+                            // SENSOR, not UNSPECIFIED: with system auto-rotate off, UNSPECIFIED would
+                            // snap straight back to portrait and drop out of fullscreen.
+                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+                            disable()
+                        }
+                    }
+                }.apply { if (canDetectOrientation()) enable() }
+            }
             bars?.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             bars?.hide(WindowInsetsCompat.Type.systemBars())
@@ -226,6 +227,7 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
         }
 
         onDispose {
+            landscapeUnlocker?.disable()
             bars?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
@@ -246,6 +248,10 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
 
     BackHandler(enabled = isFullscreen) { isFullscreen = false }
 
+    // The embed's OWN fullscreen button (fs: 1 in iframePlayerHtml) is the single fullscreen control
+    // now — the old app-level overlay button sat on top of it (and, in portrait, floated at the
+    // bottom of the screen, far from the video), which is why tapping the embed's button appeared
+    // dead. EmbeddedYouTubePlayer bridges that button to this screen's isFullscreen state.
     Scaffold(
         topBar = {
             // Empty while fullscreen (not omitted) so Scaffold measures it at zero height rather
@@ -259,10 +265,6 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
-                    },
-                    actions = {
-                        YoutubeButton(onClick = { openInYoutube(context, videoId) })
-                        Spacer(Modifier.width(8.dp))
                     }
                 )
             }
@@ -273,12 +275,16 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.Black)
+                // Black only while fullscreen. In portrait only the 16:9 player strip is black —
+                // the rest of the screen keeps the normal theme surface instead of a big black void.
+                .then(if (isFullscreen) Modifier.background(Color.Black) else Modifier)
         ) {
             // Single, unconditional call site — see this composable's doc, round #7 point 4 — only
             // the modifier (size/position) differs between fullscreen and not.
             EmbeddedYouTubePlayer(
                 videoId = videoId,
+                isFullscreen = isFullscreen,
+                onFullscreenChange = { isFullscreen = it },
                 modifier = if (isFullscreen) {
                     Modifier.fillMaxSize()
                 } else {
@@ -288,112 +294,10 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
+                        .background(Color.Black)
                 }
             )
-
-            IconButton(
-                onClick = { isFullscreen = !isFullscreen },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp)
-                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-            ) {
-                Icon(
-                    imageVector = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                    contentDescription = if (isFullscreen) stringResource(R.string.trailer_exit_fullscreen) else stringResource(R.string.trailer_fullscreen),
-                    tint = Color.White
-                )
-            }
         }
-    }
-}
-
-/**
- * The "open in the real YouTube app/browser" action, restyled per Ahsan's round #7 ask ("change
- * redirect icon to YouTube icon with text") from a plain generic icon-only button to an icon+text
- * chip. [YoutubeGlyph] is a small hand-drawn badge (rounded red square + white play triangle) — the
- * Compose Material Icons set has no official YouTube brand mark to import, and this session's
- * device-bridge grant doesn't cover `res/drawable` for a proper vector asset, so a simple
- * generically-"YouTube-like" glyph drawn with [Canvas] is the self-contained option that needs no
- * new dependency or resource file.
- */
-@Composable
-private fun YoutubeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Icon(
-            imageVector = YoutubeLogo,
-            contentDescription = null,
-            tint = Color.Unspecified,
-            modifier = Modifier.size(22.dp)
-        )
-        Text(
-            text = stringResource(R.string.trailer_youtube),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-private val YoutubeLogo: ImageVector by lazy {
-    ImageVector.Builder(
-        name = "Youtube",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f
-    ).apply {
-        // Official YouTube mark (simple-icons path)
-        path(fill = SolidColor(Color(0xFFFF0000))) {
-            moveTo(23.498f, 6.186f)
-            arcToRelative(3.016f, 3.016f, 0f, false, false, -2.122f, -2.136f)
-            curveTo(19.505f, 3.545f, 12f, 3.545f, 12f, 3.545f)
-            reflectiveCurveToRelative(-7.505f, 0f, -9.377f, 0.505f)
-            arcTo(3.017f, 3.017f, 0f, false, false, 0.502f, 6.186f)
-            curveTo(0f, 8.07f, 0f, 12f, 0f, 12f)
-            reflectiveCurveToRelative(0f, 3.93f, 0.502f, 5.814f)
-            arcToRelative(3.016f, 3.016f, 0f, false, false, 2.122f, 2.136f)
-            curveTo(4.495f, 20.455f, 12f, 20.455f, 12f, 20.455f)
-            reflectiveCurveToRelative(7.505f, 0f, 9.377f, -0.505f)
-            arcToRelative(3.015f, 3.015f, 0f, false, false, 2.122f, -2.136f)
-            curveTo(24f, 15.93f, 24f, 12f, 24f, 12f)
-            reflectiveCurveToRelative(0f, -3.93f, -0.502f, -5.814f)
-            close()
-        }
-        path(fill = SolidColor(Color.White)) {
-            moveTo(9.545f, 15.568f)
-            verticalLineTo(8.432f)
-            lineTo(15.818f, 12f)
-            close()
-        }
-    }.build()
-}
-
-@Composable
-private fun YoutubeGlyph(size: Dp, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(size)) {
-        drawRoundRect(
-            color = Color(0xFFFF0000),
-            cornerRadius = CornerRadius(this.size.width * 0.3f, this.size.height * 0.3f)
-        )
-        val w = this.size.width
-        val h = this.size.height
-        val triangleWidth = w * 0.38f
-        val triangleHeight = h * 0.42f
-        val left = (w - triangleWidth) / 2f + w * 0.04f
-        val path = Path().apply {
-            moveTo(left, h / 2f - triangleHeight / 2f)
-            lineTo(left, h / 2f + triangleHeight / 2f)
-            lineTo(left + triangleWidth, h / 2f)
-            close()
-        }
-        drawPath(path, color = Color.White)
     }
 }
 
@@ -459,23 +363,58 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
  * "embedding disabled" from a generic failure, rather than a single flat string.
  */
 @Composable
-private fun EmbeddedYouTubePlayer(videoId: String, modifier: Modifier = Modifier) {
+private fun EmbeddedYouTubePlayer(
+    videoId: String,
+    isFullscreen: Boolean,
+    onFullscreenChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
     var playbackErrorCode by remember(videoId) { mutableStateOf<Int?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val currentOnFullscreenChange by rememberUpdatedState(onFullscreenChange)
+    val currentIsFullscreen by rememberUpdatedState(isFullscreen)
+    // Lets Compose-side exits (system back, rotation handling) close the embed's native fullscreen
+    // "custom view" — the WebChromeClient below owns that view, so it publishes a hide() here.
+    val customViewHost = remember { CustomViewHost() }
+
+    LaunchedEffect(isFullscreen) {
+        if (!isFullscreen && customViewHost.isShowing) customViewHost.hide?.invoke()
+    }
+
+    // Stop playback when the app goes to the background (home button, screen off, another app):
+    // a WebView keeps playing audio on its own otherwise. Paused, not resumed — same as the real
+    // YouTube app, the user taps play again on return.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            val webView = customViewHost.webView ?: return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    webView.evaluateJavascript("if (player && player.pauseVideo) player.pauseVideo();", null)
+                    webView.onPause()
+                }
+                Lifecycle.Event.ON_RESUME -> webView.onResume()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(modifier = modifier) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
+                // JS is required by the YouTube IFrame API; the page is our own HTML and navigation
+                // is restricted to YouTube hosts (shouldOverrideUrlLoading below).
+                @SuppressLint("SetJavaScriptEnabled")
                 val webView = WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = false
                     settings.allowContentAccess = true
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-                    }
+                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                     setLayerType(View.LAYER_TYPE_HARDWARE, null)
                     webViewClient = object : WebViewClient() {
                         // The IFrame player's own embed iframe is itself loaded via a frame
@@ -483,17 +422,23 @@ private fun EmbeddedYouTubePlayer(videoId: String, modifier: Modifier = Modifier
                         // player, thumbnails, video segment delivery) while still blocking
                         // anything else (e.g. an ad or fallback link trying to take over the
                         // WebView with a full third-party page). See this composable's doc, Bug 2b.
+                        // A "Watch on YouTube" link (youtube.com/watch, youtu.be) leaves the WebView
+                        // for the YouTube app / browser; the embed itself stays here.
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                            if (isYoutubeWatchUrl(request.url)) {
+                                openYoutubeExternally(view.context, request.url)
+                                return true
+                            }
                             return !isYoutubeHost(request.url.host)
                         }
-
-                        @Deprecated("Deprecated in Java")
-                        override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                            return !isYoutubeHost(Uri.parse(url ?: return true).host)
-                        }
                     }
+                    // Lets target=_blank links reach onCreateWindow below instead of silently
+                    // loading into this WebView.
+                    settings.setSupportMultipleWindows(true)
                     addJavascriptInterface(
                         object {
+                            // Called from the page's JS via the AndroidPlayerBridge interface.
+                            @Suppress("unused")
                             @JavascriptInterface
                             fun onPlayerError(code: Int) {
                                 // @JavascriptInterface methods run on a WebView-internal thread, not
@@ -504,6 +449,7 @@ private fun EmbeddedYouTubePlayer(videoId: String, modifier: Modifier = Modifier
                         "AndroidPlayerBridge"
                     )
                     tag = videoId
+                    customViewHost.webView = this
                 }
                 // Root view returned to Compose: a FrameLayout holding the WebView, purely so the
                 // WebChromeClient below has a container to host YouTube's native "custom view" when
@@ -518,6 +464,13 @@ private fun EmbeddedYouTubePlayer(videoId: String, modifier: Modifier = Modifier
 
                         override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                             if (view == null) return
+                            // Rotation-entered fullscreen has no custom view up, so the embed's
+                            // button still reads "enter" — treat that tap as exit (one tap, not two).
+                            if (currentIsFullscreen && customView == null) {
+                                callback?.onCustomViewHidden()
+                                currentOnFullscreenChange(false)
+                                return
+                            }
                             if (customView != null) {
                                 callback?.onCustomViewHidden()
                                 return
@@ -529,6 +482,12 @@ private fun EmbeddedYouTubePlayer(videoId: String, modifier: Modifier = Modifier
                                 view,
                                 FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
                             )
+                            // The embed's own fullscreen button was tapped: grow this player's box to
+                            // the whole screen (hide bars, lock landscape) so the custom view above
+                            // actually fills it instead of staying inside the small 16:9 strip.
+                            customViewHost.isShowing = true
+                            customViewHost.hide = { onHideCustomView() }
+                            currentOnFullscreenChange(true)
                         }
 
                         override fun onHideCustomView() {
@@ -538,6 +497,27 @@ private fun EmbeddedYouTubePlayer(videoId: String, modifier: Modifier = Modifier
                             customViewCallback?.onCustomViewHidden()
                             customViewCallback = null
                             webView.visibility = View.VISIBLE
+                            customViewHost.isShowing = false
+                            currentOnFullscreenChange(false)
+                        }
+
+                        // target=_blank ("Watch on YouTube" in the player chrome): the URL isn't
+                        // known yet, so hand the page a throwaway WebView, catch its first
+                        // navigation, and send YouTube links out to the app / browser. Non-gesture
+                        // popups (ads) are refused.
+                        override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+                            if (!isUserGesture) return false
+                            val popup = WebView(view.context)
+                            popup.webViewClient = object : WebViewClient() {
+                                override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean {
+                                    if (isYoutubeHost(request.url.host)) openYoutubeExternally(v.context, request.url)
+                                    mainHandler.post { v.destroy() }
+                                    return true
+                                }
+                            }
+                            (resultMsg.obj as WebView.WebViewTransport).webView = popup
+                            resultMsg.sendToTarget()
+                            return true
                         }
                     }
                     val origin = playerOrigin(context)
@@ -563,6 +543,7 @@ private fun EmbeddedYouTubePlayer(videoId: String, modifier: Modifier = Modifier
                 // fix a real leak/background-audio risk the previous version had (nothing explicitly
                 // destroyed the WebView on dispose).
                 val webView = container.getChildAt(0) as WebView
+                customViewHost.webView = null
                 webView.loadUrl("about:blank")
                 webView.destroy()
             }
@@ -583,6 +564,15 @@ private fun EmbeddedYouTubePlayer(videoId: String, modifier: Modifier = Modifier
     }
 }
 
+/** Plain holder so the WebChromeClient (created inside AndroidView's factory) and Compose effects
+ *  can share "is the embed's native fullscreen view up, and how do I close it" plus the live
+ *  [WebView] (for lifecycle pause/resume). */
+private class CustomViewHost {
+    var isShowing: Boolean = false
+    var hide: (() -> Unit)? = null
+    var webView: WebView? = null
+}
+
 /** Matches `host` against YouTube's own domain family: an exact match or a proper subdomain (a
  *  leading dot before the suffix) — NOT a bare [String.endsWith], which would also match an
  *  unrelated domain like "evilyoutube.com" or "notgoogle.com" that merely ends with the same
@@ -592,6 +582,28 @@ private fun isYoutubeHost(host: String?): Boolean {
     val allowedDomains = listOf("youtube.com", "youtube-nocookie.com", "youtu.be", "ytimg.com", "ggpht.com", "googlevideo.com", "google.com")
     return allowedDomains.any { domain -> h == domain || h.endsWith(".$domain") }
 }
+
+/** A link to a YouTube watch page (as opposed to the /embed player, which stays in the WebView). */
+private fun isYoutubeWatchUrl(uri: Uri): Boolean {
+    val host = uri.host.orEmpty()
+    val isYoutubeCom = host == "youtube.com" || host.endsWith(".youtube.com")
+    return host == "youtu.be" || (isYoutubeCom && uri.path.orEmpty().startsWith("/watch"))
+}
+
+/** Opens a YouTube URL in the YouTube app if installed, else the external browser. */
+private fun openYoutubeExternally(context: Context, uri: Uri) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri).setPackage(YOUTUBE_PACKAGE))
+    } catch (ignored: ActivityNotFoundException) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (ignored: ActivityNotFoundException) {
+            // No browser either — nothing sensible to open.
+        }
+    }
+}
+
+private const val YOUTUBE_PACKAGE = "com.google.android.youtube"
 
 private fun playerOrigin(context: Context): String =
     "https://${context.packageName}"   // https://com.ahsan.movieapp
@@ -614,12 +626,11 @@ private fun youtubePlaybackErrorMessage(code: Int): String = when (code) {
  * player fills [EmbeddedYouTubePlayer]'s box exactly, autoplaying (needs
  * `mediaPlaybackRequiresUserGesture = false` on the [WebView], set above) and inline rather than
  * taking over with a native fullscreen view (`playsinline`) — though see [EmbeddedYouTubePlayer]'s
- * doc for why the hosting [WebView] still needs a working `onShowCustomView` regardless. `fs: 0`
- * hides the player's OWN fullscreen button — [TrailerPlayerScreen] now owns fullscreen presentation
- * at the app level instead. `modestbranding: 1` (round #7) asks the IFrame player to suppress its
- * own YouTube-branding button in the player chrome — [TrailerPlayerScreen]'s [YoutubeButton] is
- * already the app's one "open in YouTube" affordance, so the player's built-in one would just be a
- * redundant second copy of the same action. `onError` forwards the YouTube error code to Kotlin via the
+ * doc for why the hosting [WebView] still needs a working `onShowCustomView` regardless. `fs: 1`
+ * shows the player's OWN fullscreen button, which is now the single fullscreen control — its
+ * onShowCustomView/onHideCustomView events are bridged to [TrailerPlayerScreen]'s isFullscreen state.
+ * `modestbranding: 1` (round #7) is a leftover; YouTube no longer honors it, and the player's own
+ * "Watch on YouTube" button is now the app's only "open in YouTube" affordance. `onError` forwards the YouTube error code to Kotlin via the
  * `AndroidPlayerBridge` interface registered in [EmbeddedYouTubePlayer] rather than rendering its
  * own message in the page — that keeps the message itself (and its styling/localization) on the
  * Kotlin/Compose side. [origin] (see [playerOrigin]) is passed both as this page's own base URL
@@ -648,7 +659,7 @@ private fun iframePlayerHtml(videoId: String, origin: String): String = """
                 }
             }
             function onYouTubeIframeAPIReady() {
-                new YT.Player('player', {
+                player = new YT.Player('player', {
                     host: 'https://www.youtube-nocookie.com',
                     width: '100%',
                     height: '100%',
@@ -678,15 +689,6 @@ private fun iframePlayerHtml(videoId: String, origin: String): String = """
     </body>
     </html>
 """.trimIndent()
-
-/** Switches to the real YouTube app if installed, else falls back to opening it in the browser. */
-private fun openInYoutube(context: Context, videoId: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:$videoId")))
-    } catch (e: ActivityNotFoundException) {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=$videoId")))
-    }
-}
 
 /** Text share (title + TMDB page link) via the system share sheet. */
 private fun shareText(context: Context, title: String, url: String) {

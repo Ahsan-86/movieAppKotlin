@@ -18,3 +18,8 @@ local.properties
 *.jks
 google-services.json
 .env
+
+# Local-only agent docs
+CLAUDE.md
+movie-app-rewrite-progress.md
+movie-app-rewrite-archive.md

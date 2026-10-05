@@ -2,6 +2,7 @@ package com.ahsan.movieapp.di
 
 import android.content.Context
 import androidx.room.Room
+import com.ahsan.movieapp.BuildConfig
 import com.ahsan.movieapp.data.local.AppDatabase
 import com.ahsan.movieapp.data.local.dao.FavoriteDao
 import com.ahsan.movieapp.data.local.dao.MovieDao
@@ -26,7 +27,13 @@ object DatabaseModule {
             // wired before the destructive fallback so existing movie favorites survive the bump.
             // Session 7 — pure table creations for the cached Discover combos.
             .addMigrations(AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8)
-            .fallbackToDestructiveMigration()
+            .apply {
+                // Debug builds may still wipe the DB when a schema bump has no Migration, so
+                // development isn't blocked. Release builds must never do that — it would silently
+                // delete users' Favorites. The Play Store baseline is schema v8; every future version
+                // bump MUST ship a Migration (and its exported schema JSON) before release.
+                if (BuildConfig.DEBUG) fallbackToDestructiveMigration()
+            }
             .build()
 
     @Provides

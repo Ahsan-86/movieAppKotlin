@@ -3,10 +3,13 @@ package com.ahsan.movieapp.ui.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -26,8 +29,11 @@ import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.GenreChip
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.HeroMovieCarousel
+import com.ahsan.movieapp.ui.components.HeroSkeleton
 import com.ahsan.movieapp.ui.components.MovieCarouselSection
 import com.ahsan.movieapp.ui.components.OfflineBanner
+import com.ahsan.movieapp.ui.components.SectionTitleSkeleton
+import com.ahsan.movieapp.ui.components.ShimmerBox
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -71,16 +77,27 @@ fun HomeScreen(
                         chip.movieGenreId?.let { it to chip.name }
                     }.toMap()
                 }
-                HeroMovieCarousel(
-                    movies = state.heroMovies,
-                    onMovieClick = onMovieClick,
-                    genreNameById = genreNameById,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
+                // The hero is fed by the Popular section (index 0); until that first load lands the
+                // pager has nothing to show, so a shimmering placeholder holds its place.
+                val heroLoading = state.heroMovies.isEmpty() && state.sections.firstOrNull()?.isLoading == true
+                if (heroLoading) {
+                    HeroSkeleton(modifier = Modifier.padding(top = 16.dp))
+                } else {
+                    HeroMovieCarousel(
+                        movies = state.heroMovies,
+                        onMovieClick = onMovieClick,
+                        genreNameById = genreNameById,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
             }
 
             item(key = "genre_chips") {
-                ExploreGenreChipsRow(genres = state.genreChips, onGenreClick = onGenreClick)
+                if (state.genreChips.isEmpty() && state.sections.firstOrNull()?.isLoading == true) {
+                    GenreChipsSkeleton()
+                } else {
+                    ExploreGenreChipsRow(genres = state.genreChips, onGenreClick = onGenreClick)
+                }
             }
 
             items(state.sections, key = { it.labelRes }) { section ->
@@ -97,6 +114,23 @@ fun HomeScreen(
                     // live-stamped from getCategoryTv's favorites combine, no re-stamp needed here).
                     onToggleFavorite = { viewModel.toggleFavorite(it) }
                 )
+            }
+        }
+    }
+}
+
+/** Shimmer twin of [ExploreGenreChipsRow]: a heading line plus a row of chip-shaped blocks. */
+@Composable
+private fun GenreChipsSkeleton() {
+    Column {
+        SectionTitleSkeleton()
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(72.dp, 96.dp, 84.dp, 64.dp).forEach { chipWidth ->
+                ShimmerBox(modifier = Modifier.width(chipWidth).height(32.dp), shape = RoundedCornerShape(8.dp))
             }
         }
     }

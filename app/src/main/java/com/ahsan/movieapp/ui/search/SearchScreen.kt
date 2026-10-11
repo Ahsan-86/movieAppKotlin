@@ -38,9 +38,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -71,7 +71,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import coil.compose.AsyncImage
+import com.ahsan.movieapp.ui.components.ShimmerAsyncImage
 import com.ahsan.movieapp.data.repository.SearchViewMode
 import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
@@ -82,7 +82,11 @@ import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FilterPanelSection
 import com.ahsan.movieapp.ui.components.FilterSummaryBar
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.ListSkeleton
+import com.ahsan.movieapp.ui.components.PosterGridSkeleton
+import com.ahsan.movieapp.ui.components.PosterRowSkeleton
+import com.ahsan.movieapp.ui.components.ShimmerBox
+import com.ahsan.movieapp.ui.components.ShimmerLine
 import com.ahsan.movieapp.ui.components.MovieListRow
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.PagingAppendFooter
@@ -165,7 +169,7 @@ fun SearchScreen(
             placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
-                // The movie grid has its own loadState-driven loading UI (FullScreenLoading /
+                // The movie grid has its own loadState-driven loading UI (shimmer skeleton /
                 // PagingAppendFooter); this spinner just reflects the two one-shot fetches (people
                 // + TV Shows rows), the last "single Result call per submitted query"s left on
                 // this screen. When not searching, a committed (non-blank) query shows the submit
@@ -201,7 +205,7 @@ fun SearchScreen(
                 )
                 val refreshState = pagedFilteredMovies.loadState.refresh
                 when {
-                    refreshState is LoadState.Loading && pagedFilteredMovies.itemCount == 0 -> FullScreenLoading()
+                    refreshState is LoadState.Loading && pagedFilteredMovies.itemCount == 0 -> SearchLoadingSkeleton(state.viewMode)
                     refreshState is LoadState.Error && pagedFilteredMovies.itemCount == 0 -> FullScreenError(
                         message = refreshState.error.message ?: stringResource(R.string.search_couldnt_load_results),
                         onRetry = { pagedFilteredMovies.retry() }
@@ -245,7 +249,7 @@ fun SearchScreen(
                 val moviesRefresh = pagedSearchMovies.loadState.refresh
                 val nothingLoadedYet = pagedSearchMovies.itemCount == 0 && state.people.isEmpty() && state.tvShows.isEmpty()
                 when {
-                    nothingLoadedYet && (moviesRefresh is LoadState.Loading || state.isSearchingPeople || state.isSearchingTv) -> FullScreenLoading()
+                    nothingLoadedYet && (moviesRefresh is LoadState.Loading || state.isSearchingPeople || state.isSearchingTv) -> SearchLoadingSkeleton(state.viewMode)
                     nothingLoadedYet && moviesRefresh is LoadState.Error -> FullScreenError(
                         message = moviesRefresh.error.message ?: stringResource(R.string.search_failed),
                         onRetry = { pagedSearchMovies.retry() }
@@ -273,6 +277,8 @@ fun SearchScreen(
                                 movies = pagedSearchMovies,
                                 people = state.people,
                                 tvShows = state.tvShows,
+                                isLoadingPeople = state.isSearchingPeople,
+                                isLoadingTv = state.isSearchingTv,
                                 onMovieClick = onMovieClick,
                                 onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
@@ -284,6 +290,8 @@ fun SearchScreen(
                                 movies = pagedSearchMovies,
                                 people = state.people,
                                 tvShows = state.tvShows,
+                                isLoadingPeople = state.isSearchingPeople,
+                                isLoadingTv = state.isSearchingTv,
                                 columns = GridCells.Adaptive(minSize = 128.dp),
                                 posterWidth = null,
                                 onMovieClick = onMovieClick,
@@ -297,6 +305,8 @@ fun SearchScreen(
                                 movies = pagedSearchMovies,
                                 people = state.people,
                                 tvShows = state.tvShows,
+                                isLoadingPeople = state.isSearchingPeople,
+                                isLoadingTv = state.isSearchingTv,
                                 columns = GridCells.Fixed(4),
                                 posterWidth = null,
                                 onMovieClick = onMovieClick,
@@ -362,6 +372,16 @@ private val GridFourByFourIcon: ImageVector by lazy {
             }
         }
     }.build()
+}
+
+/** Shimmer placeholder shaped like whichever results layout the person has picked (list / grid / dense grid). */
+@Composable
+private fun SearchLoadingSkeleton(viewMode: SearchViewMode) {
+    when (viewMode) {
+        SearchViewMode.LIST -> ListSkeleton()
+        SearchViewMode.GRID -> PosterGridSkeleton()
+        SearchViewMode.GRID_DENSE -> PosterGridSkeleton(columns = GridCells.Fixed(4), count = 16)
+    }
 }
 
 @Composable
@@ -568,7 +588,7 @@ private fun GenreChipItem(genre: GenreChip, onClick: () -> Unit, modifier: Modif
             .clickable(onClick = onClick)
     ) {
         if (genre.imageUrl != null) {
-            AsyncImage(
+            ShimmerAsyncImage(
                 model = genre.imageUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
@@ -619,6 +639,8 @@ private fun SearchResultsGrid(
     onPersonClick: (Person) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
     gridState: LazyGridState,
+    isLoadingPeople: Boolean = false,
+    isLoadingTv: Boolean = false,
     // Live favorites set — the paged Movie snapshot's isFavorite goes stale after a toggle in
     // this screen, so each item re-stamps itself against this set at render time. See
     // SearchViewModel.favoriteIds for why.
@@ -636,14 +658,18 @@ private fun SearchResultsGrid(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 PeopleResultsRow(people = people, onPersonClick = onPersonClick)
             }
+        } else if (isLoadingPeople) {
+            item(span = { GridItemSpan(maxLineSpan) }) { PeopleResultsRowSkeleton() }
         }
         if (tvShows.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 TvShowsResultsRow(tvShows = tvShows, onTvClick = onTvClick, onToggleFavorite = onToggleFavorite, favoriteIds = favoriteIds)
             }
+        } else if (isLoadingTv) {
+            item(span = { GridItemSpan(maxLineSpan) }) { TvShowsResultsRowSkeleton() }
         }
         if (movies.itemCount > 0) {
-            if (people.isNotEmpty() || tvShows.isNotEmpty()) {
+            if (people.isNotEmpty() || tvShows.isNotEmpty() || isLoadingPeople || isLoadingTv) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         text = stringResource(R.string.movies),
@@ -680,6 +706,8 @@ private fun SearchResultsList(
     onPersonClick: (Person) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
     listState: LazyListState,
+    isLoadingPeople: Boolean = false,
+    isLoadingTv: Boolean = false,
     favoriteIds: Set<Pair<Int, MediaType>>
 ) {
     LazyColumn(
@@ -689,12 +717,16 @@ private fun SearchResultsList(
     ) {
         if (people.isNotEmpty()) {
             item { PeopleResultsRow(people = people, onPersonClick = onPersonClick) }
+        } else if (isLoadingPeople) {
+            item { PeopleResultsRowSkeleton() }
         }
         if (tvShows.isNotEmpty()) {
             item { TvShowsResultsRow(tvShows = tvShows, onTvClick = onTvClick, onToggleFavorite = onToggleFavorite, favoriteIds = favoriteIds) }
+        } else if (isLoadingTv) {
+            item { TvShowsResultsRowSkeleton() }
         }
         if (movies.itemCount > 0) {
-            if (people.isNotEmpty() || tvShows.isNotEmpty()) {
+            if (people.isNotEmpty() || tvShows.isNotEmpty() || isLoadingPeople || isLoadingTv) {
                 item {
                     Text(
                         text = stringResource(R.string.movies),
@@ -776,7 +808,7 @@ private fun PersonResultCard(person: Person, onClick: () -> Unit) {
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            AsyncImage(
+            ShimmerAsyncImage(
                 model = person.profileUrl,
                 contentDescription = person.name,
                 contentScale = ContentScale.Crop,
@@ -791,5 +823,30 @@ private fun PersonResultCard(person: Person, onClick: () -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp)
         )
+    }
+}
+
+/** Shimmer twin of [PeopleResultsRow] — shown while the one-shot people fetch is still in flight. */
+@Composable
+private fun PeopleResultsRowSkeleton() {
+    Column {
+        ShimmerLine(modifier = Modifier.padding(bottom = 12.dp), widthFraction = 0.25f, height = 16.dp)
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            repeat(5) {
+                Column(modifier = Modifier.width(80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    ShimmerBox(modifier = Modifier.size(72.dp), shape = CircleShape)
+                    ShimmerLine(modifier = Modifier.padding(top = 8.dp), widthFraction = 0.8f, height = 10.dp)
+                }
+            }
+        }
+    }
+}
+
+/** Shimmer twin of [TvShowsResultsRow] — shown while the one-shot TV fetch is still in flight. */
+@Composable
+private fun TvShowsResultsRowSkeleton() {
+    Column {
+        ShimmerLine(modifier = Modifier.padding(top = 8.dp, bottom = 12.dp), widthFraction = 0.3f, height = 16.dp)
+        PosterRowSkeleton(horizontalPadding = 0.dp)
     }
 }

@@ -1,18 +1,14 @@
 package com.ahsan.movieapp.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.Icon
@@ -22,7 +18,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ahsan.movieapp.R
@@ -37,12 +32,12 @@ fun MovieCarouselSection(
     title: String,
     movies: List<Movie>,
     onMovieClick: (Movie) -> Unit,
+    modifier: Modifier = Modifier,
     onToggleFavorite: ((Movie) -> Unit)? = null,
     onSeeAll: (() -> Unit)? = null,
     isLoading: Boolean = false,
     errorMessage: String? = null,
-    onRetry: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onRetry: (() -> Unit)? = null
 ) {
     Column(modifier = modifier) {
         SectionHeader(title = title, onSeeAll = onSeeAll, modifier = Modifier.padding(horizontal = 16.dp))
@@ -50,12 +45,7 @@ fun MovieCarouselSection(
         Spacer4()
 
         when {
-            isLoading && movies.isEmpty() -> LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(6) { PosterSkeleton() }
-            }
+            isLoading && movies.isEmpty() -> PosterRowSkeleton()
             // Nothing cached yet AND the refresh failed (first launch with no/bad connection) —
             // show why instead of a silent, confusing blank row under a title with nothing in it.
             movies.isEmpty() && errorMessage != null -> CarouselErrorRow(message = errorMessage, onRetry = onRetry)
@@ -108,21 +98,10 @@ private fun Spacer4() {
 }
 
 @Composable
-private fun PosterSkeleton() {
-    androidx.compose.foundation.layout.Box(
-        modifier = Modifier
-            .width(128.dp)
-            .aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-    )
-}
-
-@Composable
 fun SectionHeader(
     title: String,
-    onSeeAll: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSeeAll: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),

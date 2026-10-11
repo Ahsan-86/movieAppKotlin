@@ -40,7 +40,7 @@ import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FilterPanelSection
 import com.ahsan.movieapp.ui.components.FilterSummaryBar
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.PosterGridSkeleton
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.PagingAppendFooter
 import com.ahsan.movieapp.ui.person.MediaTab
@@ -181,7 +181,7 @@ private fun GenrePagedGrid(
 ) {
     val refreshState = pagingItems.loadState.refresh
     when {
-        refreshState is LoadState.Loading && pagingItems.itemCount == 0 -> FullScreenLoading()
+        refreshState is LoadState.Loading && pagingItems.itemCount == 0 -> PosterGridSkeleton()
         refreshState is LoadState.Error && pagingItems.itemCount == 0 -> FullScreenError(
             message = refreshState.error.message ?: stringResource(R.string.error_generic),
             onRetry = { pagingItems.retry() }

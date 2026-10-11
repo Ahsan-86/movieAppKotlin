@@ -30,11 +30,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import com.ahsan.movieapp.ui.components.ShimmerAsyncImage
 import com.ahsan.movieapp.domain.model.Episode
 import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.EpisodeListSkeleton
 
 /**
  * Phase 2.6 Session 2 — one season's full episode list (image + description per episode), opened
@@ -67,7 +67,7 @@ fun SeasonEpisodesScreen(
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
-                state.isLoading -> FullScreenLoading()
+                state.isLoading -> EpisodeListSkeleton()
                 state.episodes.isEmpty() && state.errorMessage != null ->
                     FullScreenError(message = state.errorMessage ?: stringResource(R.string.season_couldnt_load))
                 state.episodes.isEmpty() ->
@@ -92,7 +92,7 @@ private fun EpisodeRow(episode: Episode) {
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            AsyncImage(
+            ShimmerAsyncImage(
                 model = episode.imageUrl,
                 contentDescription = episode.name,
                 contentScale = ContentScale.Crop,

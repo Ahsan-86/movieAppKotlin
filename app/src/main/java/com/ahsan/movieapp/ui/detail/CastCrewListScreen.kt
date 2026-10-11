@@ -37,10 +37,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import com.ahsan.movieapp.ui.components.ShimmerAsyncImage
 import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.PersonListSkeleton
 
 /**
  * Phase 3 Round A's "view all" destination — the full cast list plus the director, opened from
@@ -71,7 +71,7 @@ fun CastCrewListScreen(
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
-                state.isLoading -> FullScreenLoading()
+                state.isLoading -> PersonListSkeleton()
                 state.isEmpty && state.errorMessage != null ->
                     FullScreenError(message = state.errorMessage ?: stringResource(R.string.castcrew_couldnt_load))
                 state.isEmpty -> EmptyState(title = stringResource(R.string.nothing_here), body = stringResource(R.string.castcrew_empty_body))
@@ -139,7 +139,7 @@ private fun PersonRow(
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            AsyncImage(
+            ShimmerAsyncImage(
                 model = photoUrl,
                 contentDescription = name,
                 contentScale = ContentScale.Crop,

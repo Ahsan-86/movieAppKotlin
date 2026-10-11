@@ -30,6 +30,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.ahsan.movieapp.R
 
+/** Generic spinner fallback — every screen now has a shaped shimmer skeleton instead (see Shimmer.kt). */
 @Composable
 fun FullScreenLoading(modifier: Modifier = Modifier) {
     Column(
@@ -107,13 +108,10 @@ fun EmptyState(
  */
 @Composable
 fun <T : Any> PagingAppendFooter(pagingItems: LazyPagingItems<T>, modifier: Modifier = Modifier) {
-    when (val append = pagingItems.loadState.append) {
-        is LoadState.Loading -> Row(
-            modifier = modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary)
-        }
+    when (pagingItems.loadState.append) {
+        // Phase 5 — a shimmering list-row placeholder instead of a spinner (works under both the
+        // poster grids and the list-mode search results this footer is shared by).
+        is LoadState.Loading -> ListRowSkeleton(modifier = modifier.padding(vertical = 8.dp))
         is LoadState.Error -> Row(
             modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.Center,

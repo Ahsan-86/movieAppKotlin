@@ -40,10 +40,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +63,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import com.ahsan.movieapp.ui.components.ShimmerAsyncImage
 import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.Movie
@@ -70,7 +72,7 @@ import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.ui.components.CastMemberCard
 import com.ahsan.movieapp.ui.components.DetailHeroCaption
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.DetailScreenSkeleton
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.TrailerShareRow
 import com.ahsan.movieapp.ui.components.UrlAutoSizeText
@@ -150,10 +152,10 @@ fun TvDetailScreen(
         containerColor = background,
         topBar = {
             // 100dp of scroll is safely past the hero; ScrollState.value is snapshot-backed, so
-            // reading it here recomposes only this lambda as the page scrolls. Loading/error have
+            // reading it here recomposes only this lambda as the page scrolls. Error states have
             // no hero behind the bar, so they default to the opaque titled bar.
             val barOpaque = scrollState.value > with(LocalDensity.current) { 100.dp.toPx() } ||
-                state.isLoading || state.details == null
+                (!state.isLoading && state.details == null)
             val barColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.surface else Color.Transparent)
             val barContentColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.onSurface else Color.White)
             Box {
@@ -208,7 +210,7 @@ fun TvDetailScreen(
     ) { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             when {
-                state.isLoading -> FullScreenLoading()
+                state.isLoading -> DetailScreenSkeleton()
                 state.details == null -> FullScreenError(message = state.errorMessage ?: stringResource(R.string.tv_couldnt_load_show))
                 else -> {
                     val details = state.details!!
@@ -223,7 +225,7 @@ fun TvDetailScreen(
                                 .aspectRatio(3f / 4f)
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            AsyncImage(
+                            ShimmerAsyncImage(
                                 model = details.posterUrl,
                                 contentDescription = details.name,
                                 contentScale = ContentScale.Crop,
@@ -352,7 +354,13 @@ private const val TV_CAST_ROW_LIMIT = 15
  */
 @Composable
 private fun TvSeasonsSection(seasons: List<Season>, onSeasonClick: (Season) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
+    // Opening a season destroys this composition (the detail screen leaves the screen), so a plain
+    // `remember` would always come back collapsed. This flag survives that trip (rememberSaveable rides
+    // on the back-stack entry) and is consumed right away: coming back from a season re-opens the list,
+    // while any other return to the detail screen — or a fresh visit — starts collapsed as before.
+    var reopenOnReturn by rememberSaveable { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(reopenOnReturn) }
+    LaunchedEffect(Unit) { reopenOnReturn = false }
     Column(modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)) {
         Row(
             modifier = Modifier
@@ -371,10 +379,11 @@ private fun TvSeasonsSection(seasons: List<Season>, onSeasonClick: (Season) -> U
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surface)
             ) {
-                AsyncImage(
+                ShimmerAsyncImage(
                     model = seasons.firstOrNull()?.posterUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    shimmerBase = MaterialTheme.colorScheme.surface,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -401,7 +410,10 @@ private fun TvSeasonsSection(seasons: List<Season>, onSeasonClick: (Season) -> U
         }
         if (expanded) {
             seasons.forEach { season ->
-                TvSeasonRow(season = season, onClick = { onSeasonClick(season) })
+                TvSeasonRow(season = season, onClick = {
+                    reopenOnReturn = true
+                    onSeasonClick(season)
+                })
             }
         }
     }
@@ -422,7 +434,7 @@ private fun TvSeasonRow(season: Season, onClick: () -> Unit) {
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            AsyncImage(
+            ShimmerAsyncImage(
                 model = season.posterUrl,
                 contentDescription = season.name,
                 contentScale = ContentScale.Crop,

@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import coil.compose.AsyncImage
 import com.ahsan.movieapp.domain.model.Movie
 import kotlin.math.abs
 import kotlin.math.min
@@ -117,7 +116,7 @@ fun HeroMovieCarousel(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { onMovieClick(movie) }
             ) {
-                AsyncImage(
+                ShimmerAsyncImage(
                     model = movie.posterUrl ?: movie.backdropUrl,
                     contentDescription = movie.title,
                     contentScale = ContentScale.Crop,

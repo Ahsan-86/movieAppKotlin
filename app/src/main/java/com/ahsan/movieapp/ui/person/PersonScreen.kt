@@ -58,14 +58,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import com.ahsan.movieapp.ui.components.ShimmerAsyncImage
 import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.DOT_SEPARATOR
 import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.PersonScreenSkeleton
 import com.ahsan.movieapp.ui.components.MovieListRow
 import com.ahsan.movieapp.ui.components.SeparatorDiamond
 import com.ahsan.movieapp.ui.components.backgroundSwatch
@@ -128,7 +128,7 @@ fun PersonScreen(
             // PersonHero is the first (tall, 3:4) item in the LazyColumn below, so "scrolled past
             // 100dp" is: the first item's scroll offset past 100dp, or any later item on screen.
             // The scroll threshold is derived from the snapshot-backed LazyListState fields, so it
-            // recomposes only when the derived value actually flips. Loading/error have no hero
+            // recomposes only when the derived value actually flips. Error states have no hero
             // behind the bar, so they default to the opaque titled bar.
             val heroPeekPx = with(LocalDensity.current) { 100.dp.toPx() }
             val scrolledPastHero by remember(listState) {
@@ -138,7 +138,7 @@ fun PersonScreen(
                 }
             }
             val barOpaque = scrolledPastHero ||
-                state.isLoading || (state.errorMessage != null && state.credits == null)
+                (!state.isLoading && state.errorMessage != null && state.credits == null)
             val barColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.surface else Color.Transparent)
             val barContentColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.onSurface else Color.White)
             Box {
@@ -176,7 +176,7 @@ fun PersonScreen(
     ) { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             when {
-                state.isLoading -> FullScreenLoading()
+                state.isLoading -> PersonScreenSkeleton()
                 state.errorMessage != null && state.credits == null ->
                     FullScreenError(message = state.errorMessage ?: stringResource(R.string.person_load_error))
                 else -> PersonContent(
@@ -301,7 +301,7 @@ private fun PersonHero(details: com.ahsan.movieapp.domain.model.PersonDetails) {
                 .aspectRatio(3f / 4f)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            AsyncImage(
+            ShimmerAsyncImage(
                 model = details.profileUrl,
                 contentDescription = details.name,
                 contentScale = ContentScale.Crop,

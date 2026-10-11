@@ -4,6 +4,7 @@ import com.ahsan.movieapp.R
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,7 +32,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.PosterGridSkeleton
+import com.ahsan.movieapp.ui.components.ShimmerLine
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 
 /**
@@ -64,7 +66,15 @@ fun CollectionScreen(
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
-                state.isLoading -> FullScreenLoading()
+                state.isLoading -> Column(modifier = Modifier.fillMaxSize()) {
+                    // Same spot as the real overview paragraph, so the grid does not jump when it lands.
+                    Column(modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ShimmerLine(height = 12.dp)
+                        ShimmerLine(widthFraction = 0.9f, height = 12.dp)
+                        ShimmerLine(widthFraction = 0.6f, height = 12.dp)
+                    }
+                    PosterGridSkeleton(modifier = Modifier.weight(1f))
+                }
                 state.movies.isEmpty() && state.errorMessage != null ->
                     FullScreenError(message = state.errorMessage ?: stringResource(R.string.collection_couldnt_load))
                 state.movies.isEmpty() -> EmptyState(title = stringResource(R.string.nothing_here), body = stringResource(R.string.collection_empty_body))

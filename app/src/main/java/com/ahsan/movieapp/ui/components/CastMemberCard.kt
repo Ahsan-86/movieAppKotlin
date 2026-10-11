@@ -22,7 +22,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.ahsan.movieapp.domain.model.CastMember
 
 /**
@@ -49,7 +48,7 @@ fun CastMemberCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             if (member.profileUrl != null) {
-                AsyncImage(
+                ShimmerAsyncImage(
                     model = member.profileUrl,
                     contentDescription = member.name,
                     contentScale = ContentScale.Crop,

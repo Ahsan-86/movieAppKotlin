@@ -31,7 +31,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.ahsan.movieapp.domain.model.Movie
 
 /**
@@ -43,11 +42,11 @@ import com.ahsan.movieapp.domain.model.Movie
 fun MoviePosterCard(
     movie: Movie,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     onToggleFavorite: (() -> Unit)? = null,
     // Null means "fill whatever container I'm in" (e.g. a grid cell) rather than an exact width —
     // used by the search screen's dense 4-up grid mode where cell width varies by screen size.
     width: androidx.compose.ui.unit.Dp? = 128.dp,
-    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
@@ -61,7 +60,7 @@ fun MoviePosterCard(
                 .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            AsyncImage(
+            ShimmerAsyncImage(
                 model = movie.posterUrl,
                 contentDescription = movie.title,
                 contentScale = ContentScale.Crop,
@@ -133,7 +132,7 @@ private fun RatingChip(rating: String) {
             Icon(
                 imageVector = Icons.Filled.Star,
                 contentDescription = null,
-                tint = androidx.compose.ui.graphics.Color(0xFFFFC857),
+                tint = Color(0xFFFFC857),
                 modifier = Modifier.size(12.dp)
             )
             Text(

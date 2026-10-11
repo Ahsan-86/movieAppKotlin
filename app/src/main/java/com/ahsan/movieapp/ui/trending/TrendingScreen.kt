@@ -20,7 +20,7 @@ import androidx.paging.compose.itemKey
 import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.PosterGridSkeleton
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.PagingAppendFooter
 import kotlinx.coroutines.flow.Flow
@@ -53,7 +53,7 @@ fun TrendingScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         val refreshState = movies.loadState.refresh
         when {
-            refreshState is LoadState.Loading && movies.itemCount == 0 -> FullScreenLoading()
+            refreshState is LoadState.Loading && movies.itemCount == 0 -> PosterGridSkeleton()
             // Nothing cached and the refresh failed — used to fall through to an empty grid with
             // no explanation and no way to try again.
             refreshState is LoadState.Error && movies.itemCount == 0 -> FullScreenError(

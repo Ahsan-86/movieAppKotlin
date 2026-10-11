@@ -63,7 +63,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import com.ahsan.movieapp.ui.components.ShimmerAsyncImage
 import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.CastMember
 import com.ahsan.movieapp.domain.model.CollectionSummary
@@ -74,7 +74,7 @@ import com.ahsan.movieapp.domain.model.WatchProviderRegion
 import com.ahsan.movieapp.ui.components.CastMemberCard
 import com.ahsan.movieapp.ui.components.DetailHeroCaption
 import com.ahsan.movieapp.ui.components.FullScreenError
-import com.ahsan.movieapp.ui.components.FullScreenLoading
+import com.ahsan.movieapp.ui.components.DetailScreenSkeleton
 import com.ahsan.movieapp.ui.components.MoviePosterCard
 import com.ahsan.movieapp.ui.components.TrailerShareRow
 import com.ahsan.movieapp.ui.components.UrlAutoSizeText
@@ -136,10 +136,10 @@ fun MovieDetailScreen(
         containerColor = background,
         topBar = {
             // 100dp of scroll is safely past the hero; ScrollState.value is snapshot-backed, so
-            // reading it here recomposes only this lambda as the page scrolls. Loading/error have
+            // reading it here recomposes only this lambda as the page scrolls. Error states have
             // no hero behind the bar, so they default to the opaque titled bar.
             val barOpaque = scrollState.value > with(LocalDensity.current) { 100.dp.toPx() } ||
-                state.isLoading || state.details == null
+                (!state.isLoading && state.details == null)
             val barColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.surface else Color.Transparent)
             val barContentColor by animateColorAsState(if (barOpaque) MaterialTheme.colorScheme.onSurface else Color.White)
             Box {
@@ -191,7 +191,7 @@ fun MovieDetailScreen(
     ) { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             when {
-                state.isLoading -> FullScreenLoading()
+                state.isLoading -> DetailScreenSkeleton()
                 state.details == null -> FullScreenError(message = state.errorMessage ?: stringResource(R.string.detail_couldnt_load_movie))
                 else -> {
                     val details = state.details!!
@@ -206,7 +206,7 @@ fun MovieDetailScreen(
                                 .aspectRatio(3f / 4f)
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            AsyncImage(
+                            ShimmerAsyncImage(
                                 model = details.posterUrl,
                                 contentDescription = details.title,
                                 contentScale = ContentScale.Crop,
@@ -378,10 +378,11 @@ private fun CollectionTeaser(collection: CollectionSummary, onClick: () -> Unit)
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surface)
         ) {
-            AsyncImage(
+            ShimmerAsyncImage(
                 model = collection.posterUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                shimmerBase = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -520,7 +521,7 @@ private fun ProviderLogo(provider: WatchProvider, onClick: (() -> Unit)?) {
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
-        AsyncImage(
+        ShimmerAsyncImage(
             model = provider.logoUrl,
             contentDescription = provider.name,
             contentScale = ContentScale.Crop,

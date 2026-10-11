@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.sp
  * A single-line URL value that shrinks its font so the whole string stays visible inside the space
  * it's given — the "Website" row of the Information section (Movie + TV, 2026-09-22 fix: long TMDB
  * URLs used to clip/overflow the row's right-hand column). Measures the text at
- * [MaterialTheme.typography.bodyMedium] and, if that doesn't fit the available width, walks down
+ * MaterialTheme.typography.bodyMedium and, if that doesn't fit the available width, walks down
  * through progressively smaller sizes until one does — wrapping as an absolute last resort rather
  * than ever clipping. Rendered like InfoRow's normal value text (medium weight, primary
  * clickable styling, underlined) so the row still reads as one consistent list.

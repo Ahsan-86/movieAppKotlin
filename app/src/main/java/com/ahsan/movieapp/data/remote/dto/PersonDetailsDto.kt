@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * Full person profile — bio, photo, primary department — for the person screen's header.
- * [birthday]/[deathday] are TMDB's ISO "YYYY-MM-DD" strings (both null when unknown); [gender] is
+ * birthday/deathday are TMDB's ISO "YYYY-MM-DD" strings (both null when unknown); gender is
  * TMDB's numeric code (0 = unspecified/unknown, 1 = female, 2 = male, 3 = non-binary) — see
  * PersonDetails.genderLabel for the display mapping.
  */
@@ -27,10 +27,10 @@ data class CombinedCreditsDto(
 )
 
 /**
- * One credit row from combined_credits. [character] is only present on cast entries, [job] only
+ * One credit row from combined_credits. character is only present on cast entries, job only
  * on crew entries (e.g. "Director", "Writer", "Producer") — the repository filters crew by
- * job == "Director" to build the "As Director" tab. [mediaType] distinguishes movie vs tv; a tv
- * entry uses [name]/[firstAirDate] instead of [title]/[releaseDate], same convention as multi-search.
+ * job == "Director" to build the "As Director" tab. mediaType distinguishes movie vs tv; a tv
+ * entry uses name/firstAirDate instead of title/releaseDate, same convention as multi-search.
  */
 data class CombinedCreditDto(
     val id: Int,

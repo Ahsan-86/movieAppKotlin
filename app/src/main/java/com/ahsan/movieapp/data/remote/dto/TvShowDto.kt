@@ -3,8 +3,8 @@ package com.ahsan.movieapp.data.remote.dto
 import com.google.gson.annotations.SerializedName
 
 /**
- * `/discover/tv` row — the TV equivalent of [MovieDto]. Kept as its own small DTO rather than
- * reusing [MultiSearchResultDto] since this is a plain single-media-type endpoint, not the
+ * `/discover/tv` row — the TV equivalent of MovieDto. Kept as its own small DTO rather than
+ * reusing MultiSearchResultDto since this is a plain single-media-type endpoint, not the
  * heterogeneous multi-search shape.
  */
 data class TvShowDto(

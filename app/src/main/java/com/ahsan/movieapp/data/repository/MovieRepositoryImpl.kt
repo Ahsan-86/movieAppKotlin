@@ -81,9 +81,9 @@ class MovieRepositoryImpl @Inject constructor(
         )
 
     /**
-     * Phase 4 (pagination) Round 1 — only [MovieCategory.TRENDING_TODAY] calls this so far (see
-     * [TrendingViewModel][com.ahsan.movieapp.ui.trending.TrendingViewModel]). Forwards to
-     * [pagedCategoryFlow], the shared plumbing every paginated category/genre listing uses.
+     * Phase 4 (pagination) Round 1 — only MovieCategory.TRENDING_TODAY calls this so far (see
+     * TrendingViewModel). Forwards to
+     * pagedCategoryFlow, the shared plumbing every paginated category/genre listing uses.
      */
     override fun getPagedCategory(category: MovieCategory): Flow<PagingData<Movie>> =
         pagedCategoryFlow(
@@ -93,7 +93,7 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * Phase 4 (pagination) Round 2 — the genre screen's Movies tab (see
-     * [GenreViewModel][com.ahsan.movieapp.ui.genre.GenreViewModel]). [browseGenre] below is this
+     * GenreViewModel). browseGenre below is this
      * same TMDB `with_genres` discover call's single-page counterpart, kept for anything that
      * still wants a plain one-shot list.
      */
@@ -105,11 +105,11 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * Phase 4 (pagination) Round 3 — the genre screen's TV tab. No Room table keyed by a
-     * genre+filter combo for TV (only the curated carousels are cached — see [getCategoryTv]), so
-     * unlike [getPagedGenre] this [Pager] has no [androidx.paging.RemoteMediator]: just
-     * [TvGenrePagingSource] reading TMDB pages directly, one TMDB page per Paging 3 page. The
+     * genre+filter combo for TV (only the curated carousels are cached — see getCategoryTv), so
+     * unlike getPagedGenre this Pager has no androidx.paging.RemoteMediator: just
+     * TvGenrePagingSource reading TMDB pages directly, one TMDB page per Paging 3 page. The
      * genre screen's filtered state passes filters through to that source (see its class doc);
-     * [totalResults] is forwarded so the screen can display a filtered-results count.
+     * totalResults is forwarded so the screen can display a filtered-results count.
      */
     override fun getPagedGenreTv(
         genreId: Int,
@@ -123,7 +123,7 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * Phase 4 (pagination) Round 4 — the search screen's movie results. Same no-`RemoteMediator`
-     * shape as [getPagedGenreTv]: [SearchMoviesPagingSource] reads TMDB pages (with a page-1-only
+     * shape as getPagedGenreTv: SearchMoviesPagingSource reads TMDB pages (with a page-1-only
      * local fallback) directly, since there's no Room cache table keyed by arbitrary search text.
      */
     override fun getPagedSearchMovies(
@@ -136,8 +136,8 @@ class MovieRepositoryImpl @Inject constructor(
         ).flow
 
     /**
-     * The people half of a search query — one-shot, capped at [MAX_PEOPLE_RESULTS], not part of
-     * [getPagedSearchMovies]'s pager. See the interface doc for why.
+     * The people half of a search query — one-shot, capped at MAX_PEOPLE_RESULTS, not part of
+     * getPagedSearchMovies's pager. See the interface doc for why.
      */
     override suspend fun searchPeople(query: String): Result<List<Person>> = runCatching {
         api.searchMulti(query).results
@@ -148,7 +148,7 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * The TV half of a search query — the "TV Shows" row, same one-shot/capped/net-only shape as
-     * [searchPeople]. Deliberately NOT upserted into the shared `movies` table (a TV id there
+     * searchPeople. Deliberately NOT upserted into the shared `movies` table (a TV id there
      * could clobber a same-numbered movie), and search queries have no cache table of their own,
      * so TV search rows always come back `isFavorite = false`.
      */
@@ -175,11 +175,11 @@ class MovieRepositoryImpl @Inject constructor(
     /**
      * Phase 4 (pagination) Round 4, rewritten in Session 7 — the search screen's filter-panel
      * Discover results (also the genre screen's filtered Movies tab). Now Room-cached per applied
-     * filter combination: [DiscoverRemoteMediator] decides when to hit TMDB (offline-first, 2h
-     * staleness, resumable next page, LRU-bounded cache), and [MovieDao.pagingSourceForDiscover]
-     * is what [Pager] actually reads from — so re-applying an identical combo renders from Room
+     * filter combination: DiscoverRemoteMediator decides when to hit TMDB (offline-first, 2h
+     * staleness, resumable next page, LRU-bounded cache), and MovieDao.pagingSourceForDiscover
+     * is what Pager actually reads from — so re-applying an identical combo renders from Room
      * instantly, and favorites stay live through the same `LEFT JOIN`. The "N results found" count
-     * is queryable separately via [observeDiscoverResultTotal].
+     * is queryable separately via observeDiscoverResultTotal.
      */
     @OptIn(ExperimentalPagingApi::class)
     override fun getPagedDiscoverMovies(filters: DiscoverFilters): Flow<PagingData<Movie>> {
@@ -204,9 +204,9 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * Shared plumbing for every paginated "just a list of movies under some cache key" screen —
-     * the [Pager] equivalent of [cachedCategoryFlow] below. [CategoryRemoteMediator] handles the
-     * offline-first staleness check and TMDB paging; [MovieDao.pagingSourceForCategory] is what
-     * [Pager] actually reads from and re-emits on every Room change (including favorite toggles,
+     * the Pager equivalent of cachedCategoryFlow below. CategoryRemoteMediator handles the
+     * offline-first staleness check and TMDB paging; MovieDao.pagingSourceForCategory is what
+     * Pager actually reads from and re-emits on every Room change (including favorite toggles,
      * since that query's `LEFT JOIN favorites` is part of what Room tracks for invalidation).
      */
     @OptIn(ExperimentalPagingApi::class)
@@ -283,7 +283,7 @@ class MovieRepositoryImpl @Inject constructor(
     /**
      * Cast + director for the Detail screen's cast/crew section (Phase 3 Round A). A single
      * `/movie/{id}/credits` call already returns both cast and crew — this just reads the crew
-     * half (previously ignored, see [getCast]) to find the director, rather than firing a second
+     * half (previously ignored, see getCast) to find the director, rather than firing a second
      * network request. Network-only, no Room cache — see the interface doc for why.
      */
     override suspend fun getMovieCredits(movieId: Int): Result<MovieCredits> = runCatching {
@@ -307,9 +307,9 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * Backs the Detail screen's collection teaser (Phase 3 Round B). One-shot, network-only — same
-     * convention as [getMovieCredits] for newer data with no offline table of its own yet. Every
+     * convention as getMovieCredits for newer data with no offline table of its own yet. Every
      * movie in the collection still gets upserted into the shared `movies` table (like
-     * [getPagedDiscoverMovies] does), so each one is just as available offline afterward as a movie
+     * getPagedDiscoverMovies does), so each one is just as available offline afterward as a movie
      * found any other way, even though the collection listing itself isn't cached by collection id.
      */
     override suspend fun getCollectionDetails(collectionId: Int): Result<MovieCollection> = runCatching {
@@ -325,7 +325,7 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * Backs the Detail screen's streaming-availability section (Phase 3 Round C). One-shot,
-     * network-only — same convention as [getMovieCredits]/[getCollectionDetails] for newer data
+     * network-only — same convention as getMovieCredits/getCollectionDetails for newer data
      * with no offline table of its own. TMDB's response already covers every region in one call,
      * so there's nothing region-specific to fetch again when the user switches the dropdown.
      */
@@ -390,24 +390,24 @@ class MovieRepositoryImpl @Inject constructor(
             fetch = { api.discoverByGenres(genreId.toString()).results }
         )
 
-    /** Phase 2.6 Session 4 — see the interface doc. [browseGenre]'s TV mirror over the `tv_shows` tables. */
+    /** Phase 2.6 Session 4 — see the interface doc. browseGenre's TV mirror over the `tv_shows` tables. */
     override fun browseGenreTv(genreId: Int): Flow<Resource<List<Movie>>> =
         cachedCategoryTvFlow(
             storageKey = "genre_tv_$genreId",
             fetch = { api.discoverTvByGenres(genreId.toString()).results }
         )
 
-    /** Phase 2.6 Session 3 — see the interface doc. Same offline-first mechanism as [getCategory],
+    /** Phase 2.6 Session 3 — see the interface doc. Same offline-first mechanism as getCategory,
      *  over the new `tv_shows` cache tables; since Session 6's composite-key migration, the TV
-     *  favorites table fuses in via [cachedCategoryTvFlow], so hearts on TV carousels are live. */
+     *  favorites table fuses in via cachedCategoryTvFlow, so hearts on TV carousels are live. */
     override fun getCategoryTv(category: TvCategory): Flow<Resource<List<Movie>>> =
         cachedCategoryTvFlow(
             storageKey = category.storageKey,
             fetch = { fetchCategoryTvFromNetwork(category) }
         )
 
-    /** Phase 2.6 Session 3 — see the interface doc. Forwards to [pagedCategoryTvFlow], the TV
-     *  mirror of [pagedCategoryFlow] ([TvCategoryRemoteMediator] over the `tv_remote_keys` table). */
+    /** Phase 2.6 Session 3 — see the interface doc. Forwards to pagedCategoryTvFlow, the TV
+     *  mirror of pagedCategoryFlow (TvCategoryRemoteMediator over the `tv_remote_keys` table). */
     override fun getPagedCategoryTv(category: TvCategory): Flow<PagingData<Movie>> =
         pagedCategoryTvFlow(
             storageKey = category.storageKey,
@@ -432,7 +432,7 @@ class MovieRepositoryImpl @Inject constructor(
     }
 
     /** Session 6 — every favorite (movies and TV shows), movies first then TV, each stamped
-     *  `isFavorite = true`. [Movie.mediaType] keeps same-numbered movies and TV shows apart; the
+     *  `isFavorite = true`. Movie.mediaType keeps same-numbered movies and TV shows apart; the
      *  UI re-stamps whatever it renders against this (search/genre/person) or consumes it directly
      *  (the Favorites screen, which splits it by tab). */
     override fun observeFavorites(): Flow<List<Movie>> =
@@ -504,14 +504,14 @@ class MovieRepositoryImpl @Inject constructor(
 
     /**
      * Phase 2.6 Session 1 — the TV detail screen's base info section. One-shot, network-only, no
-     * Room cache — same convention as [getMovieCredits]/[getCollectionDetails]/[getWatchProviders].
+     * Room cache — same convention as getMovieCredits/getCollectionDetails/getWatchProviders.
      */
     override suspend fun getTvDetails(tvId: Int): Result<TvShowDetails> = runCatching {
         api.getTvDetails(tvId).toDomain()
     }
 
     /**
-     * TV counterpart of [getMovieCredits] — same "read the crew list already returned by the
+     * TV counterpart of getMovieCredits — same "read the crew list already returned by the
      * credits call to find the director" approach, no second network request. With one caveat:
      * `/tv/{id}/credits`' `crew` is often empty for series, so when it has no "Director" entry we
      * fall back to `/tv/{id}/aggregate_credits` (the whole-show rollup, which carries per-episode
@@ -596,9 +596,9 @@ class MovieRepositoryImpl @Inject constructor(
         MovieCategory.FOR_YOU -> api.getPopular().results
     }
 
-    /** [fetchCategoryFromNetwork]'s paged counterpart for [getPagedCategory] — same per-category
-     * endpoint mapping, but keeps the full [PagedResponseDto] (page/totalPages) that
-     * [CategoryRemoteMediator] needs instead of just the results list. */
+    /** fetchCategoryFromNetwork's paged counterpart for getPagedCategory — same per-category
+     * endpoint mapping, but keeps the full PagedResponseDto (page/totalPages) that
+     * CategoryRemoteMediator needs instead of just the results list. */
     private suspend fun fetchCategoryFromNetworkPaged(category: MovieCategory, page: Int): PagedResponseDto<MovieDto> =
         when (category) {
             MovieCategory.TRENDING_TODAY -> api.getTrendingToday(page)
@@ -609,16 +609,16 @@ class MovieRepositoryImpl @Inject constructor(
             MovieCategory.FOR_YOU -> api.getPopular(page)
         }
 
-    /** Phase 2.6 Session 3 — [fetchCategoryFromNetwork]'s TV counterpart. */
+    /** Phase 2.6 Session 3 — fetchCategoryFromNetwork's TV counterpart. */
     private suspend fun fetchCategoryTvFromNetwork(category: TvCategory): List<TvShowDto> = when (category) {
         TvCategory.TRENDING_TV -> api.getTrendingTv().results
         TvCategory.POPULAR_TV -> api.getPopularTv().results
         TvCategory.ON_THE_AIR -> api.getOnTheAirTv().results
     }
 
-    /** [fetchCategoryTvFromNetwork]'s paged counterpart for [getPagedCategoryTv] — same as
-     * [fetchCategoryFromNetworkPaged] on the movie side: keeps the full [PagedResponseDto] that
-     * [TvCategoryRemoteMediator] needs. */
+    /** fetchCategoryTvFromNetwork's paged counterpart for getPagedCategoryTv — same as
+     * fetchCategoryFromNetworkPaged on the movie side: keeps the full PagedResponseDto that
+     * TvCategoryRemoteMediator needs. */
     private suspend fun fetchCategoryTvFromNetworkPaged(category: TvCategory, page: Int): PagedResponseDto<TvShowDto> =
         when (category) {
             TvCategory.TRENDING_TV -> api.getTrendingTv(page)
@@ -656,10 +656,10 @@ class MovieRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Phase 2.6 Session 3 — [cachedCategoryFlow]'s TV counterpart, over the `tv_shows` tables.
+     * Phase 2.6 Session 3 — cachedCategoryFlow's TV counterpart, over the `tv_shows` tables.
      * Same offline-first/staleness behavior, with one Session 6 change: the TV half of the
      * composite-key `favorites` table is fused in exactly like the movie version fuses
-     * [observeFavoriteMovies] — a TV favorite and a same-numbered movie favorite are distinct rows
+     * observeFavoriteMovies — a TV favorite and a same-numbered movie favorite are distinct rows
      * now, so a cross-media id can never wrongly badge a show as a movie favorite.
      */
     private fun cachedCategoryTvFlow(
@@ -686,9 +686,9 @@ class MovieRepositoryImpl @Inject constructor(
     )
 
     /**
-     * Phase 2.6 Session 3 — [pagedCategoryFlow]'s TV counterpart. Nothing a caller has to think
-     * about: [TvCategoryRemoteMediator] does the offline-first staleness check + TMDB paging and
-     * [TvShowDao.pagingSourceForCategoryTv] is what [Pager] reads from (see [TvCategoryRemoteMediator]
+     * Phase 2.6 Session 3 — pagedCategoryFlow's TV counterpart. Nothing a caller has to think
+     * about: TvCategoryRemoteMediator does the offline-first staleness check + TMDB paging and
+     * TvShowDao.pagingSourceForCategoryTv is what Pager reads from (see TvCategoryRemoteMediator
      * for why there's no favorites join on the TV side).
      */
     @OptIn(ExperimentalPagingApi::class)
@@ -723,7 +723,7 @@ class MovieRepositoryImpl @Inject constructor(
         private const val STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000L // 2 hours
         private const val MAX_PEOPLE_RESULTS = 10
         // The "TV Shows" search row is a bounded horizontal rail, so keep it a single-page cap of
-        // poster-sized cards rather than an infinite scroll — same trade-off as [MAX_PEOPLE_RESULTS].
+        // poster-sized cards rather than an infinite scroll — same trade-off as MAX_PEOPLE_RESULTS.
         private const val MAX_TV_SEARCH_RESULTS = 20
         // Matches TMDB's own fixed page size, so one Paging 3 "page" load is exactly one TMDB
         // request — no partial-page bookkeeping needed.

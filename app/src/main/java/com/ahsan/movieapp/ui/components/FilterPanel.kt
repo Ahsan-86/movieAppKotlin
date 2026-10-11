@@ -51,8 +51,8 @@ import java.util.Locale
 
 /** The extractable part of the search screen's Phase 2.5 filter panel — shared with the genre
  *  screen's filter section. Same dropdowns/slider/reset/show-results behavior either way; the
- *  genre dropdown is optional (empty [genres] omits it), since the genre screen pins its genre
- *  already. [onGenreSelected] is only invoked by the panel when [genres] is non-empty.
+ *  genre dropdown is optional (empty genres omits it), since the genre screen pins its genre
+ *  already. onGenreSelected is only invoked by the panel when genres is non-empty.
  */
 @Composable
 fun FilterPanelSection(
@@ -161,7 +161,7 @@ private const val FILTER_EARLIEST_YEAR = 1950
 /**
  * A short summary row shown above filtered results (in place of the filter panel) so the applied
  * criteria stay visible and adjustable without needing to re-open the panel every time. Shared by
- * the search screen's Discover results and the genre screen's filtered browse. [resultCount]
+ * the search screen's Discover results and the genre screen's filtered browse. resultCount
  * (optional) adds an "N results found" line under the row — fed from the paging sources' total.
  */
 @Composable
@@ -232,7 +232,7 @@ fun FilterSummaryBar(
     }
 }
 
-/** One applied filter as a chip; with an [onRemove] it carries a ✕ that drops just that filter. */
+/** One applied filter as a chip; with an onRemove it carries a ✕ that drops just that filter. */
 @Composable
 private fun ActiveFilterChip(label: String, onRemove: (() -> Unit)?) {
     AssistChip(
@@ -252,9 +252,9 @@ private fun ActiveFilterChip(label: String, onRemove: (() -> Unit)?) {
 }
 
 /**
- * A read-only text field that opens a [DropdownMenu] on tap. `OutlinedTextField(readOnly = true)`
- * still consumes taps for cursor placement, so a transparent clickable [Box] is layered on top to
- * actually open the menu — a plain [DropdownMenu] rather than `ExposedDropdownMenuBox` to avoid
+ * A read-only text field that opens a DropdownMenu on tap. `OutlinedTextField(readOnly = true)`
+ * still consumes taps for cursor placement, so a transparent clickable Box is layered on top to
+ * actually open the menu — a plain DropdownMenu rather than `ExposedDropdownMenuBox` to avoid
  * depending on that API's exact shape in whatever Material3 version this project is on.
  */
 @Composable

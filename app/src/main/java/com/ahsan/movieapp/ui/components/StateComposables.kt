@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,23 +29,11 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.ahsan.movieapp.R
 
-/** Generic spinner fallback — every screen now has a shaped shimmer skeleton instead (see Shimmer.kt). */
-@Composable
-fun FullScreenLoading(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-}
-
 @Composable
 fun FullScreenError(
     message: String,
-    onRetry: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRetry: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
@@ -99,12 +86,11 @@ fun EmptyState(
 
 /**
  * Phase 4 (pagination) — a small full-width row for the bottom of a paginated grid/list, driven
- * directly by [LazyPagingItems.loadState.append][androidx.paging.CombinedLoadStates.append]: a
+ * directly by LazyPagingItems.loadState.append: a
  * spinner while the next TMDB page is loading, a "Couldn't load more — Retry" row if that append
  * failed (network drop mid-scroll, say), and nothing at all once every page has loaded or none of
  * this screen's data supports further pages. Every Phase 4 screen shares this one footer instead
- * of each rolling its own, the same "shared composable" convention as [FullScreenLoading]/
- * [FullScreenError] above.
+ * of each rolling its own, the same "shared composable" convention as FullScreenError above.
  */
 @Composable
 fun <T : Any> PagingAppendFooter(pagingItems: LazyPagingItems<T>, modifier: Modifier = Modifier) {

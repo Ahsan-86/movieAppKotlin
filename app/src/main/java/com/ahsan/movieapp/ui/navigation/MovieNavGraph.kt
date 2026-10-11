@@ -51,7 +51,7 @@ import com.ahsan.movieapp.ui.tv.TvDetailScreen
 
 /**
  * App entry point: gates on session state (first launch shows the guest/login chooser,
- * reusing [AccountScreen]) and otherwise shows the main bottom-nav experience.
+ * reusing AccountScreen) and otherwise shows the main bottom-nav experience.
  */
 @Composable
 fun MovieAppRootScaffold() {
@@ -303,7 +303,7 @@ private fun NavHostController.navigateToDetail(movie: Movie) {
     navigate(Destination.MovieDetail.createRoute(movie.id))
 }
 
-/** Routes a tapped TV item (still modeled as [Movie] — its `id` is a TV id, not a movie id) to
+/** Routes a tapped TV item (still modeled as Movie — its `id` is a TV id, not a movie id) to
  *  the real TV detail screen. Used by Explore's Popular TV row, Search's TV results, Genre's TV
  *  tab, and PersonScreen's TV filmography. */
 private fun NavHostController.navigateToTvDetail(movie: Movie) {
@@ -315,7 +315,7 @@ private fun NavHostController.navigateToPerson(person: Person) {
 }
 
 /** Used directly by cast/director drill-through (Phase 3 Round A), which only has an id + name,
- * not a full [Person]. */
+ * not a full Person. */
 private fun NavHostController.navigateToPerson(personId: Int, personName: String) {
     navigate(Destination.PersonFilmography.createRoute(personId, personName))
 }
@@ -340,7 +340,7 @@ private fun NavHostController.navigateToPhotoViewer(mediaType: String, mediaId: 
 }
 
 /** Phase 2.6 Session 2 post-ship — "Watch Trailer" -> the trailer's own full-screen destination
- *  (see [TrailerPlayerScreen]'s doc for why this replaced an in-place Dialog). */
+ *  (see TrailerPlayerScreen's doc for why this replaced an in-place Dialog). */
 private fun NavHostController.navigateToTrailer(videoId: String) {
     navigate(Destination.TrailerPlayer.createRoute(videoId))
 }

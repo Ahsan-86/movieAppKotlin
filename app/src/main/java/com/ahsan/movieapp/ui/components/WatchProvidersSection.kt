@@ -45,7 +45,7 @@ import com.ahsan.movieapp.domain.model.WatchProviderRegion
  * grouped Stream/Rent/Buy provider-logo rows for one TMDB region, with a region dropdown to switch
  * (locale-derived default, US fallback — see the region-resolution logic in `MovieDetailViewModel` /
  * `TvDetailViewModel`). Switching regions is instant/local, not a re-fetch — TMDB already returned
- * every region in one call. The caller only renders this composable when [availableRegions] is
+ * every region in one call. The caller only renders this composable when availableRegions is
  * non-empty (TMDB has data for at least one region); if the currently *selected* region has none,
  * the dropdown still shows (so the user can pick one that does) with a short "not available" line in
  * place of the provider rows.
@@ -53,7 +53,7 @@ import com.ahsan.movieapp.domain.model.WatchProviderRegion
  * TMDB's `/watch/providers` response doesn't hand back a deep link per provider — only one
  * `link` per region, to TMDB's own watch-providers page for this title (which forwards through
  * JustWatch to the actual services). So every logo in this region, plus the attribution line
- * itself, opens that same [WatchProviderRegion.link] — that's also what TMDB's API terms require
+ * itself, opens that same WatchProviderRegion.link — that's also what TMDB's API terms require
  * showing as a real, working link whenever this data is displayed, not just decorative text.
  */
 @Composable
@@ -145,8 +145,8 @@ private fun ProviderRow(label: String, providers: List<WatchProvider>, onProvide
 }
 
 /**
- * TMDB doesn't hand back a per-provider deep link (see [WatchProvidersSection]'s doc comment), so
- * every logo shares the same [onClick] — the region's one TMDB watch-providers link — same
+ * TMDB doesn't hand back a per-provider deep link (see WatchProvidersSection's doc comment), so
+ * every logo shares the same onClick — the region's one TMDB watch-providers link — same
  * nullable-callback convention as the other tappable cards on the detail screens.
  */
 @Composable

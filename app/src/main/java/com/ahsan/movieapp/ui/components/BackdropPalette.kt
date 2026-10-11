@@ -15,9 +15,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Downloads [backdropUrl] at a small size (512px — served from Coil's cache when the full-res
+ * Downloads backdropUrl at a small size (512px — served from Coil's cache when the full-res
  * backdrop was already fetched for the hero, and decodes fast enough to run once per screen) and
- * extracts a [Palette] off the main thread. Memoized by URL: the sample runs once per image and a
+ * extracts a Palette off the main thread. Memoized by URL: the sample runs once per image and a
  * theme/rotation change reuses it. Returns null on any failure or a blank URL so callers fall back
  * to their theme background silently.
  */

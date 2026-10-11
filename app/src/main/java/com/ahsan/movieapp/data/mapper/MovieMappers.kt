@@ -71,7 +71,7 @@ fun MovieEntity.toDomain(isFavorite: Boolean = false): Movie = Movie(
     isFavorite = isFavorite
 )
 
-/** Phase 4 (pagination) — [MovieCategoryRow] already carries its own favorite status (computed in
+/** Phase 4 (pagination) — MovieCategoryRow already carries its own favorite status (computed in
  * SQL via a `LEFT JOIN`), so this just forwards it instead of a caller having to cross-reference a
  * separate favorites list the way the non-paged category flows do. */
 fun MovieCategoryRow.toDomain(): Movie = movie.toDomain(isFavorite)
@@ -95,7 +95,7 @@ fun MovieDetailsDto.toEntity(cachedAt: Long): MovieDetailsEntity = MovieDetailsE
 )
 
 /**
- * [MovieDetailsEntity.productionCompaniesRaw]'s encoding: one entry per company as
+ * MovieDetailsEntity.productionCompaniesRaw's encoding: one entry per company as
  * "name␟logoPath" (logoPath empty when absent), entries joined by a doubled "␟␟" — reusing the
  * same unit-separator character Converters.fromStringList/toStringList already use for
  * List<String> columns, rather than adding a dedicated Room TypeConverter for this one field.
@@ -185,7 +185,7 @@ fun PersonDto.toDomain(): Person = Person(
 /**
  * Direct DTO -> domain mapping for the Detail screen's cast/crew section (Phase 3 Round A) — this
  * path is network-only (see MovieRepositoryImpl.getMovieCredits) and deliberately doesn't go
- * through Room, unlike [CastMemberEntity.toDomain] above, which backs the separate (currently
+ * through Room, unlike CastMemberEntity.toDomain above, which backs the separate (currently
  * unused) offline-cached cast path left in place from Phase 1.
  */
 fun CastMemberDto.toDomain(): CastMember = CastMember(
@@ -196,7 +196,7 @@ fun CastMemberDto.toDomain(): CastMember = CastMember(
     order = order
 )
 
-/** A director credit surfaced as a [Person] so it can reuse the same PersonScreen drill-down as cast. */
+/** A director credit surfaced as a Person so it can reuse the same PersonScreen drill-down as cast. */
 fun CrewMemberDto.toPerson(): Person = Person(
     id = id,
     name = name,
@@ -205,7 +205,7 @@ fun CrewMemberDto.toPerson(): Person = Person(
 )
 
 /**
- * An aggregate TV director credit surfaced as a [Person] — the fallback source when the plain
+ * An aggregate TV director credit surfaced as a Person — the fallback source when the plain
  * `/tv/{id}/credits` crew has no "Director" (see MovieRepositoryImpl.getTvCredits). Aggregate
  * crew members carry a `jobs` list (per-episode roles) instead of a single `job`, so the known
  * role comes from the matching job entry.
@@ -219,8 +219,8 @@ fun TvAggregateCrewMemberDto.toPerson(): Person = Person(
 
 /**
  * `/collection/{id}` -> the Detail screen's full "franchise" list (Phase 3 Round B). `parts`
- * decodes straight into the existing [MovieDto], mapped here directly to [Movie] (bypassing Room,
- * same convention as [TvShowDto.toMovie] and [CombinedCreditDto.toMovie]) since this path is
+ * decodes straight into the existing MovieDto, mapped here directly to Movie (bypassing Room,
+ * same convention as TvShowDto.toMovie and CombinedCreditDto.toMovie) since this path is
  * network-only — see MovieRepositoryImpl.getCollectionDetails for why. Every part still gets
  * upserted into the shared `movies` table by the repository afterward, so each movie is just as
  * available offline afterward as one found any other way; this mapper just produces the in-memory
@@ -251,7 +251,7 @@ private fun MovieDto.toDomainDirect(favoriteIds: Set<Int>): Movie = Movie(
 /**
  * `/movie/{id}/watch/providers` -> the Detail screen's streaming-availability section (Phase 3
  * Round C). TMDB's response already covers every region in one payload — this just reshapes each
- * region's DTO into the domain [WatchProviderRegion] used for display, sorted by TMDB's own
+ * region's DTO into the domain WatchProviderRegion used for display, sorted by TMDB's own
  * `display_priority` (falls back to arrival order for providers where TMDB omits it).
  */
 fun WatchProvidersResponseDto.toDomain(): WatchProviders {
@@ -293,9 +293,9 @@ fun MultiSearchResultDto.toMovieDto(): MovieDto = MovieDto(
 )
 
 /**
- * Bridges a `/search/multi` row (media_type == "tv") back into the [TvShowDto] pipeline, the
- * same shape `/discover/tv` rows already flow through ([TvShowDto.toMovie]) — the search TV row
- * and the genre-browse TV row map to the exact same [Movie] afterwards.
+ * Bridges a `/search/multi` row (media_type == "tv") back into the TvShowDto pipeline, the
+ * same shape `/discover/tv` rows already flow through (TvShowDto.toMovie) — the search TV row
+ * and the genre-browse TV row map to the exact same Movie afterwards.
  */
 fun MultiSearchResultDto.toTvShowDto(): TvShowDto = TvShowDto(
     id = id,
@@ -375,11 +375,11 @@ private fun CombinedCreditDto.toMovie(favoriteIds: Set<Int>, mediaType: MediaTyp
 
 /**
  * `/tv/{id}` -> the TV detail screen's info section + Information section (Phase 2.6 Session 1).
- * Network-only, same convention as [CollectionDetailsDto.toDomain]/[WatchProvidersResponseDto.toDomain]
+ * Network-only, same convention as CollectionDetailsDto.toDomain/WatchProvidersResponseDto.toDomain
  * for data with no offline table yet. `episode_run_time`'s first entry is used as a representative
- * typical episode length — see [TvShowDetails.episodeRuntimeMinutes]'s doc. `networks`/
+ * typical episode length — see TvShowDetails.episodeRuntimeMinutes's doc. `networks`/
  * `production_companies` are mapped names-only (no logos), same convention as
- * [MovieDetails.productionCompaniesFormatted].
+ * MovieDetails.productionCompaniesFormatted.
  */
 fun TvDetailsDto.toDomain(): TvShowDetails = TvShowDetails(
     id = id,
@@ -418,7 +418,7 @@ private fun SeasonDto.toDomain(): Season = Season(
 /**
  * `/tv/{id}/season/{season_number}` -> a season's full episode list, opened from the TV detail
  * screen's Seasons section (Phase 2.6 Session 2). Network-only, same convention as
- * [TvDetailsDto.toDomain] above.
+ * TvDetailsDto.toDomain above.
  */
 fun SeasonDetailsDto.toDomain(): SeasonDetails = SeasonDetails(
     seasonNumber = seasonNumber,
@@ -440,7 +440,7 @@ private fun EpisodeDto.toDomain(): Episode = Episode(
  * Detail screen's Watch Trailer button (Phase 2.6 Session 2) — prefers an official YouTube
  * trailer, falls back to any YouTube trailer, then any YouTube video at all; null if TMDB has no
  * YouTube video attached (the button simply doesn't render — see
- * [com.ahsan.movieapp.ui.components.TrailerShareRow]'s doc).
+ * com.ahsan.movieapp.ui.components.TrailerShareRow's doc).
  */
 fun VideosResponseDto.bestYoutubeTrailerKey(): String? {
     val youtubeVideos = results.orEmpty().filter { it.site == "YouTube" }
@@ -450,9 +450,9 @@ fun VideosResponseDto.bestYoutubeTrailerKey(): String? {
 }
 
 /**
- * Bridges a `/discover/tv` row into the same [Movie] shape everything else renders. Session 6 —
+ * Bridges a `/discover/tv` row into the same Movie shape everything else renders. Session 6 —
  * TV shows can now be favorited (the composite-key Favorites migration landed), so this stamps
- * [MediaType.TV]; snippet-favorite status is supplied per screen (search/genre re-stamp against a
+ * MediaType.TV; snippet-favorite status is supplied per screen (search/genre re-stamp against a
  * live favorites set; home fuses the TV favorites table into its cached TV rows).
  */
 fun TvShowDto.toMovie(): Movie = Movie(
@@ -469,8 +469,8 @@ fun TvShowDto.toMovie(): Movie = Movie(
     mediaType = MediaType.TV
 )
 
-/** Session 6 — the active TV detail page into the [Movie] shape the Favorites upsert expects. This
- *  exists separate from [TvShowDto.toMovie] because the detail payload carries genre *names*, not
+/** Session 6 — the active TV detail page into the Movie shape the Favorites upsert expects. This
+ *  exists separate from TvShowDto.toMovie because the detail payload carries genre *names*, not
  *  ids, and the TV-detail FAB needs only enough to re-render as a favorite — single-source on the
  *  data the screen already has, no extra fetch. */
 fun TvShowDetails.toMovie(): Movie = Movie(
@@ -487,7 +487,7 @@ fun TvShowDetails.toMovie(): Movie = Movie(
     mediaType = MediaType.TV
 )
 
-/** Phase 2.6 Session 3 — a TV row into the Room `tv_shows` cache table, the [MovieDto.toEntity]
+/** Phase 2.6 Session 3 — a TV row into the Room `tv_shows` cache table, the MovieDto.toEntity
  *  counterpart for TV. Kept in its own table (never the movie `movies`/`favorites` tables) because
  *  TMDB reuses one numeric ID range across movies and TV. */
 fun TvShowDto.toTvEntity(cachedAt: Long): TvShowEntity = TvShowEntity(
@@ -503,9 +503,9 @@ fun TvShowDto.toTvEntity(cachedAt: Long): TvShowEntity = TvShowEntity(
     cachedAt = cachedAt
 )
 
-/** Phase 2.6 Session 3 — a cached `tv_shows` row back into the [Movie] shape the carousels render.
- *  Session 6: TV favorites now live in the composite-key `favorites` table, so [isFavorite] is
- *  caller-supplied the same way the movie row's is ([MovieEntity.toDomain]) — home fuses the TV
+/** Phase 2.6 Session 3 — a cached `tv_shows` row back into the Movie shape the carousels render.
+ *  Session 6: TV favorites now live in the composite-key `favorites` table, so isFavorite is
+ *  caller-supplied the same way the movie row's is (MovieEntity.toDomain) — home fuses the TV
  *  favorites table in, other embedded screens re-stamp against a live set. `Movie.mediaType` is always TV. */
 fun TvShowEntity.toDomain(isFavorite: Boolean = false): Movie = Movie(
     id = id,

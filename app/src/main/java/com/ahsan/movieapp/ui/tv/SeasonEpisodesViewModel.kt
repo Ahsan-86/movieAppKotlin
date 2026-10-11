@@ -26,9 +26,9 @@ data class SeasonEpisodesUiState(
 
 /**
  * Phase 2.6 Session 2 — the TV detail screen's Seasons section drill-down: one season's full
- * episode list. One-shot, network-only, no Room cache (same convention as [TvDetailViewModel]).
- * [seasonName] seeds the initial title from the nav arg (same "show a title immediately, before
- * the fetch completes" convention as [com.ahsan.movieapp.ui.detail.CollectionScreen]'s
+ * episode list. One-shot, network-only, no Room cache (same convention as TvDetailViewModel).
+ * seasonName seeds the initial title from the nav arg (same "show a title immediately, before
+ * the fetch completes" convention as com.ahsan.movieapp.ui.detail.CollectionScreen's
  * collectionName arg) and is never overwritten by the fetch result — TMDB's season name would be
  * identical anyway. Purely informational — tapping an episode does nothing yet (parked for Phase 6
  * discussion, per the project doc's Open items).

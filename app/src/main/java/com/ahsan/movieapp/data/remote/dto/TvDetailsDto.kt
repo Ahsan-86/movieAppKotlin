@@ -3,14 +3,14 @@ package com.ahsan.movieapp.data.remote.dto
 import com.google.gson.annotations.SerializedName
 
 /**
- * `/tv/{id}` response — the TV counterpart of [MovieDetailsDto], scoped to what Phase 2.6's TV
+ * `/tv/{id}` response — the TV counterpart of MovieDetailsDto, scoped to what Phase 2.6's TV
  * detail screen needs (info section + Cast & Crew + Information, Session 1; Seasons, Session 2).
  * Deliberately excludes fields with no TV equivalent (budget/revenue/belongs_to_collection).
- * [productionCountries]/[productionCompanies]/[networks] back the Information section added on
- * Ahsan's post-build feedback, same fields as [MovieDetailsDto]'s Information section plus TV's
- * own `networks` field (reuses [ProductionCompanyDto]'s shape — TMDB's networks have the identical
- * id/name/logo_path fields). [seasons] backs Session 2's Seasons section — each season's full
- * episode list is a separate `/tv/{id}/season/{season_number}` call ([SeasonDetailsDto]), not part
+ * productionCountries/productionCompanies/networks back the Information section added on
+ * Ahsan's post-build feedback, same fields as MovieDetailsDto's Information section plus TV's
+ * own `networks` field (reuses ProductionCompanyDto's shape — TMDB's networks have the identical
+ * id/name/logo_path fields). seasons backs Session 2's Seasons section — each season's full
+ * episode list is a separate `/tv/{id}/season/{season_number}` call (SeasonDetailsDto), not part
  * of this response.
  */
 data class TvDetailsDto(

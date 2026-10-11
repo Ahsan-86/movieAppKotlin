@@ -26,8 +26,8 @@ import com.ahsan.movieapp.domain.model.CastMember
 
 /**
  * One tappable cast member in a horizontal row: a circular profile avatar, the actor's name, and
- * the character they played beneath it. Shared by both [com.ahsan.movieapp.ui.detail.MovieDetailScreen]
- * and [com.ahsan.movieapp.ui.tv.TvDetailScreen]'s "Cast & Crew" rows (each screen previously
+ * the character they played beneath it. Shared by both com.ahsan.movieapp.ui.detail.MovieDetailScreen
+ * and com.ahsan.movieapp.ui.tv.TvDetailScreen's "Cast & Crew" rows (each screen previously
  * carried an identical private copy — extracted here with a size bump: avatar 72→84dp, card
  * 84→96dp, name `labelMedium`→`labelLarge`).
  */

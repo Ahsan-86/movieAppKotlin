@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 
 /**
  * Phase 2.6 Session 3 — one row per TV show TMDB has ever returned to us across the cached TV
- * carousels (Trending TV, Popular TV). The TV mirror of [MovieEntity], deliberately in its own
+ * carousels (Trending TV, Popular TV). The TV mirror of MovieEntity, deliberately in its own
  * `tv_shows` table rather than the shared `movies` table: TMDB reuses one numeric ID range across
  * movies and TV, so a TV id must never share the movie cache. Since Session 6, TV favorites DO
  * live in the shared `favorites` table — but by the composite `(id, mediaType)` key with
@@ -27,7 +27,7 @@ data class TvShowEntity(
     val cachedAt: Long
 )
 
-/** Maps a [TvCategory][com.ahsan.movieapp.domain.model.TvCategory] to the ordered TV ids it contains. */
+/** Maps a TvCategory to the ordered TV ids it contains. */
 @Entity(tableName = "category_tv_shows", primaryKeys = ["category", "tvId"])
 data class CategoryTvShowCrossRef(
     val category: String,
@@ -37,9 +37,9 @@ data class CategoryTvShowCrossRef(
 )
 
 /** The `tv_remote_keys` counterpart of
- * [CategoryRemoteKeys][com.ahsan.movieapp.data.local.entity.CategoryRemoteKeys] — per TV category,
+ * CategoryRemoteKeys — per TV category,
  * which TMDB page to fetch next and when, so
- * [com.ahsan.movieapp.data.paging.TvCategoryRemoteMediator] can resume "load more" across app
+ * com.ahsan.movieapp.data.paging.TvCategoryRemoteMediator can resume "load more" across app
  * restarts. `nextPage == null` means TMDB reached this category's `total_pages`. */
 @Entity(tableName = "tv_remote_keys")
 data class TvRemoteKeys(

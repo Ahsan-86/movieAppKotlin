@@ -31,16 +31,16 @@ import kotlinx.coroutines.flow.Flow
 /**
  * The Favorites tab. Session 6 — now a Movies / TV Shows segmented-toggle screen (same control as
  * Genre/Person): each tab shows that media type's saved favorites. On Ahsan's request (Session 7
- * working-tree round) the two tabs render as full-width list rows via [MovieListRow] — the same
+ * working-tree round) the two tabs render as full-width list rows via MovieListRow — the same
  * list row the search screen's list-view mode and the person filmography use — instead of a poster
- * grid. A TV row routes to the real TV detail screen via [onTvClick]; a movie row goes through
- * [onMovieClick]. Empty states are per-tab since the two are independent lists now.
+ * grid. A TV row routes to the real TV detail screen via onTvClick; a movie row goes through
+ * onMovieClick. Empty states are per-tab since the two are independent lists now.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesScreen(
     onMovieClick: (Movie) -> Unit,
-    // Session 6 — TV favorites route to the real TV detail screen (the item's [MediaType] decides
+    // Session 6 — TV favorites route to the real TV detail screen (the item's MediaType decides
     // which callback a card fires).
     onTvClick: (Movie) -> Unit,
     // Fires when the user re-taps the already-selected Favorites tab — scrolls back to top

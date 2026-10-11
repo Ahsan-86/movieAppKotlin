@@ -84,34 +84,34 @@ import com.ahsan.movieapp.ui.components.rememberBackdropPalette
 /**
  * Phase 2.6's TV detail screen: a big full-width portrait poster hero (PersonHero-style,
  * 2026-09-22) with the title/tagline/rating/year/seasons·episode runtime/genres overlaid on its
- * bottom edge via the shared [DetailHeroCaption] — the backdrop is gone and the poster is the hero;
+ * bottom edge via the shared DetailHeroCaption — the backdrop is gone and the poster is the hero;
  * then the Overview section directly below it with the Watch Trailer + Share row (Session 2) at the
  * end of that section — repositioned on Ahsan's 2026-09-12 post-ship feedback (originally a
- * separate full-width row below, mirroring [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s
+ * separate full-width row below, mirroring com.ahsan.movieapp.ui.detail.MovieDetailScreen's
  * identical move); then Cast & Crew, a collapsible Seasons section (Session 2, collapsed by default
  * per the same feedback round), Information, Similar, and Recommendations sections (Session 1,
- * following the same layout pattern as [com.ahsan.movieapp.ui.detail.MovieDetailScreen] — the last
+ * following the same layout pattern as com.ahsan.movieapp.ui.detail.MovieDetailScreen — the last
  * three added on Ahsan's post-build feedback, "where is information and similar and recommendation
  * sections?", after the initial narrower build shipped). Session 6 added the favorite
- * FloatingActionButton (the same shape as [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s),
+ * FloatingActionButton (the same shape as com.ahsan.movieapp.ui.detail.MovieDetailScreen's),
  * now that the composite-key Favorites table holds TV ids. Still deliberately excludes what these
  * rounds don't cover: no collection-teaser/streaming-availability sections (movie-specific — TV
  * has no TMDB "collection" concept and no round has extended Round C's watch-providers work to
  * TV). The Cast & Crew heading
- * carries the same "view all" arrow as [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s, opening
+ * carries the same "view all" arrow as com.ahsan.movieapp.ui.detail.MovieDetailScreen's, opening
  * the media-agnostic cast & crew list for this show's full cast + director.
  *
  * Same full-screen pattern as every other detail-type screen (Movie/Person/Genre): its own
  * Scaffold + transparent TopAppBar over a short gradient scrim (the PersonScreen treatment — the
  * hero poster bleeds edge-to-edge behind the bar, contentWindowInsets zeroed), with a real back
  * button, gated out of `MovieNavGraph`'s
- * `TOP_LEVEL_ROUTES` set, no bottom nav. [onTvClick] lets Similar/Recommendations posters push
+ * `TOP_LEVEL_ROUTES` set, no bottom nav. onTvClick lets Similar/Recommendations posters push
  * another TV detail screen onto the back stack (TV -> Similar -> Similar chains the same way
- * Movie -> Similar -> Similar already does); [onSeasonClick] opens
- * [com.ahsan.movieapp.ui.tv.SeasonEpisodesScreen] for a tapped season; [onViewAllCastCrew] opens
- * the full cast & crew list for this show; [onWatchTrailer] opens
- * [com.ahsan.movieapp.ui.components.TrailerPlayerScreen] for the trailer key
- * [com.ahsan.movieapp.ui.components.TrailerShareRow] passes it.
+ * Movie -> Similar -> Similar already does); onSeasonClick opens
+ * com.ahsan.movieapp.ui.tv.SeasonEpisodesScreen for a tapped season; onViewAllCastCrew opens
+ * the full cast & crew list for this show; onWatchTrailer opens
+ * com.ahsan.movieapp.ui.components.TrailerPlayerScreen for the trailer key
+ * com.ahsan.movieapp.ui.components.TrailerShareRow passes it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 // contentWindowInsets is deliberately (0,0,0,0) below (see the comment on that param) and the
@@ -285,7 +285,7 @@ fun TvDetailScreen(
                         TvInformationSection(details)
 
                         // Seasons sits below Information (Ahsan, 2026-10-11), then "Where to watch" like the
-                        // Movie screen's order (Information -> [Collection] -> Where to watch -> More like this).
+                        // Movie screen's order (Information -> Collection -> Where to watch -> More like this).
                         if (details.seasons.isNotEmpty()) {
                             TvSeasonsSection(
                                 seasons = details.seasons,
@@ -315,8 +315,8 @@ fun TvDetailScreen(
 }
 
 /**
- * Same shape as [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s cast/crew section — a "view
- * all" arrow next to the heading opens [com.ahsan.movieapp.ui.detail.CastCrewListScreen] with the
+ * Same shape as com.ahsan.movieapp.ui.detail.MovieDetailScreen's cast/crew section — a "view
+ * all" arrow next to the heading opens com.ahsan.movieapp.ui.detail.CastCrewListScreen with the
  * full cast plus the director, mirroring the movie screen's navigation.
  */
 @Composable
@@ -357,22 +357,22 @@ private const val TV_CAST_ROW_LIMIT = 15
 /**
  * Phase 2.6 Session 2 — every season of the show, each with its poster image, name, air year,
  * episode count, and a short overview snippet. Tapping a season opens
- * [com.ahsan.movieapp.ui.tv.SeasonEpisodesScreen] for that season's full episode list. A plain
+ * com.ahsan.movieapp.ui.tv.SeasonEpisodesScreen for that season's full episode list. A plain
  * `Column` + `forEach`, not a `LazyColumn` — this section already lives inside
- * [TvDetailScreen]'s outer `.verticalScroll()` Column, and nesting a lazy list inside another
+ * TvDetailScreen's outer `.verticalScroll()` Column, and nesting a lazy list inside another
  * scrolling container is the project's standing lazy-inside-scrolling-parent pitfall. A show's
  * season count is always small (TMDB shows rarely exceed a few dozen), so this is safe.
  *
  * Collapsed by default (Ahsan's 2026-09-12 post-ship feedback), and the collapsed heading is
  * deliberately styled as the same rounded-card row as
- * [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s "Part of a collection" teaser (poster
+ * com.ahsan.movieapp.ui.detail.MovieDetailScreen's "Part of a collection" teaser (poster
  * thumbnail + small label/bold-value text pair on a `surfaceVariant` card) rather than a plain
  * section title — a second round of the same feedback, after an initial plain-heading version.
  * The whole card is the expand/collapse toggle (an `ExpandMore`/`ExpandLess` icon takes the
  * teaser's arrow-icon slot); the thumbnail is simply the first season's poster, since there's no
  * single "the" season image the way a collection has one poster. Tapping an individual season row
  * (once expanded) still opens its episode list exactly as before — the collapse/expand state is
- * purely about this section's own list, unrelated to [onSeasonClick].
+ * purely about this section's own list, unrelated to onSeasonClick.
  */
 @Composable
 private fun TvSeasonsSection(seasons: List<Season>, onSeasonClick: (Season) -> Unit) {
@@ -562,8 +562,8 @@ private fun TvInfoRow(label: String, value: String, onClick: (() -> Unit)? = nul
 
 /**
  * Layout for the "More Like This" shelf (Review-queue item 2 → option A) — same shape as
- * [com.ahsan.movieapp.ui.detail.MovieDetailScreen]'s `PosterRowSection`, reusing [MoviePosterCard]
- * (TV shows are modeled as [Movie] throughout this app — their id is a TV id, not a movie id): a
+ * com.ahsan.movieapp.ui.detail.MovieDetailScreen's `PosterRowSection`, reusing MoviePosterCard
+ * (TV shows are modeled as Movie throughout this app — their id is a TV id, not a movie id): a
  * uniform 144dp horizontal row. Option B (spotlight + queue) was tried here but Ahsan's intent was
  * the Person screen's filmography — this shelf stays in the standard row language. The shelf shows
  * Recommendations only (Similar dropped 2026-09-20: not relevant enough); title unchanged from

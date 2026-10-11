@@ -269,7 +269,7 @@ private fun PersonContent(
                             }
                         },
                         // Session 6 — both tabs favorite-able (composite-key Favorites table); each
-                        // row re-stamps its heart against the live keyed [favoriteIds] set above so
+                        // row re-stamps its heart against the live keyed favoriteIds set above so
                         // it flips immediately, keyed by (id, mediaType) so a movie and a
                         // same-numbered TV show never fight over one heart.
                         onToggleFavorite = { onToggleFavorite(displayMovie) }
@@ -290,7 +290,7 @@ private fun PersonContent(
  * This is a plain item inside the outer LazyColumn (see PersonContent) so it scrolls underneath
  * the pinned, transparent top bar as the user browses — the back button stays put, and this caption
  * is where the name lives at rest; the top bar's own title fades in only after the hero has scrolled
- * past (the scroll-aware bar in [PersonScreen]), so the two never show the name simultaneously.
+ * past (the scroll-aware bar in PersonScreen), so the two never show the name simultaneously.
  */
 @Composable
 private fun PersonHero(details: com.ahsan.movieapp.domain.model.PersonDetails) {
@@ -489,13 +489,13 @@ private fun PersonFilterRow(
 
 /**
  * One credit-filter chip in the filmography year-chip style (2026-09-20): same 10dp radius,
- * 12/6 padding and bold titleMedium text as [FilmographyYearHeader]. The selected bucket fills
+ * 12/6 padding and bold titleMedium text as FilmographyYearHeader. The selected bucket fills
  * with the person palette gradient (tone → darkened tone) and adapts its text color to the tone's
  * luminance, exactly like the year chips; unselected buckets carry a faint wash of the same
  * gradient (2026-09-26 — no more bare outline rectangles) plus a soft border and muted text.
  *
- * [wrapText] allows the label to break to a second line with the gradient growing to wrap it too
- * (the two-chip horizontal row); otherwise it stays on one line, ellipsized if needed. [fillWidth]
+ * wrapText allows the label to break to a second line with the gradient growing to wrap it too
+ * (the two-chip horizontal row); otherwise it stays on one line, ellipsized if needed. fillWidth
  * stretches the chip to the full row width with the text centered (2026-09-26 — the vertical stack
  * reads as a single-column list, each chip a full-width pill).
  */
@@ -553,11 +553,11 @@ private fun PersonCreditChip(
 /**
  * Section header for one release year in the year-grouped filmography (Session 5 → option 2,
  * chosen 2026-09-20): a rounded gradient chip sized to the year text only (Ahsan's styling picks
- * 2026-09-20 — no full-width band). The gradient runs from the person photo's palette [tone] into
+ * 2026-09-20 — no full-width band). The gradient runs from the person photo's palette tone into
  * a darkened version of it, so it harmonizes with the palette-tinted screen background instead of
- * clashing; [MaterialTheme.colorScheme]'s secondary → primary is the fallback when no tone was
+ * clashing; MaterialTheme.colorScheme's secondary → primary is the fallback when no tone was
  * sampled (loading/error). Text is dark on light tones and white on dark ones. The unknown-year
- * bucket (the "—" releaseYear placeholder from [Movie.releaseYear]) reads "Unknown year", not a
+ * bucket (the "—" releaseYear placeholder from Movie.releaseYear) reads "Unknown year", not a
  * bare dash.
  */
 @Composable

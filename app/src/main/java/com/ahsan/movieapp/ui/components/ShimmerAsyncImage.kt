@@ -21,7 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Phase 5 — [AsyncImage] that shimmers while a *network* download is in flight, and never otherwise.
+ * Phase 5 — AsyncImage that shimmers while a *network* download is in flight, and never otherwise.
  *
  * Before showing anything it asks Coil's caches whether this URL is already on the device: the memory
  * cache synchronously, then the disk cache off the main thread. Cached images appear on their own

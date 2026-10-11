@@ -19,8 +19,8 @@ import kotlinx.coroutines.flow.Flow
 /**
  * One row of a paginated category listing — the movie itself plus whether it's currently a
  * favorite, computed in SQL via a `LEFT JOIN` (rather than a separate combine() step, the way
- * [MovieDao.observeCategory]'s non-paged callers do it) so Room's own invalidation tracking
- * re-runs the [PagingSource] whenever `favorites` changes, not just when `category_movies` does.
+ * MovieDao.observeCategory's non-paged callers do it) so Room's own invalidation tracking
+ * re-runs the PagingSource whenever `favorites` changes, not just when `category_movies` does.
  */
 data class MovieCategoryRow(
     @Embedded val movie: MovieEntity,
@@ -64,9 +64,9 @@ interface MovieDao {
     suspend fun categoryFetchedAt(category: String): Long?
 
     /**
-     * Phase 4 (pagination) — the same category listing as [observeCategory], but as a
-     * [PagingSource] for [androidx.paging.Pager] rather than a plain [Flow], and with favorite
-     * status computed inline (see [MovieCategoryRow]) so the list badge stays live without a
+     * Phase 4 (pagination) — the same category listing as observeCategory, but as a
+     * PagingSource for androidx.paging.Pager rather than a plain Flow, and with favorite
+     * status computed inline (see MovieCategoryRow) so the list badge stays live without a
      * separate `combine()`.
      */
     @Query(
@@ -85,7 +85,7 @@ interface MovieDao {
     suspend fun maxCategoryPosition(category: String): Int?
 
     /** Appends a freshly-fetched page to an existing category listing (Phase 4 "load more"),
-     * rather than [replaceCategory]'s clear-and-replace, which only makes sense for a REFRESH. */
+     * rather than replaceCategory's clear-and-replace, which only makes sense for a REFRESH. */
     @Transaction
     suspend fun appendCategory(category: String, movies: List<MovieEntity>, startPosition: Int, fetchedAt: Long) {
         upsertMovies(movies)
@@ -108,7 +108,7 @@ interface MovieDao {
 
     /**
      * The same listing as the category pager, but for one Discover combo — favorite status computed
-     * inline via the same `LEFT JOIN favorites` (see [MovieCategoryRow]) so hearts stay live.
+     * inline via the same `LEFT JOIN favorites` (see MovieCategoryRow) so hearts stay live.
      */
     @Query(
         """
@@ -164,7 +164,7 @@ interface MovieDao {
     @Query("SELECT totalResults FROM discover_combo_remote_keys WHERE comboKey = :comboKey")
     fun observeDiscoverTotal(comboKey: String): Flow<Int?>
 
-    /** LRU bound for the cached combos — deletes every combo beyond the [keepCount] most recently
+    /** LRU bound for the cached combos — deletes every combo beyond the keepCount most recently
      *  fetched (by remote-keys `fetchedAt`). Call inside the same transaction that wrote a combo. */
     @Query(
         """
@@ -222,7 +222,7 @@ interface MovieDao {
     fun observeIsFavoriteMovie(movieId: Int): Flow<MovieEntity?>
 
     /**
-     * Offline fallback for search: a capped match against whatever's already cached. [limit]
+     * Offline fallback for search: a capped match against whatever's already cached. limit
      * exists specifically so one query can never return an unbounded row count regardless of how
      * many movies happen to be cached — this is what caused the Phase 2 slowdown last time,
      * combined with a non-lazy results grid (now fixed on the UI side).

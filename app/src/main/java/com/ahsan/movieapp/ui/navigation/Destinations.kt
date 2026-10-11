@@ -23,7 +23,7 @@ sealed class Destination(val route: String) {
     }
 
     /**
-     * Phase 2.6 Session 1 — the TV detail screen. Its own route (not reusing [MovieDetail]) since
+     * Phase 2.6 Session 1 — the TV detail screen. Its own route (not reusing MovieDetail) since
      * TMDB TV ids and movie ids are separate namespaces sharing the same numeric range — a
      * `tv/{tvId}` route makes that explicit rather than relying on callers to route correctly by
      * convention.
@@ -43,10 +43,10 @@ sealed class Destination(val route: String) {
     }
 
     /**
-     * The same "view all" cast + director screen as [CastCrewList], but for TV shows — reached
+     * The same "view all" cast + director screen as CastCrewList, but for TV shows — reached
      * from TvDetailScreen's cast/crew heading (mirrors MovieDetailScreen's navigation). Its own
      * route since it carries a `tvId` (TMDB TV ids share the movie numeric range), with the
-     * media-agnostic [com.ahsan.movieapp.ui.detail.CastCrewListScreen] reused for both.
+     * media-agnostic com.ahsan.movieapp.ui.detail.CastCrewListScreen reused for both.
      */
     data object TvCastCrewList : Destination("tv/{tvId}/cast-crew") {
         fun createRoute(tvId: Int) = "tv/$tvId/cast-crew"
@@ -71,7 +71,7 @@ sealed class Destination(val route: String) {
     /**
      * Phase 3 Round B's collection teaser destination — every movie in a franchise, opened from
      * the Detail screen's compact "part of a collection" row. The name travels as a nav arg (same
-     * URL-encoded convention as [PersonFilmography]/[GenreBrowse]) so the top bar has a title to
+     * URL-encoded convention as PersonFilmography/GenreBrowse) so the top bar has a title to
      * show immediately, before the full collection fetch completes.
      */
     data object CollectionDetail : Destination("collection/{collectionId}/{collectionName}") {
@@ -82,7 +82,7 @@ sealed class Destination(val route: String) {
     /**
      * Phase 2.6 Session 2 — a single season's full episode list, opened from the TV detail
      * screen's Seasons section. seasonName travels as a nav arg (same URL-encoded convention as
-     * [PersonFilmography]/[CollectionDetail]) so the top bar has a title to show immediately,
+     * PersonFilmography/CollectionDetail) so the top bar has a title to show immediately,
      * before the season-details fetch completes.
      */
     data object SeasonEpisodes : Destination("tv/{tvId}/season/{seasonNumber}/{seasonName}") {
@@ -92,8 +92,8 @@ sealed class Destination(val route: String) {
 
     /**
      * Phase 2.6 Session 2 post-ship — the trailer's own full-screen destination, replacing the
-     * earlier Dialog-based player (see [com.ahsan.movieapp.ui.components.TrailerPlayerScreen]'s doc
-     * for why a real nav destination replaced a floating [androidx.compose.ui.window.Dialog]). The
+     * earlier Dialog-based player (see com.ahsan.movieapp.ui.components.TrailerPlayerScreen's doc
+     * for why a real nav destination replaced a floating androidx.compose.ui.window.Dialog). The
      * YouTube video id travels as a plain path segment (not URL-encoded like the name-bearing
      * routes above) since YouTube ids are always URL-safe (alphanumeric, `-`, `_`).
      */

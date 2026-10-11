@@ -47,19 +47,19 @@ data class MovieDetailUiState(
     val errorMessage: String? = null
 )
 
-/** Cast/director slice fetched separately from [MovieDetails] — see [MovieDetailViewModel.uiState]. */
+/** Cast/director slice fetched separately from MovieDetails — see MovieDetailViewModel.uiState. */
 private data class CreditsState(
     val cast: List<CastMember> = emptyList(),
     val director: Person? = null
 )
 
 /**
- * Streaming-availability slice fetched separately from [MovieDetails] (Phase 3 Round C) — same
- * failure-tolerant, separately-fetched pattern as [CreditsState]. [selectedRegion] is the Detail
+ * Streaming-availability slice fetched separately from MovieDetails (Phase 3 Round C) — same
+ * failure-tolerant, separately-fetched pattern as CreditsState. selectedRegion is the Detail
  * screen's own local, non-persistent region picker (Ahsan's confirmed Round C scope): it starts at
- * [defaultRegionCode] every time this ViewModel is created (i.e. every time the Detail screen is
+ * defaultRegionCode every time this ViewModel is created (i.e. every time the Detail screen is
  * opened for a movie) and is never saved, so it never carries over between movies or app sessions.
- * A single `/watch/providers` fetch covers every region, so changing [selectedRegion] is pure
+ * A single `/watch/providers` fetch covers every region, so changing selectedRegion is pure
  * client-side lookup — never a re-fetch.
  */
 private data class WatchState(

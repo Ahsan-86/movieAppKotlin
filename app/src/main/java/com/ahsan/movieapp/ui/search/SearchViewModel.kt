@@ -38,8 +38,8 @@ import javax.inject.Inject
 data class SearchUiState(
     val query: String = "",
     // Session 6 — `query` is only the live field text (every keystroke updates it);
-    // `committedQuery` is the last query actually run against TMDB (written by [onSearchSubmit] /
-    // [onRecentSearchClick]). The screen's results branch keys off THIS, not the raw text — so
+    // `committedQuery` is the last query actually run against TMDB (written by onSearchSubmit /
+    // onRecentSearchClick). The screen's results branch keys off THIS, not the raw text — so
     // typing alone never slides the UI into the results/loading layout. That was the source of
     // the full-screen loader appearing while typing on the first ever search: a first keystroke
     // made `query` non-blank, the screen entered the results branch, and the still-unloaded
@@ -51,9 +51,9 @@ data class SearchUiState(
     // row, which stays a small one-shot fetch per query (never paginated, see the class doc).
     val people: List<Person> = emptyList(),
     val isSearchingPeople: Boolean = false,
-    // The "TV Shows" result row — a capped one-shot [Movie] list per submitted query (see
+    // The "TV Shows" result row — a capped one-shot Movie list per submitted query (see
     // MovieRepository.searchTvShows), grouped separately from the movie grid the same way
-    // [people] is. TV rows ARE favoritable since Session 6 (the composite-key Favorites table),
+    // people is. TV rows ARE favoritable since Session 6 (the composite-key Favorites table),
     // so like the movie grid they render a heart and re-stamp against the live favorites set.
     val tvShows: List<Movie> = emptyList(),
     val isSearchingTv: Boolean = false,
@@ -68,7 +68,7 @@ data class SearchUiState(
     val isFilterApplied: Boolean = false,
     // The first-screen filter results' "TV Shows" row (capped first page of /discover/tv for the same
     // filters) and TMDB's total for it — the movie side is the paged flow, this is the one-shot half,
-    // like [tvShows] is for text search.
+    // like tvShows is for text search.
     val filterTvShows: List<Movie> = emptyList(),
     val filterTvTotal: Int? = null,
     val isLoadingFilterTv: Boolean = false,
@@ -83,35 +83,35 @@ data class SearchUiState(
 /**
  * Phase 2 redo, extended, now Phase 4 Round 4 (pagination): the movie grid — both text-search
  * results and the filter panel's Discover results — is Paging 3 infinite scroll, backed by
- * [MovieRepository.getPagedSearchMovies]/[MovieRepository.getPagedDiscoverMovies]. Arbitrary search
- * text still has no Room cache table, so only [MovieRepository.getPagedSearchMovies] resolves favorite
+ * MovieRepository.getPagedSearchMovies/MovieRepository.getPagedDiscoverMovies. Arbitrary search
+ * text still has no Room cache table, so only MovieRepository.getPagedSearchMovies resolves favorite
  * status via a per-load snapshot inside its `PagingSource` (`SearchMoviesPagingSource`).
  *
- * Session 7 — the filter panel's Discover results are different now: [MovieRepository.getPagedDiscoverMovies]
+ * Session 7 — the filter panel's Discover results are different now: MovieRepository.getPagedDiscoverMovies
  * is Room-cached per applied filter combination (`comboKey`), so favorites on that grid are computed
  * by the same live `LEFT JOIN favorites` as the Trending/Genre carousels — hearts flip without any
  * overlay. The stamped-snapshot trade-off and the combine-vs-`cachedIn` crash it caused only apply
- * to [pagedSearchMovies]'s text results now: `combine()` re-invokes `.map{}` on the same underlying
+ * to pagedSearchMovies's text results now: `combine()` re-invokes `.map{}` on the same underlying
  * `PagingData` every time the side flow emits, so two overlapping generations ended up trying to
  * collect the same page-event flow at once (`IllegalStateException: Attempt to collect twice from
  * pageEventFlow`). Do NOT reintroduce a `combine()` (or `zip()`) of a live side flow against a
  * `Flow<PagingData<*>>` before `cachedIn()` — see `SearchMoviesPagingSource`'s class doc for the
  * fix that replaced it. The remaining visible trade-off — toggling a favorite from the text-search
- * grid didn't flip the heart icon live — is closed with a render-time overlay ([favoriteIds]): each
+ * grid didn't flip the heart icon live — is closed with a render-time overlay (favoriteIds): each
  * grid item re-stamps its `isFavorite` against the live favorites set as it's composed, so hearts
  * flip immediately even though the underlying page was stamped from a snapshot.
  *
- * The people row stays a small one-shot fetch per submitted query (see [SearchUiState.people]) —
+ * The people row stays a small one-shot fetch per submitted query (see SearchUiState.people) —
  * only the first handful of people a query returns are ever shown, so there's nothing to paginate
  * there, same reasoning that keeps Cast & Crew and Similar/Recommendations out of Phase 4 entirely.
- * The TV Shows row follows the exact same pattern (see [SearchUiState.tvShows] and
- * [MovieRepository.searchTvShows]): capped, non-paginated, network-only, grouped separately from
+ * The TV Shows row follows the exact same pattern (see SearchUiState.tvShows and
+ * MovieRepository.searchTvShows): capped, non-paginated, network-only, grouped separately from
  * the movie grid. The first-open state still shows genre chips (tapping one navigates to a
  * dedicated full-screen genre browser) instead of a blank prompt. The results layout
  * (list/grid/4-up grid) is a persisted preference, not local state.
  *
- * Session 6 — search is now explicit-submit: typing only edits the field text ([onQueryInput]),
- * and the query actually executes only when the user commits it ([onSearchSubmit] — the IME
+ * Session 6 — search is now explicit-submit: typing only edits the field text (onQueryInput),
+ * and the query actually executes only when the user commits it (onSearchSubmit — the IME
  * search key or the trailing button). No more live search as you type; recent-search chips.
  */
 @HiltViewModel
@@ -139,7 +139,7 @@ class SearchViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    // Same count pattern for text-search results ([SearchMoviesPagingSource] writes its total
+    // Same count pattern for text-search results (SearchMoviesPagingSource writes its total
     // here); the screen shows the line above the results grid. Reset to null whenever the query
     // changes so a stale count never lingers until the next page 1 arrives.
     private val searchTotal = MutableStateFlow<Int?>(null)
@@ -181,7 +181,7 @@ class SearchViewModel @Inject constructor(
         .cachedIn(viewModelScope)
 
     init {
-        // Session 6 — the query executes only on [onSearchSubmit]/[onRecentSearchClick]; both write
+        // Session 6 — the query executes only on onSearchSubmit/onRecentSearchClick; both write
         // queryFlow, and this block fans the committed query out to the people + TV one-shot rows.
         queryFlow
             .onEach { query ->
@@ -206,9 +206,9 @@ class SearchViewModel @Inject constructor(
     }
 
     /** Session 6 — every keystroke just updates the field text for display. It does NOT execute the
-     *  search: that happens once on [onSearchSubmit] (IME search action or the trailing button).
+     *  search: that happens once on onSearchSubmit (IME search action or the trailing button).
      *  Clearing the field also clears the committed query, returning the screen to the blank home
-     *  content (see [SearchUiState.committedQuery] for why the two are separate). */
+     *  content (see SearchUiState.committedQuery for why the two are separate). */
     fun onQueryInput(query: String) {
         _uiState.update {
             it.copy(query = query, committedQuery = if (query.isBlank()) "" else it.committedQuery)
@@ -223,7 +223,7 @@ class SearchViewModel @Inject constructor(
 
     /** The user explicitly committed a search (IME search action / trailing button). The ONLY place
      *  a typed query turns into results — never runs while typing (Session 6). Also records the
-     *  trimmed query to history; [onRecentSearchClick] is the other writer of queryFlow. */
+     *  trimmed query to history; onRecentSearchClick is the other writer of queryFlow. */
     fun onSearchSubmit() {
         val query = _uiState.value.query.trim()
         if (query.isBlank()) return
@@ -238,7 +238,7 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch { repository.recordSearch(query) }
     }
 
-    /** Publishes [query] to the pager. The "N results found" total is only reset when the query
+    /** Publishes query to the pager. The "N results found" total is only reset when the query
      *  actually changes: queryFlow is a StateFlow, so re-submitting the same text doesn't re-run the
      *  pager, and clearing the total then would leave the count line blank until the next new query. */
     private fun commitQuery(query: String) {
@@ -280,9 +280,9 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setSearchViewMode(mode) }
     }
 
-    /** Only the text-search grid ([pagedSearchMovies]) stamps `isFavorite` from a one-time snapshot
+    /** Only the text-search grid (pagedSearchMovies) stamps `isFavorite` from a one-time snapshot
      *  inside its `PagingSource` — so its heart icon reflects a change the next time the query
-     *  re-runs, not instantly (re-stamped visually by [favoriteIds] at render time). The filter
+     *  re-runs, not instantly (re-stamped visually by favoriteIds at render time). The filter
      *  panel's Discover grid is Room-backed with a live favorites join (Session 7), so its hearts
      *  follow toggles immediately. */
     fun toggleFavorite(movie: Movie) {
@@ -450,7 +450,7 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    /** Same pattern as [loadPeople] for the "TV Shows" row — capped one-shot, silent failure, no
+    /** Same pattern as loadPeople for the "TV Shows" row — capped one-shot, silent failure, no
      *  Room involvement (TV data isn't persisted in this app). */
     private fun loadTvShows(query: String) {
         tvJob?.cancel()

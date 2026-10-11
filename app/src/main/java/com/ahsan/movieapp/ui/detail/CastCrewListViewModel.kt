@@ -26,11 +26,11 @@ data class CastCrewUiState(
 /**
  * Backs Phase 3 Round A's "view all" screen — the full cast list plus the director, reached from
  * MovieDetailScreen's (and now TvDetailScreen's) cast/crew section heading arrow. Re-fetches
- * [MovieRepository.getMovieCredits]/[MovieRepository.getTvCredits] by the route's media id rather
+ * MovieRepository.getMovieCredits/MovieRepository.getTvCredits by the route's media id rather
  * than sharing the detail ViewModel's state, same as every other full-screen destination in this
  * app (Person, Genre) re-fetches its own data by id. The movie and TV routes each pass exactly one
  * id, in their own key (`movieId` or `tvId`), so this VM picks whichever is present — the
- * [com.ahsan.movieapp.ui.detail.CastCrewListScreen] itself is media-agnostic.
+ * com.ahsan.movieapp.ui.detail.CastCrewListScreen itself is media-agnostic.
  */
 @HiltViewModel
 class CastCrewListViewModel @Inject constructor(

@@ -89,7 +89,7 @@ data class PersonUiState(
  * Backs the redesigned person screen: bio/photo header, then a single row of credit-bucket
  * chips in the filmography year-chip style (Review-queue item 4 → option A) — "Acting - Movies",
  * "Directed - Movies", etc., one per present (Acting/Directed) × (Movies/TV) combination, so
- * switching media type OR role is one tap. Filtering is pure client-side — [PersonCredits] is
+ * switching media type OR role is one tap. Filtering is pure client-side — PersonCredits is
  * fetched once via TMDB's combined_credits and already split into all four buckets, so switching
  * never re-hits the network.
  */
@@ -163,7 +163,7 @@ class PersonViewModel @Inject constructor(
             repository.toggleFavorite(movie)
             // One-shot optimistic flip for the *movie* buckets — id-only match is safe there
             // because every row in those lists is a movie (mediaType MOVIE); the live keyed
-            // [favoriteIds] re-stamp in PersonScreen keeps the TV rows (and any edge case) in sync.
+            // favoriteIds re-stamp in PersonScreen keeps the TV rows (and any edge case) in sync.
             _uiState.update { state ->
                 val credits = state.credits ?: return@update state
                 fun flip(list: List<Movie>) = list.map { if (it.id == movie.id) it.copy(isFavorite = !it.isFavorite) else it }

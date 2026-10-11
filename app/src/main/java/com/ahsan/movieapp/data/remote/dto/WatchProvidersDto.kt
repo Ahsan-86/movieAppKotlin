@@ -5,7 +5,7 @@ import com.google.gson.annotations.SerializedName
 /**
  * `/movie/{id}/watch/providers` response — streaming availability for the Detail screen's
  * streaming-availability section (Phase 3 Round C), powered by JustWatch. TMDB returns every
- * region in ONE call, keyed by ISO 3166-1 country code (e.g. "US", "GB") under [results] — no
+ * region in ONE call, keyed by ISO 3166-1 country code (e.g. "US", "GB") under results — no
  * per-region fetch needed; the Detail screen's region dropdown filters this one response
  * client-side rather than re-fetching per region.
  */

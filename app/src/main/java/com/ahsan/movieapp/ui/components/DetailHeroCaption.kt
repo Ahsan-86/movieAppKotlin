@@ -30,17 +30,17 @@ import androidx.compose.ui.unit.dp
  * hero is now a big portrait poster (PersonHero-style) with the details sunk into its bottom edge
  * behind the same stacked scrims PersonHero uses (radial vignette around the edges + a taller
  * bottom gradient behind the caption text). The 2:3 poster *is* the hero image the caller passes
- * in, and the Overview then sits directly below it. [metaLabels] plugs in the media-specific labels
+ * in, and the Overview then sits directly below it. metaLabels plugs in the media-specific labels
  * (movie runtime vs TV seasons + episode runtime) while everything else stays shared between
- * [com.ahsan.movieapp.ui.detail.MovieDetailScreen] and
- * [com.ahsan.movieapp.ui.tv.TvDetailScreen].
+ * com.ahsan.movieapp.ui.detail.MovieDetailScreen and
+ * com.ahsan.movieapp.ui.tv.TvDetailScreen.
  *
- * [showMetaDiamond] inserts small rotated-square diamonds (the B3 accent from the Person credit
- * filters, confirmed by Ahsan 2026-09-26) between the rating and each following [metaLabels] item
+ * showMetaDiamond inserts small rotated-square diamonds (the B3 accent from the Person credit
+ * filters, confirmed by Ahsan 2026-09-26) between the rating and each following metaLabels item
  * — **Explored/used everywhere now, including the Movie/TV detail heroes**, so rating ◆ year ◆
- * runtime reads as one dotted meta line. When it's on, [genres] are rendered on a second line
+ * runtime reads as one dotted meta line. When it's on, genres are rendered on a second line
  * joined by the same diamonds instead of " • " dots.
- * [compactMeta] shrinks the headline title and rating/meta text (the hero carousel's card,
+ * compactMeta shrinks the headline title and rating/meta text (the hero carousel's card,
  * 2026-09-26 — titleLarge title, labelSmall rating/year once the genres line joined them);
  * detail heroes pass false and keep the larger labels.
  */

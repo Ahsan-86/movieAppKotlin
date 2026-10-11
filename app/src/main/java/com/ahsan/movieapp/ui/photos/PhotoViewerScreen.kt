@@ -138,7 +138,7 @@ fun PhotoViewerScreen(
 /**
  * One zoomable photo page. scale runs 1-MAX_SCALE; offset is the pan in pixels, clamped so the
  * zoomed image can never be dragged past its own edges. Pinch zooms about the gesture, double-tap
- * toggles between fit and [DOUBLE_TAP_SCALE] centred on the tapped point.
+ * toggles between fit and DOUBLE_TAP_SCALE centred on the tapped point.
  */
 @Composable
 private fun ZoomablePhoto(

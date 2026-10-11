@@ -40,10 +40,10 @@ import com.ahsan.movieapp.ui.components.ShimmerLine
 
 /**
  * Phase 2.6 Session 2 — one season's full episode list (image + description per episode), opened
- * by tapping a season on [TvDetailScreen]'s Seasons section. Purely informational: episode rows
- * aren't clickable — see [SeasonEpisodesViewModel]'s doc for why. Same full-screen
+ * by tapping a season on TvDetailScreen's Seasons section. Purely informational: episode rows
+ * aren't clickable — see SeasonEpisodesViewModel's doc for why. Same full-screen
  * Scaffold+dynamic-TopAppBar pattern as every other detail-type screen in this app. Its
- * [LazyColumn] is this screen's ONLY scrolling container (unlike TvDetailScreen's outer
+ * LazyColumn is this screen's ONLY scrolling container (unlike TvDetailScreen's outer
  * `.verticalScroll()` Column) — per the project's lazy-inside-scrolling-parent rule, a episode
  * list belongs in a real `LazyColumn`, not nested inside another scrollable Column.
  */

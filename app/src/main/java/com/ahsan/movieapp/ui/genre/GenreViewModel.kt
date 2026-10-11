@@ -44,25 +44,25 @@ data class GenreUiState(
 /**
  * Backs the full-screen genre browse view opened by tapping a genre chip on the search screen.
  * Both tabs are Paging 3 infinite-scroll as of Phase 4 Round 3: Movies goes through
- * [MovieRepository.getPagedGenre] (Room + [androidx.paging.RemoteMediator], Round 2); TV goes
- * through [MovieRepository.getPagedGenreTv] (a plain network-only
- * [androidx.paging.PagingSource], Round 3 — a genre+filter TV search has no cache table of its
+ * MovieRepository.getPagedGenre (Room + androidx.paging.RemoteMediator, Round 2); TV goes
+ * through MovieRepository.getPagedGenreTv (a plain network-only
+ * androidx.paging.PagingSource, Round 3 — a genre+filter TV search has no cache table of its
  * own, so there's no Room table for a `RemoteMediator` to page into; only the curated TV carousels
- * are cached, see [MovieRepository.getCategoryTv]). Paging 3's own loadState carries all
- * loading/error/empty state for both tabs now, so [GenreUiState] only tracks which tab is
+ * are cached, see MovieRepository.getCategoryTv). Paging 3's own loadState carries all
+ * loading/error/empty state for both tabs now, so GenreUiState only tracks which tab is
  * selected and which tabs this chip actually has.
  *
  * The filter section (year/language/minimum rating — the genre itself is fixed by this screen)
  * borrows the search screen's Phase 2.5 panel + summary-bar pattern, 2026-09-21. Each paged flow
  * `flatMapLatest`s over an applied-filters flow: no filters → Movies keeps its offline-first Room
- * browse; filters applied → Movies pages via [MovieRepository.getPagedDiscoverMovies]
+ * browse; filters applied → Movies pages via MovieRepository.getPagedDiscoverMovies
  * (the fixed genre is folded into the filters as `genreId`), TV pages via
- * [MovieRepository.getPagedGenreTv]'s filter param. Since Session 7 the filtered Movies path has
- * its OWN Room cache (per `{genreId, filters} combos`, see [MovieRepository.observeDiscoverResultTotal]):
- * [MovieRepository.getPagedDiscoverMovies] pages through `DiscoverRemoteMediator` into
+ * MovieRepository.getPagedGenreTv's filter param. Since Session 7 the filtered Movies path has
+ * its OWN Room cache (per `{genreId, filters} combos`, see MovieRepository.observeDiscoverResultTotal):
+ * MovieRepository.getPagedDiscoverMovies pages through `DiscoverRemoteMediator` into
  * `discover_combo_movies`, so hearts come from the live `LEFT JOIN favorites` — flips land
  * immediately, same as the unfiltered browse. The TV tab stays a plain TvGenrePagingSource
- * (network-only, no table to page into) and re-stamps hearts against [favoriteIds] at render time.
+ * (network-only, no table to page into) and re-stamps hearts against favoriteIds at render time.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -83,7 +83,7 @@ class GenreViewModel @Inject constructor(
     // Room cache keyed by `{genreId, filters}` (so it survives offline and needs no per-page flow
     // plumbing); null until that combo has been fetched at least once (and always null while no
     // filters are applied, since the screen only shows the count while isFilterApplied). The TV
-    // total below is still a MutableStateFlow ([TvGenrePagingSource] writes page-1 totals into it).
+    // total below is still a MutableStateFlow (TvGenrePagingSource writes page-1 totals into it).
     val movieFilteredTotal: StateFlow<Int?> =
         movieGenreId?.let { id ->
             appliedFiltersFlow
@@ -93,7 +93,7 @@ class GenreViewModel @Inject constructor(
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
         } ?: MutableStateFlow(null)
 
-    // Same count pattern for the TV tab ([TvGenrePagingSource] writes its total here). Reset to
+    // Same count pattern for the TV tab (TvGenrePagingSource writes its total here). Reset to
     // null whenever the filter set changes so a stale count never lingers until the next page 1.
     private val tvTotal = MutableStateFlow<Int?>(null)
     val tvFilteredTotal: StateFlow<Int?> = tvTotal.asStateFlow()
@@ -147,7 +147,7 @@ class GenreViewModel @Inject constructor(
         // No optimistic state update needed: the unfiltered Movies tab reads through Room, and the
         // filtered Movies path is itself Room-cached via a `LEFT JOIN favorites` since Session 7 —
         // either way a toggle re-invalidates the PagingSource query and Paging 3 diffs in just the
-        // changed row. The TV tab (Session 6) re-stamps against the live [favoriteIds] set at
+        // changed row. The TV tab (Session 6) re-stamps against the live favoriteIds set at
         // render time instead, so those hearts flip immediately too.
         viewModelScope.launch { repository.toggleFavorite(movie) }
     }

@@ -29,7 +29,7 @@ import com.ahsan.movieapp.R
 import com.ahsan.movieapp.domain.model.Photo
 
 /**
- * What a detail screen's Photos row is showing. [None] covers both "TMDB has no photos" and "the
+ * What a detail screen's Photos row is showing. None covers both "TMDB has no photos" and "the
  * fetch failed" — like cast and trailer, the gallery is supplementary, so a failure just means the
  * row doesn't render rather than blocking or erroring the screen.
  */
@@ -41,9 +41,9 @@ sealed interface PhotosState {
 
 /**
  * Phase 5's IMDb-style Photos row for the Movie and TV detail screens: a heading with a "see all"
- * arrow (same pattern as Cast & Crew), then a horizontal strip of the first [ROW_LIMIT] stills.
- * Tapping a still opens the fullscreen viewer at that photo ([onPhotoClick] gets its index); the arrow
- * opens the full grid ([onSeeAll]). While the separate, lazy fetch is in flight the row holds its
+ * arrow (same pattern as Cast & Crew), then a horizontal strip of the first ROW_LIMIT stills.
+ * Tapping a still opens the fullscreen viewer at that photo (onPhotoClick gets its index); the arrow
+ * opens the full grid (onSeeAll). While the separate, lazy fetch is in flight the row holds its
  * place with shimmer thumbnails, so the main detail content is never delayed by it.
  */
 @Composable

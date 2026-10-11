@@ -36,8 +36,8 @@ object NetworkModule {
     }
 
     /**
-     * Transparently retries a request up to [maxRetries] times (with a short linear backoff)
-     * when the call fails with an [IOException] — a dropped packet, a DNS blip, a connection
+     * Transparently retries a request up to maxRetries times (with a short linear backoff)
+     * when the call fails with an IOException — a dropped packet, a DNS blip, a connection
      * reset on flaky mobile data. Every TMDB call this app makes is a GET, so retrying is always
      * safe (nothing here has a side effect that could double-fire). Runs on the OkHttp dispatcher
      * thread, not the main thread, so the short sleep between attempts never touches the UI.

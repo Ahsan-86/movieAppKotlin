@@ -27,7 +27,7 @@ data class CollectionUiState(
 /**
  * Backs Phase 3 Round B's collection teaser destination — the full list of movies in a franchise,
  * reached from the Detail screen's "part of a collection" row. Re-fetches
- * [MovieRepository.getCollectionDetails] by collectionId rather than sharing
+ * MovieRepository.getCollectionDetails by collectionId rather than sharing
  * MovieDetailViewModel's state, same as every other full-screen destination in this app (Person,
  * Genre, CastCrewList) re-fetches its own data by id.
  */

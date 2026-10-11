@@ -37,7 +37,7 @@ data class HomeSection(
 )
 
 data class HomeUiState(
-    // Top-of-screen hero banner — the first [HERO_MOVIE_COUNT] movies from the "Popular" section,
+    // Top-of-screen hero banner — the first HERO_MOVIE_COUNT movies from the "Popular" section,
     // reusing that section's already-fetched data rather than a second network call.
     val heroMovies: List<Movie> = emptyList(),
     val genreChips: List<GenreChip> = emptyList(),
@@ -45,9 +45,9 @@ data class HomeUiState(
     val isOffline: Boolean = false
 )
 
-/** One row in [HomeViewModel.sectionSources] — where a carousel's movies come from. [genreMovieId]
- *  and [genreTvId] back the curated genre rows (TMDB `/discover`), mutually exclusive with [category]/
- *  [categoryTv] and with each other. */
+/** One row in HomeViewModel.sectionSources — where a carousel's movies come from. genreMovieId
+ *  and genreTvId back the curated genre rows (TMDB `/discover`), mutually exclusive with category/
+ *  categoryTv and with each other. */
 private data class HomeSectionSource(
     val labelRes: Int,
     val category: MovieCategory? = null,

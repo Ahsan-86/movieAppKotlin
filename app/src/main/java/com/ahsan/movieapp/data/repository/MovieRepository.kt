@@ -28,30 +28,30 @@ interface MovieRepository {
     fun getCategory(category: MovieCategory): Flow<Resource<List<Movie>>>
 
     /**
-     * Phase 4 (pagination) — the same category, but as an infinite-scroll [PagingData] stream
-     * backed by Room + a [androidx.paging.RemoteMediator] instead of [getCategory]'s single
-     * cached snapshot. Currently only wired up for [MovieCategory.TRENDING_TODAY] (Round 1);
-     * every other category still uses [getCategory]'s single-page behavior until its own round.
-     * See [MovieRepositoryImpl.getPagedCategory].
+     * Phase 4 (pagination) — the same category, but as an infinite-scroll PagingData stream
+     * backed by Room + a androidx.paging.RemoteMediator instead of getCategory's single
+     * cached snapshot. Currently only wired up for MovieCategory.TRENDING_TODAY (Round 1);
+     * every other category still uses getCategory's single-page behavior until its own round.
+     * See MovieRepositoryImpl.getPagedCategory.
      */
     fun getPagedCategory(category: MovieCategory): Flow<PagingData<Movie>>
 
     /**
-     * Phase 4 (pagination) Round 2 — [browseGenre]'s infinite-scroll counterpart, backing the
-     * genre screen's Movies tab. Same [androidx.paging.RemoteMediator]-over-Room mechanism as
-     * [getPagedCategory], just keyed by `"genre_$genreId"` instead of a fixed [MovieCategory].
-     * The TV tab's counterpart is [getPagedGenreTv], which pages differently — network-only, since
+     * Phase 4 (pagination) Round 2 — browseGenre's infinite-scroll counterpart, backing the
+     * genre screen's Movies tab. Same androidx.paging.RemoteMediator-over-Room mechanism as
+     * getPagedCategory, just keyed by `"genre_$genreId"` instead of a fixed MovieCategory.
+     * The TV tab's counterpart is getPagedGenreTv, which pages differently — network-only, since
      * a genre+filter TV search has no cache table of its own (only the curated TV carousels do).
      */
     fun getPagedGenre(genreId: Int): Flow<PagingData<Movie>>
 
 /**
      * Phase 4 (pagination) Round 3 — the genre screen's TV tab. No Room table keyed by genre+filter
-     * for TV (same convention as [getPagedGenre]'s filter-only caveats on the movie side), so
-     * unlike [getPagedGenre] this `Pager` has no [androidx.paging.RemoteMediator]: just
-     * [com.ahsan.movieapp.data.paging.TvGenrePagingSource] reading TMDB pages directly, one TMDB
+     * for TV (same convention as getPagedGenre's filter-only caveats on the movie side), so
+     * unlike getPagedGenre this `Pager` has no androidx.paging.RemoteMediator: just
+     * com.ahsan.movieapp.data.paging.TvGenrePagingSource reading TMDB pages directly, one TMDB
      * page per Paging 3 page. The genre screen's filtered state passes filters through to that
-     * source (see its class doc); [totalResults] is forwarded so the screen can display a
+     * source (see its class doc); totalResults is forwarded so the screen can display a
      * filtered-results count.
      */
     fun getPagedGenreTv(
@@ -69,8 +69,8 @@ interface MovieRepository {
 
     /**
      * Cast + director for the Detail screen's cast/crew section (Phase 3 Round A) and its "view
-     * all" screen — one-shot, network-only (no Room cache; same convention as [getTvDetails]
-     * and [getCollectionDetails] for data that has no offline table of its own). Cast +
+     * all" screen — one-shot, network-only (no Room cache; same convention as getTvDetails
+     * and getCollectionDetails for data that has no offline table of its own). Cast +
      * director only, no other crew roles, per the round's confirmed scope.
      */
     suspend fun getMovieCredits(movieId: Int): Result<MovieCredits>
@@ -78,16 +78,16 @@ interface MovieRepository {
     fun getSimilarMovies(movieId: Int): Flow<Resource<List<Movie>>>
 
     /**
-     * TMDB's own "Recommendations" algorithm — a separate endpoint/model from [getSimilarMovies],
+     * TMDB's own "Recommendations" algorithm — a separate endpoint/model from getSimilarMovies,
      * deliberately not deduped against it. Offline-first via the same cachedCategoryFlow-style
-     * caching as everything else in [getCategory]'s family, keyed per movieId.
+     * caching as everything else in getCategory's family, keyed per movieId.
      */
     fun getRecommendedMovies(movieId: Int): Flow<Resource<List<Movie>>>
 
     /**
      * The full "franchise" list opened from the Detail screen's collection teaser (Phase 3 Round
      * B) — every movie in the collection plus its own overview/poster/backdrop. One-shot,
-     * network-only (no Room cache — same convention as [getMovieCredits] and [getPersonCredits]
+     * network-only (no Room cache — same convention as getMovieCredits and getPersonCredits
      * for newer data that doesn't have its own offline table yet).
      */
     suspend fun getCollectionDetails(collectionId: Int): Result<MovieCollection>
@@ -95,42 +95,42 @@ interface MovieRepository {
     /**
      * Streaming availability for the Detail screen's Round C section — every region TMDB has
      * JustWatch data for in one call. One-shot, network-only (no Room cache — same convention as
-     * [getMovieCredits] and [getCollectionDetails]; awkward to cache anyway since results vary by
+     * getMovieCredits and getCollectionDetails; awkward to cache anyway since results vary by
      * the region the user has picked).
      */
     suspend fun getWatchProviders(movieId: Int): Result<WatchProviders>
 
-    /** TV counterpart of [getWatchProviders] — the TV detail screen's "Where to watch". Same one-shot,
+    /** TV counterpart of getWatchProviders — the TV detail screen's "Where to watch". Same one-shot,
      *  network-only convention; one call covers every region. */
     suspend fun getTvWatchProviders(tvId: Int): Result<WatchProviders>
 
     /**
      * Phase 4 (pagination) Round 4 — the search screen's movie results, infinite-scroll over TMDB
-     * `/search/multi` filtered to movies. Network-only, no [androidx.paging.RemoteMediator] (same
-     * reasoning as [getPagedGenreTv] — arbitrary search queries have no Room cache table of their
+     * `/search/multi` filtered to movies. Network-only, no androidx.paging.RemoteMediator (same
+     * reasoning as getPagedGenreTv — arbitrary search queries have no Room cache table of their
      * own), but still falls back to a capped local title/overview match on page 1 if the network
      * call fails outright, so search never goes fully blank just because the device is offline. See
-     * [com.ahsan.movieapp.data.paging.SearchMoviesPagingSource].
+     * com.ahsan.movieapp.data.paging.SearchMoviesPagingSource.
      */
     fun getPagedSearchMovies(query: String, totalResults: MutableStateFlow<Int?>? = null): Flow<PagingData<Movie>>
 
     /**
      * The people half of a `/search/multi` query — one-shot, capped, and NOT paginated (unlike
-     * [getPagedSearchMovies]): only the first handful of people a query returns are ever shown, so
+     * getPagedSearchMovies): only the first handful of people a query returns are ever shown, so
      * there's nothing worth infinite-scrolling here, same reasoning that keeps Cast & Crew and
      * Similar/Recommendations out of Phase 4's scope entirely. TV results are surfaced separately
-     * by [searchTvShows], not dropped.
+     * by searchTvShows, not dropped.
      */
     suspend fun searchPeople(query: String): Result<List<Person>>
 
     /**
      * The TV half of a `/search/multi` query, rendered as the search screen's "TV Shows" row
      * (grouped separately from the movie grid the way people already are). Same convention as
-     * [searchPeople]: one-shot, capped, NOT paginated — and network-only with no Room upsert
+     * searchPeople: one-shot, capped, NOT paginated — and network-only with no Room upsert
      * (arbitrary search queries have no cache table of their own, and a TV id in the movie-only
      * `movies` table would collide with a movie that happens to share the same numeric id — the
      * dedicated `tv_shows` cache is keyed by curated carousel, not searches, per Session 3).
-     * Results come back as [Movie] via the same [com.ahsan.movieapp.data.mapper.toMovie] bridge
+     * Results come back as Movie via the same com.ahsan.movieapp.data.mapper.toMovie bridge
      * every other TV listing uses; TV rows can now be favorited (Session 6's composite-key Favorites),
      * and the search screen re-stamps their hearts against a live favorites set at render time.
      */
@@ -138,9 +138,9 @@ interface MovieRepository {
 
     /**
      * The TV half of the search screen's first-screen filter results — TMDB `/discover/tv` for the same
-     * year / language / minimum-rating (and genre, via [tvGenreId], the TV id of the chosen movie genre;
+     * year / language / minimum-rating (and genre, via tvGenreId, the TV id of the chosen movie genre;
      * null for "any genre") the movie side is filtered by. One-shot, capped, NOT paginated and
-     * network-only, same convention as [searchTvShows]: it fills the "TV Shows" row above the movies.
+     * network-only, same convention as searchTvShows: it fills the "TV Shows" row above the movies.
      */
     suspend fun discoverTvShows(filters: DiscoverFilters, tvGenreId: Int?): Result<TvDiscoverResult>
 
@@ -170,28 +170,28 @@ interface MovieRepository {
     fun browseGenre(genreId: Int): Flow<Resource<List<Movie>>>
 
     /**
-     * Phase 2.6 Session 4 — the TV counterpart of [browseGenre]: one cached page of TV shows for a
-     * genre (TMDB `/discover/tv`). Same offline-first mechanism as [getCategoryTv] over the `tv_shows`
+     * Phase 2.6 Session 4 — the TV counterpart of browseGenre: one cached page of TV shows for a
+     * genre (TMDB `/discover/tv`). Same offline-first mechanism as getCategoryTv over the `tv_shows`
      * cache tables — backs the home screen's curated genre TV rows (e.g. Sci-Fi) with the standard
      * single-page carousel flow, not the genre screen's filter/result-count paging machinery.
      */
     fun browseGenreTv(genreId: Int): Flow<Resource<List<Movie>>>
 
     /**
-     * Phase 2.6 Session 3 — the TV counterpart of [getCategory], backing the Explore screen's TV
+     * Phase 2.6 Session 3 — the TV counterpart of getCategory, backing the Explore screen's TV
      * carousels (Trending TV Shows, Popular TV Shows). Offline-first the same way: emits the cached
      * page-1 listing from Room immediately, refreshes from TMDB in the background, re-emits on
-     * change. Rows come back as [Movie] (via TvShowEntity.toDomain) with [com.ahsan.movieapp.domain.model.MediaType] TV;
+     * change. Rows come back as Movie (via TvShowEntity.toDomain) with com.ahsan.movieapp.domain.model.MediaType TV;
      * favorite status is fused live from the TV half of the Session 6 favorites table, so hearts
      * flip on the carousels just like movie rows.
      */
     fun getCategoryTv(category: TvCategory): Flow<Resource<List<Movie>>>
 
     /**
-     * Phase 2.6 Session 3 — the TV counterpart of [getPagedCategory], the infinite-scroll form of
-     * [getCategoryTv] backed by [com.ahsan.movieapp.data.paging.TvCategoryRemoteMediator] over the
+     * Phase 2.6 Session 3 — the TV counterpart of getPagedCategory, the infinite-scroll form of
+     * getCategoryTv backed by com.ahsan.movieapp.data.paging.TvCategoryRemoteMediator over the
      * new Room `tv_shows` tables. Shared plumbing, ready for a paged TV screen (Session 4's Explore
-     * reorder); the Explore carousels themselves consume the non-paged [getCategoryTv].
+     * reorder); the Explore carousels themselves consume the non-paged getCategoryTv.
      */
     fun getPagedCategoryTv(category: TvCategory): Flow<PagingData<Movie>>
 
@@ -200,12 +200,12 @@ interface MovieRepository {
      * search screen's filter panel (genre/year/language/minimum rating — any subset) and the genre
      * screen's filtered Movies tab, driven by TMDB `/discover/movie`. Since Session 7 the result
      * *is* cached offline per applied filter combination: a `Pager` over the Room-backed
-     * [com.ahsan.movieapp.data.paging.DiscoverRemoteMediator], keyed by this filter set's
+     * com.ahsan.movieapp.data.paging.DiscoverRemoteMediator, keyed by this filter set's
      * normalized `comboKey` (movies live in the shared `movies` table, the combo's ordered page
      * list in `discover_combo_movies` with resume/`totalResults` bookkeeping in
      * `discover_combo_remote_keys`). Staleness follows the carousel convention (skip re-fetch for
      * combos seen within the 2h window); combos beyond the newest few are LRU-evicted. The matching
-     * "N results found" count is now read by [observeDiscoverResultTotal] from that Room row — no
+     * "N results found" count is now read by observeDiscoverResultTotal from that Room row — no
      * per-page flow plumbing, and it survives cached/offline reads.
      */
     fun getPagedDiscoverMovies(filters: DiscoverFilters): Flow<PagingData<Movie>>
@@ -221,7 +221,7 @@ interface MovieRepository {
     fun observeDiscoverResultTotal(filters: DiscoverFilters): Flow<Int?>
 
     /** All saved favorites — movies and TV shows together, each stamped `isFavorite = true` (their
-     *  [com.ahsan.movieapp.domain.model.MediaType] keeps the two apart even with shared TMDB ids).
+     *  com.ahsan.movieapp.domain.model.MediaType keeps the two apart even with shared TMDB ids).
      *  Drives the render-time heart re-stamping on the search/genre/person screens. */
     fun observeFavorites(): Flow<List<Movie>>
 
@@ -229,14 +229,14 @@ interface MovieRepository {
     fun observeFavoriteMovies(): Flow<List<Movie>>
 
     /** TV-show favorites only, newest-added first — backs the Favorites screen's TV Shows tab
-     *  (Session 6). Same [Movie] shape as everything else; each row's [com.ahsan.movieapp.domain.model.MediaType] is TV. */
+     *  (Session 6). Same Movie shape as everything else; each row's com.ahsan.movieapp.domain.model.MediaType is TV. */
     fun observeFavoriteTvShows(): Flow<List<Movie>>
 
     /** Session 6 — whether a specific media item is favorited; the composite key keeps a movie and a
      *  same-numbered TV show distinct. */
     fun isFavorite(movieId: Int, mediaType: com.ahsan.movieapp.domain.model.MediaType): Flow<Boolean>
 
-    /** Toggles the favorite flag for [movie], using its own [com.ahsan.movieapp.domain.model.MediaType] —
+    /** Toggles the favorite flag for movie, using its own com.ahsan.movieapp.domain.model.MediaType —
      *  a TV show favorite never collides with a same-numbered movie favorite (Session 6). */
     suspend fun toggleFavorite(movie: Movie)
 
@@ -245,17 +245,17 @@ interface MovieRepository {
 
     /**
      * Phase 2.6 Session 1 — the TV detail screen's base info section. One-shot, network-only, no
-     * Room cache — same convention as [getMovieCredits]/[getCollectionDetails]/[getWatchProviders]
+     * Room cache — same convention as getMovieCredits/getCollectionDetails/getWatchProviders
      * for data that doesn't have its own offline table yet (the only TV data this app persists is
-     * the two curated carousel lists — see [getCategoryTv]). A Favorites-aware `isFavorite` flag
-     * isn't part of [TvShowDetails] yet; that needs Session 6's Favorites schema migration
+     * the two curated carousel lists — see getCategoryTv). A Favorites-aware `isFavorite` flag
+     * isn't part of TvShowDetails yet; that needs Session 6's Favorites schema migration
      * (movie/TV id collision — see the project doc's Decisions).
      */
     suspend fun getTvDetails(tvId: Int): Result<TvShowDetails>
 
     /**
-     * TV counterpart of [getMovieCredits] — cast + director (crew job == "Director"), same
-     * one-shot, network-only, no-Room-cache convention. Reuses [MovieCredits] as the return shape
+     * TV counterpart of getMovieCredits — cast + director (crew job == "Director"), same
+     * one-shot, network-only, no-Room-cache convention. Reuses MovieCredits as the return shape
      * since TMDB's `/tv/{id}/credits` has the identical cast/crew fields as the movie side. When
      * that crew list has no Director (common for series), the impl falls back to
      * `/tv/{id}/aggregate_credits` to find one.
@@ -263,49 +263,49 @@ interface MovieRepository {
     suspend fun getTvCredits(tvId: Int): Result<MovieCredits>
 
     /**
-     * TV counterpart of [getSimilarMovies] — the TV detail screen's Similar section, added on
+     * TV counterpart of getSimilarMovies — the TV detail screen's Similar section, added on
      * Ahsan's post-build feedback to Phase 2.6 Session 1. One-shot, network-only, no Room cache —
-     * same convention as [getTvDetails]/[getTvCredits] (this TV-per-id kind of data has no offline
-     * table of its own; only the curated carousel lists are cached — see [getCategoryTv]).
-     * Results come back as [Movie] (via [com.ahsan.movieapp.data.mapper.toMovie]) — the same
+     * same convention as getTvDetails/getTvCredits (this TV-per-id kind of data has no offline
+     * table of its own; only the curated carousel lists are cached — see getCategoryTv).
+     * Results come back as Movie (via com.ahsan.movieapp.data.mapper.toMovie) — the same
      * bridge every other TV listing in this app uses so TV rows can render through the shared
      * poster-card components.
      */
     suspend fun getSimilarTvShows(tvId: Int): Result<List<Movie>>
 
     /**
-     * TV counterpart of [getRecommendedMovies] — a separate TMDB algorithm from
-     * [getSimilarTvShows], deliberately not deduped against it, same as the movie side. One-shot,
+     * TV counterpart of getRecommendedMovies — a separate TMDB algorithm from
+     * getSimilarTvShows, deliberately not deduped against it, same as the movie side. One-shot,
      * network-only, no Room cache.
      */
     suspend fun getRecommendedTvShows(tvId: Int): Result<List<Movie>>
 
     /**
      * Phase 2.6 Session 2 — the Watch Trailer button on the Movie detail screen. One-shot,
-     * network-only (no Room cache — same convention as [getMovieCredits]). Null means TMDB has no
+     * network-only (no Room cache — same convention as getMovieCredits). Null means TMDB has no
      * YouTube video attached for this movie, in which case the button doesn't render.
      */
     suspend fun getMovieTrailerKey(movieId: Int): Result<String?>
 
-    /** TV counterpart of [getMovieTrailerKey] — backs the TV detail screen's Watch Trailer button. */
+    /** TV counterpart of getMovieTrailerKey — backs the TV detail screen's Watch Trailer button. */
     suspend fun getTvTrailerKey(tvId: Int): Result<String?>
 
     /**
      * Phase 2.6 Session 2 — a season's full episode list, opened from the TV detail screen's
-     * Seasons section. One-shot, network-only, no Room cache — same convention as [getTvDetails].
+     * Seasons section. One-shot, network-only, no Room cache — same convention as getTvDetails.
      */
     suspend fun getSeasonDetails(tvId: Int, seasonNumber: Int): Result<SeasonDetails>
 
     /**
      * Phase 5 Photos gallery — real frames from the movie, up to 20: auto-generated frames of its
      * YouTube Trailer / Teaser / Clip videos, de-duplicated and screened for black-bar/fade frames
-     * (TMDB's own `backdrops` are mostly promo art, so they are not used — see [GalleryPhotoLoader]).
-     * One-shot, network-only (no Room table — same convention as [getMovieCredits]); the impl keeps the
+     * (TMDB's own `backdrops` are mostly promo art, so they are not used — see GalleryPhotoLoader).
+     * One-shot, network-only (no Room table — same convention as getMovieCredits); the impl keeps the
      * last few results in memory so the detail row, the "See all" grid and the fullscreen viewer share one
      * fetch instead of each re-requesting it. Empty when the movie has no usable videos.
      */
     suspend fun getMovieImages(movieId: Int): Result<List<Photo>>
 
-    /** TV counterpart of [getMovieImages], built from episode stills sampled across the show's seasons. */
+    /** TV counterpart of getMovieImages, built from episode stills sampled across the show's seasons. */
     suspend fun getTvImages(tvId: Int): Result<List<Photo>>
 }

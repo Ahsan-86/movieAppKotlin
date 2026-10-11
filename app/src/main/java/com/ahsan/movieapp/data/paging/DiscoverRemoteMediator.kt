@@ -15,19 +15,19 @@ import com.ahsan.movieapp.data.remote.dto.PagedResponseDto
 
 /**
  * Session 7 — the network half of one cached Discover filter combination (the search screen's
- * filter panel + the genre screen's filtered Movies tab). [MovieDao.pagingSourceForDiscover] feeds
+ * filter panel + the genre screen's filtered Movies tab). MovieDao.pagingSourceForDiscover feeds
  * the UI from Room; this only decides *when* to hit TMDB and *what* to save — the exact same shape
- * as [CategoryRemoteMediator] for the curated carousels, but keyed by a `comboKey` string (a
+ * as CategoryRemoteMediator for the curated carousels, but keyed by a `comboKey` string (a
  * normalized `DiscoverFilters.comboKey()`) instead of a category name.
  *
- * Same offline-first staleness philosophy: [initialize] skips the network for combos fetched inside
- * [staleThresholdMs] (2h, same window as the carousels), so re-applying an identical filter combo
- * renders instantly from Room. `discover_combo_remote_keys` (see [DiscoverComboRemoteKeys]) lets
+ * Same offline-first staleness philosophy: initialize skips the network for combos fetched inside
+ * staleThresholdMs (2h, same window as the carousels), so re-applying an identical filter combo
+ * renders instantly from Room. `discover_combo_remote_keys` (see DiscoverComboRemoteKeys) lets
  * APPEND resume from the right TMDB page across process restarts — and also carries the combo's
  * `totalResults`, which replaces the old `DiscoverPagingSource`'s per-load "N results found" write
  * (the count now survives cached/offline reads instead of only appearing after a network page).
  *
- * The cache is bounded: every write evicts combos beyond the [keepCount] most recently fetched
+ * The cache is bounded: every write evicts combos beyond the keepCount most recently fetched
  * (LRU by `fetchedAt`), so the naturally small combo space never grows into an unbounded table.
  */
 @OptIn(ExperimentalPagingApi::class)

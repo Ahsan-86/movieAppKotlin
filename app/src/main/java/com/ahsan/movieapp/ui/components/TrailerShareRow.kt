@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.os.Message
 import android.view.OrientationEventListener
 import android.view.View
@@ -72,7 +73,7 @@ import android.content.pm.ActivityInfo
 /**
  * Watch Trailer + Share — shared by both Movie and TV detail screens (Phase 2.6 Session 2, per
  * Ahsan's confirmed scope; repositioned into each screen's title/meta/genre info column on
- * Ahsan's 2026-09-12 post-ship feedback — see com.ahsan.movieapp.ui.tv.TvDetailScreen]'s and
+ * Ahsan's 2026-09-12 post-ship feedback — see com.ahsan.movieapp.ui.tv.TvDetailScreen's and
  * com.ahsan.movieapp.ui.detail.MovieDetailScreen's docs). "Watch Trailer" calls onWatchTrailer
  * with the trailer's YouTube video id — the caller (both detail screens, via
  * com.ahsan.movieapp.ui.navigation.MovieNavGraph) navigates to TrailerPlayerScreen, a real
@@ -317,8 +318,8 @@ fun TrailerPlayerScreen(videoId: String, onBack: () -> Unit) {
 /**
  * Holds the Activity in portrait after fullscreen is left while the phone is still sideways, then
  * hands orientation back to the system once the phone is physically upright. Deliberately outlives
- * [TrailerPlayerScreen]: backing out sideways must not leave Detail/Explore in landscape. Stops
- * itself once upright, on [cancel], or when the Activity is finishing.
+ * TrailerPlayerScreen: backing out sideways must not leave Detail/Explore in landscape. Stops
+ * itself once upright, on cancel, or when the Activity is finishing.
  */
 private class PortraitReleaser(private val activity: Activity) : OrientationEventListener(activity) {
     var pending = false
@@ -361,7 +362,7 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 /**
- * A [WebView] running YouTube's own IFrame Player API, loaded via [WebView.loadDataWithBaseURL].
+ * A WebView running YouTube's own IFrame Player API, loaded via WebView.loadDataWithBaseURL.
  * Several real, distinct bugs were found and fixed here, all on Ahsan's device (an
  * Infinix/Transsion phone):
  *
@@ -378,7 +379,7 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
  * `https://www.youtube.com` as both the WebView's base URL and the implicit origin — a common
  * WebView workaround, but not a genuine origin, and still left the page's actual referrer
  * unset/inconsistent (the same class of problem as error 153 above, just not fully resolved).
- * Ahsan fixed this properly: [playerOrigin] derives a real, consistent origin from the app's own
+ * Ahsan fixed this properly: playerOrigin derives a real, consistent origin from the app's own
  * package name, used as BOTH `loadDataWithBaseURL`'s base URL AND the `origin`/`widget_referrer`
  * values passed into `playerVars` — matching what the IFrame API's own reference docs describe
  * (the origin should be the URL scheme + host of the actual embedding page) instead of spoofing
@@ -390,11 +391,11 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
  * `CookieManager.setAcceptThirdPartyCookies` (some of the IFrame API's own session/analytics
  * cookies are third-party from the WebView's declared origin, and are blocked by default).
  *
- * **Bug 2b (also fixed by Ahsan, same round)**: [WebViewClient.shouldOverrideUrlLoading] had been
+ * **Bug 2b (also fixed by Ahsan, same round)**: WebViewClient.shouldOverrideUrlLoading had been
  * unconditionally blocking every navigation (added earlier to stop a hypothesized "Watch on
  * YouTube" fallback link from hijacking the WebView) — but the IFrame player's own internal embed
  * iframe is itself loaded via a frame navigation, which a blanket block also silently prevented,
- * regardless of origin/referrer correctness. [isYoutubeHost] now allows navigation to YouTube's own
+ * regardless of origin/referrer correctness. isYoutubeHost now allows navigation to YouTube's own
  * domain family (needed for the player itself, thumbnails, and video segment delivery) while still
  * blocking anything else. In hindsight this was likely the dominant cause of "every video fails to
  * play", more so than the origin/referrer issue above — both needed fixing regardless.
@@ -619,7 +620,7 @@ private fun EmbeddedYouTubePlayer(
 
 /** Plain holder so the WebChromeClient (created inside AndroidView's factory) and Compose effects
  *  can share "is the embed's native fullscreen view up, and how do I close it" plus the live
- *  [WebView] (for lifecycle pause/resume). */
+ *  WebView (for lifecycle pause/resume). */
 private class CustomViewHost {
     var isShowing: Boolean = false
     var hide: (() -> Unit)? = null
@@ -627,7 +628,7 @@ private class CustomViewHost {
 }
 
 /** Matches `host` against YouTube's own domain family: an exact match or a proper subdomain (a
- *  leading dot before the suffix) — NOT a bare [String.endsWith], which would also match an
+ *  leading dot before the suffix) — NOT a bare String.endsWith, which would also match an
  *  unrelated domain like "evilyoutube.com" or "notgoogle.com" that merely ends with the same
  *  characters. */
 private fun isYoutubeHost(host: String?): Boolean {
@@ -647,15 +648,18 @@ private fun isYoutubeWatchUrl(uri: Uri): Boolean {
 private fun openYoutubeExternally(context: Context, uri: Uri) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, uri).setPackage(YOUTUBE_PACKAGE))
-    } catch (ignored: ActivityNotFoundException) {
+    } catch (e: ActivityNotFoundException) {
+        Log.d(TAG, "YouTube app not installed, opening in the browser", e)
         try {
             context.startActivity(Intent(Intent.ACTION_VIEW, uri))
-        } catch (ignored: ActivityNotFoundException) {
+        } catch (noBrowser: ActivityNotFoundException) {
             // No browser either — nothing sensible to open.
+            Log.w(TAG, "No app can open the YouTube link", noBrowser)
         }
     }
 }
 
+private const val TAG = "TrailerShareRow"
 private const val YOUTUBE_PACKAGE = "com.google.android.youtube"
 
 private fun playerOrigin(context: Context): String =
@@ -676,19 +680,19 @@ private fun youtubePlaybackErrorMessage(code: Int): String = when (code) {
 
 /**
  * A minimal HTML host page for YouTube's IFrame Player API — full-bleed black background so the
- * player fills [EmbeddedYouTubePlayer]'s box exactly, autoplaying (needs
- * `mediaPlaybackRequiresUserGesture = false` on the [WebView], set above) and inline rather than
- * taking over with a native fullscreen view (`playsinline`) — though see [EmbeddedYouTubePlayer]'s
- * doc for why the hosting [WebView] still needs a working `onShowCustomView` regardless. `fs: 1`
+ * player fills EmbeddedYouTubePlayer's box exactly, autoplaying (needs
+ * `mediaPlaybackRequiresUserGesture = false` on the WebView, set above) and inline rather than
+ * taking over with a native fullscreen view (`playsinline`) — though see EmbeddedYouTubePlayer's
+ * doc for why the hosting WebView still needs a working `onShowCustomView` regardless. `fs: 1`
  * shows the player's OWN fullscreen button, which is now the single fullscreen control — its
- * onShowCustomView/onHideCustomView events are bridged to [TrailerPlayerScreen]'s isFullscreen state.
+ * onShowCustomView/onHideCustomView events are bridged to TrailerPlayerScreen's isFullscreen state.
  * `modestbranding: 1` (round #7) is a leftover; YouTube no longer honors it, and the player's own
  * "Watch on YouTube" button is now the app's only "open in YouTube" affordance. `onError` forwards the YouTube error code to Kotlin via the
- * `AndroidPlayerBridge` interface registered in [EmbeddedYouTubePlayer] rather than rendering its
+ * `AndroidPlayerBridge` interface registered in EmbeddedYouTubePlayer rather than rendering its
  * own message in the page — that keeps the message itself (and its styling/localization) on the
- * Kotlin/Compose side. [origin] (see [playerOrigin]) is passed both as this page's own base URL
+ * Kotlin/Compose side. origin (see playerOrigin) is passed both as this page's own base URL
  * (by the caller, via `loadDataWithBaseURL`) and here as `playerVars.origin`/`widget_referrer`, so
- * they're always consistent — see [EmbeddedYouTubePlayer]'s doc, Bug 2.
+ * they're always consistent — see EmbeddedYouTubePlayer's doc, Bug 2.
  */
 private fun iframePlayerHtml(videoId: String, origin: String): String = """
     <!DOCTYPE html>

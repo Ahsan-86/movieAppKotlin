@@ -34,15 +34,15 @@ import kotlin.math.min
 import kotlinx.coroutines.delay
 
 /**
- * The Explore screen's top banner: a swipeable, full-width pager of [movies] (the caller passes
+ * The Explore screen's top banner: a swipeable, full-width pager of movies (the caller passes
  * the top 8 popular titles), each card a **16:12 poster hero** (a clear landscape rectangle —
  * 16:11 still read short, bumped another +~9% taller to 4:3-equivalent, 2026-09-26 — taller than
  * the old 16:9 banner but far shorter than the 3:4 Detail heroes) with the poster image scrimmed by
- * [DetailHeroCaption] (rating/year/genres) and the parallax/scale polish: adjacent pages shrink to
+ * DetailHeroCaption (rating/year/genres) and the parallax/scale polish: adjacent pages shrink to
  * ~90% for depth as you swipe. Horizontal insets (42dp) keep a clear **peek of the previous and
  * next card visible on both sides** while the current card is in focus. Below sits a row of M3-style
  * dots (an active pill that widens 6→14dp and slides smoothly between pages as you swipe, driven by
- * [PagerState.currentPageOffsetFraction]). The pager is **truly infinite** (Session 4): it starts at a
+ * PagerState.currentPageOffsetFraction). The pager is **truly infinite** (Session 4): it starts at a
  * huge virtual page index and reads cards via `page % movies.size`, so there is no first or last page —
  * swipe either direction forever, and auto-advance just flows on. The banner sits above the genre chips
  * row and the rest of Explore's carousel sections.
@@ -152,8 +152,8 @@ fun HeroMovieCarousel(
 /**
  * A row of M3-style page dots — one 6dp circle per page, with the current page's dot widening
  * into a 14dp pill. The active pill widens continuously mid-swipe and hands off to the next dot
- * because it reads [PagerState.currentPageOffsetFraction], not just [PagerState.currentPage].
- * Because the pager is infinite, the pill's position is [dotWidthFraction]'s ring distance — it
+ * because it reads PagerState.currentPageOffsetFraction, not just PagerState.currentPage.
+ * Because the pager is infinite, the pill's position is dotWidthFraction's ring distance — it
  * sees dot 0 as sitting next to the last dot, so the last→first wrap hands off like any adjacent
  * pair (the last dot fades as the first rises) instead of the pill glitching or skipping across.
  */
@@ -193,7 +193,7 @@ private fun DotsPageIndicator(
 }
 
 /**
- * How lit dot [index] should be while the pager settles, on a 0..[pageCount] ring. The virtual page
+ * How lit dot index should be while the pager settles, on a 0..pageCount ring. The virtual page
  * index grows forever, so the raw position is `currentPage % pageCount + currentPageOffsetFraction`;
  * distance to the dot is measured the short way *around the ring* (min of the two wraps). That short
  * way flips the last dot and the first dot into ring-neighbors, which is exactly what makes the
@@ -217,6 +217,6 @@ private const val INFINITE_INITIAL_PAGE = Int.MAX_VALUE / 2
  * The total number of virtual pages the pager owns. Deliberately NOT the item count: the infinite
  * loop lives in an unbounded page space that the items are modded into, so advancing the page index
  * always has a valid next page to land on. `Int.MAX_VALUE` covers ~1 billion trips around the loop
- * from [INFINITE_INITIAL_PAGE] before exhausting itself.
+ * from INFINITE_INITIAL_PAGE before exhausting itself.
  */
 private const val INFINITE_PAGE_COUNT = Int.MAX_VALUE

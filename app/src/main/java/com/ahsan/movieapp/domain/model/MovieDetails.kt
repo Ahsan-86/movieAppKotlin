@@ -28,8 +28,8 @@ data class MovieDetails(
      * Set only when this movie belongs to a TMDB "collection" (a franchise, e.g. a trilogy) — comes
      * free on the same `/movie/{id}` call as everything else above (`belongs_to_collection`), no
      * extra fetch. Backs the Detail screen's compact collection teaser (Phase 3 Round B); tapping it
-     * opens a new full-screen [MovieCollection] listing every movie in the collection, fetched
-     * separately via [MovieCollection] once the teaser is tapped.
+     * opens a new full-screen MovieCollection listing every movie in the collection, fetched
+     * separately via MovieCollection once the teaser is tapped.
      */
     val collection: CollectionSummary? = null
 ) {
@@ -51,9 +51,9 @@ data class MovieDetails(
 }
 
 /**
- * One entry from [MovieDetails.productionCompanies] — name plus an optional logo. [logoUrl] is
+ * One entry from MovieDetails.productionCompanies — name plus an optional logo. logoUrl is
  * still captured from TMDB and stored (see MovieDetailsEntity), but the Information section only
- * ever displays [name] (see [MovieDetails.productionCompaniesFormatted]) — Ahsan asked for
+ * ever displays name (see MovieDetails.productionCompaniesFormatted) — Ahsan asked for
  * names-only, comma-separated, no logos/images.
  */
 data class ProductionCompany(
@@ -64,7 +64,7 @@ data class ProductionCompany(
 /**
  * The compact "part of a collection" teaser shown on the Detail screen (Phase 3 Round B) — just
  * enough to render a tappable poster + name row. The full collection (overview + every movie in
- * it) is a separate one-shot fetch, [MovieCollection], only made once the teaser is tapped.
+ * it) is a separate one-shot fetch, MovieCollection, only made once the teaser is tapped.
  */
 data class CollectionSummary(
     val id: Int,
@@ -76,7 +76,7 @@ data class CollectionSummary(
  * The full "franchise" list opened from the Detail screen's collection teaser (Phase 3 Round B) —
  * every movie belonging to a TMDB collection, each clickable through to its own Detail screen.
  * One-shot, network-only fetch (see MovieRepositoryImpl.getCollectionDetails); no Room cache, same
- * convention as [MovieCredits] and the other newer Phase-3 data that doesn't have its own offline
+ * convention as MovieCredits and the other newer Phase-3 data that doesn't have its own offline
  * table yet.
  */
 data class MovieCollection(
@@ -90,10 +90,10 @@ data class MovieCollection(
 
 /**
  * Streaming availability for the Detail screen's Round C section — every TMDB region this movie
- * has JustWatch data for, plus each region's own [WatchProviderRegion]. One-shot, network-only
+ * has JustWatch data for, plus each region's own WatchProviderRegion. One-shot, network-only
  * fetch (see MovieRepositoryImpl.getWatchProviders) that covers every region in a single TMDB
- * call; [regionsAvailable] backs the region dropdown, and switching regions is pure client-side
- * lookup via [forRegion] — never a re-fetch.
+ * call; regionsAvailable backs the region dropdown, and switching regions is pure client-side
+ * lookup via forRegion — never a re-fetch.
  */
 data class WatchProviders(
     val regionsAvailable: List<String>,
@@ -104,7 +104,7 @@ data class WatchProviders(
 
 /**
  * One region's Stream/Rent/Buy provider lists, per Round C's confirmed scope (TMDB's `free`/`ads`
- * ad-supported categories aren't surfaced). [link] is TMDB's own watch-providers page for this
+ * ad-supported categories aren't surfaced). link is TMDB's own watch-providers page for this
  * movie+region, included for a future "more info" affordance but not currently used by the UI.
  */
 data class WatchProviderRegion(
@@ -150,8 +150,8 @@ data class Person(
 )
 
 /**
- * Bio/photo shown at the top of the person screen. [birthday]/[deathday] are TMDB's ISO
- * "YYYY-MM-DD" strings, both nullable — [age] and the header rely on them. [gender] is TMDB's
+ * Bio/photo shown at the top of the person screen. birthday/deathday are TMDB's ISO
+ * "YYYY-MM-DD" strings, both nullable — age and the header rely on them. gender is TMDB's
  * numeric code; the caller maps it to a localized label (Female/Male/Non-binary/Unknown).
  */
 data class PersonDetails(
@@ -167,7 +167,7 @@ data class PersonDetails(
     val gender: Int? = null
 ) {
     /**
-     * Age in years as of today, or age at death when [deathday] is present. Null when [birthday]
+     * Age in years as of today, or age at death when deathday is present. Null when birthday
      * is missing or unparseable, so the header can drop the segment entirely instead of showing a
      * bogus "0 years old". Uses plain integer date-part math rather than java.time, since this
      * module doesn't assume a desugared minSdk. The caller formats it for display ("N years old").
@@ -214,10 +214,7 @@ data class PersonCredits(
     val directingMovies: List<Movie>,
     val actingTvShows: List<Movie>,
     val directingTvShows: List<Movie>
-) {
-    val hasTvCredits: Boolean get() = actingTvShows.isNotEmpty() || directingTvShows.isNotEmpty()
-    fun hasDirectingCredits(isTv: Boolean): Boolean = if (isTv) directingTvShows.isNotEmpty() else directingMovies.isNotEmpty()
-}
+)
 
 /**
  * One "browse by genre" chip on the search screen's first-open state. TMDB uses separate genre-id

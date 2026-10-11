@@ -46,7 +46,7 @@ import kotlinx.coroutines.flow.Flow
 fun HomeScreen(
     onMovieClick: (Movie) -> Unit,
     // Phase 2.6 Session 1 — Popular TV Shows row's tap target: the real TV detail screen. Still
-    // modeled as [Movie] like every other TV item in this app (its `id` is a TV id, not a movie id).
+    // modeled as Movie like every other TV item in this app (its `id` is a TV id, not a movie id).
     onTvClick: (Movie) -> Unit,
     onGenreClick: (GenreChip) -> Unit,
     // Fires when the user re-taps the already-selected Explore tab — scrolls back to top instead
@@ -119,7 +119,7 @@ fun HomeScreen(
     }
 }
 
-/** Shimmer twin of [ExploreGenreChipsRow]: a heading line plus a row of chip-shaped blocks. */
+/** Shimmer twin of ExploreGenreChipsRow: a heading line plus a row of chip-shaped blocks. */
 @Composable
 private fun GenreChipsSkeleton() {
     Column {

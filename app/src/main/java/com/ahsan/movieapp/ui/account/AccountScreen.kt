@@ -24,7 +24,7 @@ import com.ahsan.movieapp.data.repository.SessionState
 /**
  * Phase 1 ships Guest mode end-to-end. Phase 4 swaps the disabled Log In / Sign Up buttons
  * here for real Firebase Authentication, without touching anything else in the app — every
- * other screen already only cares about [SessionState], not how you got it.
+ * other screen already only cares about SessionState, not how you got it.
  */
 @Composable
 fun AccountScreen(viewModel: AccountViewModel = hiltViewModel()) {

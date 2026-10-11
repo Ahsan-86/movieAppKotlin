@@ -14,8 +14,8 @@ import kotlinx.coroutines.flow.first
 
 /**
  * Phase 4 (pagination) Round 4 — the search screen's movie results. Network-only, straight over
- * [TmdbApi.searchMulti] filtered to `media_type == "movie"`; people are a separate one-shot fetch
- * (see [com.ahsan.movieapp.data.repository.MovieRepository.searchPeople]) rather than part of this
+ * TmdbApi.searchMulti filtered to `media_type == "movie"`; people are a separate one-shot fetch
+ * (see com.ahsan.movieapp.data.repository.MovieRepository.searchPeople) rather than part of this
  * pager — `/search/multi`'s pages mix movies and people together, but only the first handful of
  * people a query returns are ever shown, so there's nothing worth paginating there.
  *
@@ -25,23 +25,23 @@ import kotlinx.coroutines.flow.first
  * same pattern already used by `getCollectionDetails()`/`getPersonCredits()` in
  * `MovieRepositoryImpl` — NOT a live `combine()` against this pager's output. An earlier version of
  * this class always returned `isFavorite = false` and left
- * [com.ahsan.movieapp.ui.search.SearchViewModel] to `combine()` a live favorites flow over the raw
- * [androidx.paging.PagingData] before `cachedIn()`; that crashed with `IllegalStateException:
+ * com.ahsan.movieapp.ui.search.SearchViewModel to `combine()` a live favorites flow over the raw
+ * androidx.paging.PagingData before `cachedIn()`; that crashed with `IllegalStateException:
  * Attempt to collect twice from pageEventFlow`, because `combine()` re-invokes `.map{}` on the same
  * underlying `PagingData` every time the side flow emits (not just when the paging flow itself
  * emits), producing two overlapping generations that both try to collect the same page-event flow
  * at once — Paging 3 explicitly disallows that. The trade-off of the snapshot approach: toggling a
  * favorite from Search/Discover results doesn't flip the heart icon live the way Trending/Genre's
  * Room-`LEFT JOIN`-based reactivity does — it's correct again next time this screen re-queries.
- * Each loaded page's [com.ahsan.movieapp.data.remote.dto.PagedResponseDto.totalResults] is also
- * written into [totalResults] (when provided) so the search screen can show "N results found".
+ * Each loaded page's com.ahsan.movieapp.data.remote.dto.PagedResponseDto.totalResults is also
+ * written into totalResults (when provided) so the search screen can show "N results found".
  * (The filter panel's Discover results show the same line, but theirs is Room-backed since
  * Session 7 — see `MovieRepository.observeDiscoverResultTotal` rather than a per-page write.)
  *
  * Falls back to a local `LIKE` match, but ONLY on page 1 and ONLY when the network call fails
  * outright — the same "search still half-works offline" behavior this app has always had — and
  * returns it as a single, non-paginated page (`endOfPaginationReached` implied by a null
- * [LoadResult.Page.nextKey]) since a bounded local match has no real "next page." A page-2+ network
+ * LoadResult.Page.nextKey) since a bounded local match has no real "next page." A page-2+ network
  * failure is a normal Paging 3 append error instead (retry button), not a silent switch to local
  * data mid-scroll.
  */

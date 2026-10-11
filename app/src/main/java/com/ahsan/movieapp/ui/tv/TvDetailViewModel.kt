@@ -55,13 +55,13 @@ data class TvDetailUiState(
  * Recommendations-based "More Like This" shelf (Session 1; merged into one shelf per Review-queue
  * item 1 → option C, then Similar dropped 2026-09-20: not relevant enough), plus a Watch
  * Trailer button (Session 2). Network-only for every fetch, no Room cache — same one-shot,
- * failure-tolerant convention as [com.ahsan.movieapp.ui.detail.CastCrewListViewModel] and the
- * newer network-only calls on [MovieRepository] ([MovieRepository.getMovieCredits],
- * [MovieRepository.getCollectionDetails]), since TV detail data has no offline table of its own
- * (only the curated TV carousels are cached — see [MovieRepository.getCategoryTv]). Unlike
- * [com.ahsan.movieapp.ui.detail.MovieDetailViewModel], there's no networkBoundResource/offline-first
+ * failure-tolerant convention as com.ahsan.movieapp.ui.detail.CastCrewListViewModel and the
+ * newer network-only calls on MovieRepository (MovieRepository.getMovieCredits,
+ * MovieRepository.getCollectionDetails), since TV detail data has no offline table of its own
+ * (only the curated TV carousels are cached — see MovieRepository.getCategoryTv). Unlike
+ * com.ahsan.movieapp.ui.detail.MovieDetailViewModel, there's no networkBoundResource/offline-first
  * path here — but Session 6 added the favorite toggle: the FloatingActionButton mirrors
- * MovieDetailScreen's, driving [toggleFavorite] against the composite-key Favorites table through
+ * MovieDetailScreen's, driving toggleFavorite against the composite-key Favorites table through
  * the same `isFavorite(tvId, TV)` live flow.
  *
  * Credits, Recommendations, and the trailer key are each fetched in their own
@@ -153,7 +153,7 @@ class TvDetailViewModel @Inject constructor(
     }
 
     /** Session 6 — favorite/un-favorite this show via the composite-key Favorites table. The FAB's
-     *  heart reads [isFavorite] live, so it flips on its own after a toggle; no optimistic update
+     *  heart reads isFavorite live, so it flips on its own after a toggle; no optimistic update
      *  needed (the show is never in a Room cache flow this screen pages through). */
     fun toggleFavorite() {
         val details = _uiState.value.details ?: return

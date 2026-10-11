@@ -15,10 +15,10 @@ import com.ahsan.movieapp.data.remote.dto.TvShowDto
 
 /**
  * Phase 2.6 Session 3 — the network half of one cached TV category's offline-first listing, the
- * [CategoryRemoteMediator] counterpart for the `tv_shows`/`category_tv_shows`/`tv_remote_keys`
- * tables. Same shape in every respect: [TvShowDao.pagingSourceForCategoryTv] feeds the UI from
- * Room, this only decides *when* to hit the network and *what* to save, [initialize] skips the
- * fetch entirely while the category is within its staleness window, and [TvRemoteKeys] is what lets
+ * CategoryRemoteMediator counterpart for the `tv_shows`/`category_tv_shows`/`tv_remote_keys`
+ * tables. Same shape in every respect: TvShowDao.pagingSourceForCategoryTv feeds the UI from
+ * Room, this only decides *when* to hit the network and *what* to save, initialize skips the
+ * fetch entirely while the category is within its staleness window, and TvRemoteKeys is what lets
  * APPEND resume from the right TMDB page after a process restart.
  */
 @OptIn(ExperimentalPagingApi::class)

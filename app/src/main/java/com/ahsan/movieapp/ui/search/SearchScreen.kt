@@ -99,7 +99,7 @@ fun SearchScreen(
     onMovieClick: (Movie) -> Unit,
     onPersonClick: (Person) -> Unit,
     // TV search results ("TV Shows" row) route to the real TV detail screen, same as Explore's
-    // Popular TV Shows row — the item is still modeled as [Movie] (its `id` is a TV id).
+    // Popular TV Shows row — the item is still modeled as Movie (its `id` is a TV id).
     onTvClick: (Movie) -> Unit,
     onGenreClick: (GenreChip) -> Unit,
     // Fires when the user re-taps the Search icon while already on this screen — same "scroll
@@ -470,7 +470,7 @@ private fun SearchLoadingSkeleton(viewMode: SearchViewMode) {
     }
 }
 
-/** The Movies-section header: an optional [title] on the left, the three layout toggles on the right. */
+/** The Movies-section header: an optional title on the left, the three layout toggles on the right. */
 @Composable
 private fun ViewModeRow(selected: SearchViewMode, onSelected: (SearchViewMode) -> Unit, title: String? = null) {
     Row(
@@ -540,7 +540,7 @@ private fun BlankSearchContent(
     // only measures/scrolls its first couple of items correctly (the "only two genres show" bug
     // this hit before); nesting lazy content inside a LazyColumn item {} instead is the robust
     // pattern, same lesson as the Phase 2 results-grid fix. This also gives the hoisted
-    // [listState] something to drive "scroll to top" on when the Search icon is re-tapped.
+    // listState something to drive "scroll to top" on when the Search icon is re-tapped.
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         item {
             FilterPanelSection(
@@ -707,21 +707,21 @@ private fun GenreChipItem(genre: GenreChip, onClick: () -> Unit, modifier: Modif
  * section header — that's deliberate. This is the fix for the reverted Phase 2 attempt: only
  * items that scroll into view get composed (and only then does Coil kick off an image load),
  * whereas the old FlowRow composed and loaded every result at once regardless of what was visible.
- * [columns] varies by view mode (adaptive ~2-3 up vs a fixed 4-up dense grid); [posterWidth] null
+ * columns varies by view mode (adaptive ~2-3 up vs a fixed 4-up dense grid); posterWidth null
  * lets each poster fill its grid cell instead of a fixed 128dp.
  *
- * Phase 4 (pagination) Round 4 — [movies] is now a [LazyPagingItems] source (either
- * [SearchViewModel.pagedSearchMovies] or [SearchViewModel.pagedFilteredMovies], depending on the
- * caller) rather than a plain list; [people] and [tvShows] stay plain, small, non-paginated lists
+ * Phase 4 (pagination) Round 4 — movies is now a LazyPagingItems source (either
+ * SearchViewModel.pagedSearchMovies or SearchViewModel.pagedFilteredMovies, depending on the
+ * caller) rather than a plain list; people and tvShows stay plain, small, non-paginated lists
  * either way (both empty for the filter-results caller, since Discover has no people or TV to
- * show). A [PagingAppendFooter] closes out the movies section, same shared composable every other
+ * show). A PagingAppendFooter closes out the movies section, same shared composable every other
  * paginated grid in this app already uses.
  */
 @Composable
 private fun SearchResultsGrid(
     movies: LazyPagingItems<Movie>,
     people: List<Person>,
-    // One-shot [Movie] list for the "TV Shows" row (see SearchViewModel.uiState) — empty for the
+    // One-shot Movie list for the "TV Shows" row (see SearchViewModel.uiState) — empty for the
     // filter-results caller, since Discover has no TV counterpart.
     tvShows: List<Movie>,
     columns: GridCells,
@@ -789,7 +789,7 @@ private fun SearchResultsGrid(
     }
 }
 
-/** List-view mode: a LazyColumn of full-width rows instead of a poster grid. See [SearchResultsGrid]'s doc for [movies]/[people]/[tvShows] and [favoriteIds]. */
+/** List-view mode: a LazyColumn of full-width rows instead of a poster grid. See SearchResultsGrid's doc for movies/people/tvShows and favoriteIds. */
 @Composable
 private fun SearchResultsList(
     movies: LazyPagingItems<Movie>,
@@ -860,7 +860,7 @@ private fun PeopleResultsRow(people: List<Person>, onPersonClick: (Person) -> Un
 /**
  * A LazyRow for the search screen's TV results, grouped separately from the movie grid the same
  * way people are. Session 6 — TV cards now render a heart like movies (the composite-key Favorites
- * table can hold both), re-stamping each row's [Movie.isFavorite] against [favoriteIds] at render
+ * table can hold both), re-stamping each row's Movie.isFavorite against favoriteIds at render
  * time, same live-set trick as the movie grid above.
  */
 @Composable
@@ -921,7 +921,7 @@ private fun PersonResultCard(person: Person, onClick: () -> Unit) {
     }
 }
 
-/** Shimmer twin of [PeopleResultsRow] — shown while the one-shot people fetch is still in flight. */
+/** Shimmer twin of PeopleResultsRow — shown while the one-shot people fetch is still in flight. */
 @Composable
 private fun PeopleResultsRowSkeleton() {
     Column {
@@ -937,7 +937,7 @@ private fun PeopleResultsRowSkeleton() {
     }
 }
 
-/** Shimmer twin of [TvShowsResultsRow] — shown while the one-shot TV fetch is still in flight. */
+/** Shimmer twin of TvShowsResultsRow — shown while the one-shot TV fetch is still in flight. */
 @Composable
 private fun TvShowsResultsRowSkeleton() {
     Column {

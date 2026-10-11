@@ -33,10 +33,10 @@ fun DiscoverFilters.comboKey(): String = buildList {
 
 /**
  * Whether a text-search result — a movie or a TV show — passes the search screen's client-side
- * [filters]. Year compares the release / first-air year, rating is a minimum on the vote average, and
+ * filters. Year compares the release / first-air year, rating is a minimum on the vote average, and
  * language compares TMDB's original-language code (a result with no language on record, e.g. the
- * offline local-match fallback, doesn't pass a language filter). [DiscoverFilters.genreId] is a *movie*
- * genre id; a TV show is checked against [tvGenreId] instead (the matching TV id of that genre — TMDB
+ * offline local-match fallback, doesn't pass a language filter). DiscoverFilters.genreId is a *movie*
+ * genre id; a TV show is checked against tvGenreId instead (the matching TV id of that genre — TMDB
  * uses different ids for some, e.g. Action is 28 for movies but 10759 for TV — or null when the genre
  * has no TV counterpart, in which case no TV show passes a genre filter).
  */
@@ -46,7 +46,7 @@ fun Movie.matches(filters: DiscoverFilters, tvGenreId: Int? = null): Boolean =
         (filters.language == null || originalLanguage == filters.language) &&
         (filters.genreId == null || (if (mediaType == MediaType.TV) tvGenreId else filters.genreId)?.let { it in genreIds } == true)
 
-/** The four criteria of [DiscoverFilters]; used to drop a single one (a filter chip's ✕). */
+/** The four criteria of DiscoverFilters; used to drop a single one (a filter chip's ✕). */
 enum class FilterField { GENRE, YEAR, LANGUAGE, MIN_RATING }
 
 /** These filters minus one criterion. */

@@ -14,9 +14,9 @@ import javax.inject.Inject
 
 /**
  * Phase 4 (pagination) Round 1 — Trending is the first screen converted from a single cached
- * snapshot ([com.ahsan.movieapp.util.Resource]-wrapped list) to an infinite-scroll
- * [PagingData] stream. [MovieRepository.getPagedCategory] owns the offline-first/staleness and
- * TMDB-paging logic; [androidx.paging.Pager]'s own loading/error states (surfaced to the UI via
+ * snapshot (com.ahsan.movieapp.util.Resource-wrapped list) to an infinite-scroll
+ * PagingData stream. MovieRepository.getPagedCategory owns the offline-first/staleness and
+ * TMDB-paging logic; androidx.paging.Pager's own loading/error states (surfaced to the UI via
  * `LazyPagingItems.loadState`) replace this ViewModel's old hand-rolled isLoading/errorMessage
  * fields and refreshTrigger-based retry.
  */

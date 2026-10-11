@@ -15,16 +15,16 @@ import com.ahsan.movieapp.data.remote.dto.PagedResponseDto
 
 /**
  * Phase 4 (pagination) — the network half of one paginated category's offline-first "load more"
- * list. [MovieDao.pagingSourceForCategory] (via [androidx.paging.Pager]) is what actually feeds
+ * list. MovieDao.pagingSourceForCategory (via androidx.paging.Pager) is what actually feeds
  * the UI from Room; this only decides *when* to hit the network and *what* to save.
  *
  * Deliberately keeps this project's existing offline-first/staleness philosophy rather than the
- * "always refresh on screen open" default most Paging 3 samples use: [initialize] skips the
- * network entirely if the category was fetched recently (same [staleThresholdMs] window
- * [com.ahsan.movieapp.data.repository.MovieRepositoryImpl] already uses for its non-paged
+ * "always refresh on screen open" default most Paging 3 samples use: initialize skips the
+ * network entirely if the category was fetched recently (same staleThresholdMs window
+ * com.ahsan.movieapp.data.repository.MovieRepositoryImpl already uses for its non-paged
  * categories), so reopening a screen with fresh cached data never re-fires TMDB calls just to
  * satisfy Paging 3's usual "always REFRESH on first collect" behavior. `category_remote_keys`
- * (see [CategoryRemoteKeys]) is what lets APPEND resume from the right TMDB page even after the
+ * (see CategoryRemoteKeys) is what lets APPEND resume from the right TMDB page even after the
  * process restarts, since Room — not this class — is the actual source of truth in between loads.
  */
 @OptIn(ExperimentalPagingApi::class)

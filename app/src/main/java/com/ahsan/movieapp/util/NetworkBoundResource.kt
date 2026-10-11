@@ -9,12 +9,12 @@ import kotlinx.coroutines.flow.map
 /**
  * Classic offline-first pattern: always emit what's in the local database first (instant,
  * works offline), then try to refresh from the network in the background and save the
- * result back into the database, which re-emits automatically through [query]'s Flow.
+ * result back into the database, which re-emits automatically through query's Flow.
  *
  * This is what makes every screen in the app "seamlessly offline": the UI only ever talks
  * to Room; the network is just something that occasionally refills Room. If the network
- * call fails (no connection, TMDB down, etc.) we keep collecting [query] and simply flag
- * the emission as [Resource.Error] while still showing whatever is cached.
+ * call fails (no connection, TMDB down, etc.) we keep collecting query and simply flag
+ * the emission as Resource.Error while still showing whatever is cached.
  */
 inline fun <ResultType, RequestType> networkBoundResource(
     crossinline query: () -> Flow<ResultType>,

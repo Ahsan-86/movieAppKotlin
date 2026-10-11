@@ -43,13 +43,13 @@ import androidx.compose.ui.unit.dp
 /**
  * Phase 5 — the app-wide shimmer / skeleton-loading toolkit, replacing the old centered spinners.
  *
- * [Modifier.shimmer] paints a moving highlight band over a theme-derived base colour (so it reads in
+ * Modifier.shimmer paints a moving highlight band over a theme-derived base colour (so it reads in
  * both light and dark themes), and the animation reads its progress inside the draw phase — it never
  * recomposes the skeleton. If the system's animations are turned off (Developer options "Animator
  * duration scale" = off, which is also what the accessibility "remove animations" switch sets) the
  * band is drawn static: a flat placeholder, no motion.
  *
- * The building blocks below ([ShimmerBox], [ShimmerLine], [PosterCardSkeleton], …) mirror the real
+ * The building blocks below (ShimmerBox, ShimmerLine, PosterCardSkeleton, …) mirror the real
  * layouts' dimensions so content swaps in without the screen jumping around.
  */
 @Composable
@@ -90,7 +90,7 @@ fun ShimmerBox(modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(
     Box(modifier = modifier.clip(shape).shimmer())
 }
 
-/** A shimmering "line of text" — [widthFraction] of the available width, [height] tall. */
+/** A shimmering "line of text" — widthFraction of the available width, height tall. */
 @Composable
 fun ShimmerLine(
     modifier: Modifier = Modifier,
@@ -103,7 +103,7 @@ fun ShimmerLine(
     )
 }
 
-/** Skeleton twin of [MoviePosterCard]: 2:3 poster, a two-line title, a short year line. */
+/** Skeleton twin of MoviePosterCard: 2:3 poster, a two-line title, a short year line. */
 @Composable
 fun PosterCardSkeleton(modifier: Modifier = Modifier, width: Dp? = 128.dp) {
     Column(modifier = modifier.let { if (width != null) it.width(width) else it.fillMaxWidth() }) {
@@ -116,7 +116,7 @@ fun PosterCardSkeleton(modifier: Modifier = Modifier, width: Dp? = 128.dp) {
     }
 }
 
-/** A non-scrolling horizontal row of [PosterCardSkeleton]s — a carousel's loading state. */
+/** A non-scrolling horizontal row of PosterCardSkeletons — a carousel's loading state. */
 @Composable
 fun PosterRowSkeleton(
     modifier: Modifier = Modifier,
@@ -134,7 +134,7 @@ fun PosterRowSkeleton(
     }
 }
 
-/** A non-scrolling grid of [PosterCardSkeleton]s — Trending / Genre / Collection / Search grids. */
+/** A non-scrolling grid of PosterCardSkeletons — Trending / Genre / Collection / Search grids. */
 @Composable
 fun PosterGridSkeleton(
     modifier: Modifier = Modifier,
@@ -153,7 +153,7 @@ fun PosterGridSkeleton(
     }
 }
 
-/** Skeleton twin of [MovieListRow]: poster thumbnail + title / year / two overview lines. */
+/** Skeleton twin of MovieListRow: poster thumbnail + title / year / two overview lines. */
 @Composable
 fun ListRowSkeleton(modifier: Modifier = Modifier) {
     Row(
@@ -174,7 +174,7 @@ fun ListRowSkeleton(modifier: Modifier = Modifier) {
     }
 }
 
-/** A non-scrolling stack of [ListRowSkeleton]s — list-mode search results, Favorites, filmography. */
+/** A non-scrolling stack of ListRowSkeletons — list-mode search results, Favorites, filmography. */
 @Composable
 fun ListSkeleton(modifier: Modifier = Modifier, count: Int = 8) {
     Column(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {

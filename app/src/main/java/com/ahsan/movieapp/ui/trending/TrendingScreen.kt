@@ -26,11 +26,11 @@ import com.ahsan.movieapp.ui.components.PagingAppendFooter
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Phase 4 (pagination) Round 1 — was a single-page [LazyVerticalGrid] over a plain
- * `List<Movie>`; now backed by [androidx.paging.compose.LazyPagingItems] so scrolling near the
- * bottom transparently loads the next TMDB page (see [TrendingViewModel.pagedMovies]/
- * [com.ahsan.movieapp.data.paging.CategoryRemoteMediator]). The full-screen loading/error states
- * below are driven by `loadState.refresh` (first page); [PagingAppendFooter] handles "loading/
+ * Phase 4 (pagination) Round 1 — was a single-page LazyVerticalGrid over a plain
+ * `List<Movie>`; now backed by androidx.paging.compose.LazyPagingItems so scrolling near the
+ * bottom transparently loads the next TMDB page (see TrendingViewModel.pagedMovies/
+ * com.ahsan.movieapp.data.paging.CategoryRemoteMediator). The full-screen loading/error states
+ * below are driven by `loadState.refresh` (first page); PagingAppendFooter handles "loading/
  * failed the *next* page" separately, at the bottom of an already-populated grid.
  */
 @Composable

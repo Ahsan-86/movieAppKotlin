@@ -62,7 +62,7 @@ data class CastMemberDto(
 )
 
 /**
- * One crew entry from `/movie/{id}/credits` (director, writer, producer, etc. — filter by [job]).
+ * One crew entry from `/movie/{id}/credits` (director, writer, producer, etc. — filter by job).
  * Phase 3 Round A only surfaces the director; other crew roles are read here but not exposed
  * further up the stack yet (see MovieRepositoryImpl.getMovieCredits).
  */

@@ -32,8 +32,8 @@ import com.ahsan.movieapp.domain.model.Movie
  * Full-width list row for a movie — poster thumbnail, title, year, overview snippet, and a
  * favorite toggle. Originally the search screen's list-view-mode row; promoted to a shared
  * component (Phase 3, PersonScreen feedback round) so the person screen's filmography can reuse
- * the exact same visual style instead of growing a near-duplicate row. [onToggleFavorite] is
- * nullable the same way [MoviePosterCard]'s is — pass null to hide the toggle entirely, e.g. for
+ * the exact same visual style instead of growing a near-duplicate row. onToggleFavorite is
+ * nullable the same way MoviePosterCard's is — pass null to hide the toggle entirely, e.g. for
  * TV credits that can't be favorited yet.
  */
 @Composable

@@ -20,7 +20,7 @@ import retrofit2.http.Query
 
 /**
  * TMDB v3 REST API. The API key is attached automatically for every call by
- * [com.ahsan.movieapp.di.NetworkModule]'s auth interceptor, so it's never passed here explicitly.
+ * com.ahsan.movieapp.di.NetworkModule's auth interceptor, so it's never passed here explicitly.
  * Docs: https://developer.themoviedb.org/reference/intro/getting-started
  */
 interface TmdbApi {
@@ -77,8 +77,8 @@ interface TmdbApi {
     ): PagedResponseDto<MovieDto>
 
     /**
-     * TV counterpart of [discoverByGenres] — backs the genre screen's TV tab. The year/language/
-     * minimum-rating params mirror [discoverMovies]'s filter set so the genre screen's filter
+     * TV counterpart of discoverByGenres — backs the genre screen's TV tab. The year/language/
+     * minimum-rating params mirror discoverMovies's filter set so the genre screen's filter
      * section can page TV results just like Movies. TV uses `first_air_date_year` (TMDB's TV
      * counterpart of `primary_release_year`).
      */
@@ -104,7 +104,7 @@ interface TmdbApi {
     suspend fun getSimilarMovies(@Path("id") movieId: Int, @Query("page") page: Int = 1): PagedResponseDto<MovieDto>
 
     /**
-     * A separate TMDB algorithm from [getSimilarMovies] (genre/keyword similarity vs. TMDB's own
+     * A separate TMDB algorithm from getSimilarMovies (genre/keyword similarity vs. TMDB's own
      * recommendation model) — the Detail screen's Similar and Recommendations sections are
      * deliberately not deduped against each other, per Ahsan's request, since they're different
      * data.
@@ -115,7 +115,7 @@ interface TmdbApi {
     /**
      * Backs the Detail screen's collection teaser (Phase 3 Round B) — every movie belonging to a
      * TMDB "collection" (franchise), plus the collection's own overview/poster/backdrop. The
-     * teaser itself needs no separate call (see [getMovieDetails]'s `belongs_to_collection`); this
+     * teaser itself needs no separate call (see getMovieDetails's `belongs_to_collection`); this
      * is only fetched once the teaser is tapped.
      */
     @GET("3/collection/{id}")
@@ -124,13 +124,13 @@ interface TmdbApi {
     /**
      * Backs the Detail screen's streaming-availability section (Phase 3 Round C) — powered by
      * JustWatch. No query params: TMDB returns every region in one response (see
-     * [WatchProvidersResponseDto]), so the region dropdown filters client-side instead of
+     * WatchProvidersResponseDto), so the region dropdown filters client-side instead of
      * re-fetching per region.
      */
     @GET("3/movie/{id}/watch/providers")
     suspend fun getWatchProviders(@Path("id") movieId: Int): WatchProvidersResponseDto
 
-    /** TV counterpart of [getWatchProviders] — same response shape, backs the TV detail screen's "Where to watch". */
+    /** TV counterpart of getWatchProviders — same response shape, backs the TV detail screen's "Where to watch". */
     @GET("3/tv/{id}/watch/providers")
     suspend fun getTvWatchProviders(@Path("id") tvId: Int): WatchProvidersResponseDto
 
@@ -156,7 +156,7 @@ interface TmdbApi {
 
     /**
      * Phase 2.6 Session 1 — the TV detail screen's base info section. Scoped down from
-     * [MovieDetailsDto]'s full field set to what that screen needs (see [TvDetailsDto]'s doc);
+     * MovieDetailsDto's full field set to what that screen needs (see TvDetailsDto's doc);
      * Seasons (Session 2) is a separate `/tv/{id}/season/{season_number}` call, not part of this
      * response's fields used here.
      */
@@ -164,14 +164,14 @@ interface TmdbApi {
     suspend fun getTvDetails(@Path("id") tvId: Int): TvDetailsDto
 
     /**
-     * TV counterpart of [getMovieCredits] — same cast/crew shape, reused via [CreditsDto] rather
+     * TV counterpart of getMovieCredits — same cast/crew shape, reused via CreditsDto rather
      * than a separate TV-specific DTO. Backs the TV detail screen's Cast & Crew section.
      */
     @GET("3/tv/{id}/credits")
     suspend fun getTvCredits(@Path("id") tvId: Int): CreditsDto
 
     /**
-     * The whole-show rollup of [getTvCredits], across every episode. `/tv/{id}/credits`' `crew`
+     * The whole-show rollup of getTvCredits, across every episode. `/tv/{id}/credits`' `crew`
      * is often empty for series, so the director is read from this aggregate view instead (see
      * MovieRepositoryImpl.getTvCredits' fallback).
      */
@@ -179,14 +179,14 @@ interface TmdbApi {
     suspend fun getTvAggregateCredits(@Path("id") tvId: Int): TvAggregateCreditsDto
 
     /**
-     * TV counterpart of [getSimilarMovies] — backs the TV detail screen's Similar section, added
+     * TV counterpart of getSimilarMovies — backs the TV detail screen's Similar section, added
      * on Ahsan's post-build feedback to Phase 2.6 Session 1.
      */
     @GET("3/tv/{id}/similar")
     suspend fun getSimilarTv(@Path("id") tvId: Int, @Query("page") page: Int = 1): PagedResponseDto<TvShowDto>
 
     /**
-     * TV counterpart of [getMovieRecommendations] — a separate TMDB algorithm from [getSimilarTv],
+     * TV counterpart of getMovieRecommendations — a separate TMDB algorithm from getSimilarTv,
      * deliberately not deduped against it, same as the movie side.
      */
     @GET("3/tv/{id}/recommendations")
@@ -195,19 +195,19 @@ interface TmdbApi {
     /**
      * Phase 2.6 Session 2 — backs the Watch Trailer button on the Movie detail screen. TMDB
      * returns every attached video (trailers, teasers, clips, etc.) across sites; see
-     * [com.ahsan.movieapp.data.mapper.bestYoutubeTrailerKey] for how the one shown is picked.
+     * com.ahsan.movieapp.data.mapper.bestYoutubeTrailerKey for how the one shown is picked.
      */
     @GET("3/movie/{id}/videos")
     suspend fun getMovieVideos(@Path("id") movieId: Int): VideosResponseDto
 
-    /** TV counterpart of [getMovieVideos] — backs the Watch Trailer button on the TV detail screen. */
+    /** TV counterpart of getMovieVideos — backs the Watch Trailer button on the TV detail screen. */
     @GET("3/tv/{id}/videos")
     suspend fun getTvVideos(@Path("id") tvId: Int): VideosResponseDto
 
     /**
      * Phase 2.6 Session 2 — one season's full episode list, opened by tapping a season in the TV
      * detail screen's Seasons section. Not part of `/tv/{id}` itself (that only returns the season
-     * summaries — see [TvDetailsDto.seasons]).
+     * summaries — see TvDetailsDto.seasons).
      */
     @GET("3/tv/{id}/season/{season_number}")
     suspend fun getSeasonDetails(@Path("id") tvId: Int, @Path("season_number") seasonNumber: Int): SeasonDetailsDto

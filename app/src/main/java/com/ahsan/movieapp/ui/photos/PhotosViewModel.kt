@@ -24,7 +24,7 @@ data class PhotosUiState(
  * nav destination carrying `mediaType` ("movie" / "tv") + `mediaId`, and re-requests the list by id
  * like every other drill-down in this app. The repository keeps recent results in memory, so these
  * calls normally answer instantly from the fetch the detail screen's Photos row already made.
- * [startIndex] is only present on the viewer's route.
+ * startIndex is only present on the viewer's route.
  */
 @HiltViewModel
 class PhotosViewModel @Inject constructor(

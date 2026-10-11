@@ -10,13 +10,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Phase 4 (pagination) Round 3 — the genre screen's TV tab. Network-only, straight over
- * [TmdbApi.discoverTvByGenres] with no Room table and no [androidx.paging.RemoteMediator] behind
- * it, unlike [CategoryRemoteMediator]'s offline-first pattern: a genre+filter TV search has no
+ * TmdbApi.discoverTvByGenres with no Room table and no androidx.paging.RemoteMediator behind
+ * it, unlike CategoryRemoteMediator's offline-first pattern: a genre+filter TV search has no
  * cache table of its own (only the curated TV carousels are cached — see
- * [com.ahsan.movieapp.data.repository.MovieRepository.getCategoryTv]), so there's nothing for a
- * mediator to page into — a plain [PagingSource] reading TMDB pages directly is the whole story.
- * [filters] (year/language/minimum rating — the genre is already [genreId]) fold into the discover
- * call: a [DiscoverFilters] with nothing set pages the plain genre list, so the genre screen's
+ * com.ahsan.movieapp.data.repository.MovieRepository.getCategoryTv), so there's nothing for a
+ * mediator to page into — a plain PagingSource reading TMDB pages directly is the whole story.
+ * filters (year/language/minimum rating — the genre is already genreId) fold into the discover
+ * call: a DiscoverFilters with nothing set pages the plain genre list, so the genre screen's
  * filter section can switch between the two without swapping sources.
  */
 class TvGenrePagingSource(

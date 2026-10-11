@@ -35,7 +35,7 @@ import kotlin.math.roundToInt
  *    trailer and the teaser) are removed with a perceptual hash.
  *
  * Network-only and best-effort: any failure yields an empty list and the detail screen simply hides
- * the Photos row. Callers are cached by [MovieRepositoryImpl].
+ * the Photos row. Callers are cached by MovieRepositoryImpl.
  */
 @Singleton
 class GalleryPhotoLoader @Inject constructor(private val api: TmdbApi) {
@@ -166,7 +166,7 @@ class GalleryPhotoLoader @Inject constructor(private val api: TmdbApi) {
         return hash
     }
 
-    /** [count] items spread evenly across [items] (always including the first and last when count > 1). */
+    /** count items spread evenly across items (always including the first and last when count > 1). */
     private fun <T> spreadPick(items: List<T>, count: Int): List<T> {
         if (items.size <= count) return items
         if (count <= 1) return items.take(count)

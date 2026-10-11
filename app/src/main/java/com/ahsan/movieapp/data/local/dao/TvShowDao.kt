@@ -12,7 +12,7 @@ import com.ahsan.movieapp.data.local.entity.TvShowEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Phase 2.6 Session 3 — the `tv_shows`/`category_tv_shows`/`tv_remote_keys` mirror of [MovieDao],
+ * Phase 2.6 Session 3 — the `tv_shows`/`category_tv_shows`/`tv_remote_keys` mirror of MovieDao,
  * backing the Explore screen's TV carousels the exact same way movies are backed. TV favorites
  * DON'T live here as a join — since Session 6 they're in the separate composite-key `favorites`
  * table (`mediaType = 'tv'`), folded in by MovieRepository.getCategoryTv via a favorites flow
@@ -55,7 +55,7 @@ interface TvShowDao {
     @Query("SELECT MIN(fetchedAt) FROM category_tv_shows WHERE category = :category")
     suspend fun categoryTvFetchedAt(category: String): Long?
 
-    /** The paged form of [observeCategoryTv], for [androidx.paging.Pager] + the TV mediator. */
+    /** The paged form of observeCategoryTv, for androidx.paging.Pager + the TV mediator. */
     @Query(
         """
         SELECT tv_shows.* FROM tv_shows

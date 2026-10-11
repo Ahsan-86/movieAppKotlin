@@ -49,9 +49,9 @@ import com.ahsan.movieapp.ui.person.MediaTab
  * Full-screen "browse a genre" view opened from the search screen's genre chips. Shows a
  * Movies/TV segmented toggle only when the genre actually has both (e.g. "Horror" is
  * movie-only) — same pattern as the person screen's Movies/TV toggle. Both tabs are paginated,
- * infinite-scroll (Phase 4 Round 2 for Movies, Round 3 for TV) — see [GenreViewModel]'s class doc
+ * infinite-scroll (Phase 4 Round 2 for Movies, Round 3 for TV) — see GenreViewModel's class doc
  * for why they're backed by two different mechanisms under the hood. Tapping a TV item routes to
- * the real TV detail screen via [onTvClick] (the toast that used to live here was retired on
+ * the real TV detail screen via onTvClick (the toast that used to live here was retired on
  * 2026-09-22 now that the TV detail screen exists).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -167,9 +167,9 @@ fun GenreScreen(
     }
 }
 
-/** Shared grid for both of [GenreScreen]'s tabs — same loading/error/empty/append handling,
- *  paging library, and layout either way, just a different [LazyPagingItems] source, empty-state
- *  message, click handler, and favoriting behavior. [favoriteIds] re-stamps each item's
+/** Shared grid for both of GenreScreen's tabs — same loading/error/empty/append handling,
+ *  paging library, and layout either way, just a different LazyPagingItems source, empty-state
+ *  message, click handler, and favoriting behavior. favoriteIds re-stamps each item's
  *  isFavorite at render time (see SearchViewModel.favoriteIds for the why) so both tabs' hearts
  *  flip immediately on toggle. */
 @Composable

@@ -4,10 +4,10 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * TMDB `/search/multi` returns movies, TV shows, and people in one heterogeneous list,
- * distinguished by [mediaType]. One flat DTO covers every field any of the three shapes uses
+ * distinguished by mediaType. One flat DTO covers every field any of the three shapes uses
  * (Gson just leaves the fields that don't apply to a given item as null). The repository splits
  * the three media types apart — movies (paginated search grid), TV shows (see
- * [com.ahsan.movieapp.data.mapper.toTvShowDto]), and people (one-shot row) — so TV results are
+ * com.ahsan.movieapp.data.mapper.toTvShowDto), and people (one-shot row) — so TV results are
  * no longer dropped since this app now browses TV.
  */
 data class MultiSearchResultDto(

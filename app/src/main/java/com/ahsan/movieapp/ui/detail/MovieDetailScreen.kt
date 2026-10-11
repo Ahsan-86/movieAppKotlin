@@ -76,10 +76,10 @@ import com.ahsan.movieapp.ui.components.rememberBackdropPalette
 /**
  * Detail screen: a big full-width portrait poster hero (PersonHero-style, 2026-09-22) with the
  * title/tagline/rating/year/runtime/genres overlaid on its bottom edge via the shared
- * [DetailHeroCaption] — the backdrop is gone and the poster is the hero; then the Overview section
+ * DetailHeroCaption — the backdrop is gone and the poster is the hero; then the Overview section
  * directly below it with the Watch Trailer + Share row (Phase 2.6 Session 2) at the end of that
  * section — repositioned on Ahsan's 2026-09-12 post-ship feedback (originally a separate full-width
- * row below, mirroring [com.ahsan.movieapp.ui.tv.TvDetailScreen]'s identical move); then
+ * row below, mirroring com.ahsan.movieapp.ui.tv.TvDetailScreen's identical move); then
  * cast/crew (Phase 3 Round A), Information/Similar/Recommendations (added the same round on Ahsan's
  * post-build feedback), a collection teaser (Round B), and streaming availability (Round C).
  *
@@ -285,7 +285,7 @@ fun MovieDetailScreen(
  * Production Companies (names only, comma-separated — no logos), Budget, Revenue, Website, in
  * that order per Ahsan's request. Every row is individually optional: a null/blank/zero value
  * simply doesn't render its row, rather than showing an empty or "$0" value. Renders nothing at
- * all if every field is absent. The Website row uses the same "Label / value" [InfoRow] layout as
+ * all if every field is absent. The Website row uses the same "Label / value" InfoRow layout as
  * every other field here — labeled "Website", value = the raw URL as plain (but clickable-styled)
  * text — rather than a standalone icon+link row, so it reads as one consistent list.
  */
@@ -355,8 +355,8 @@ private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null,
 
 /**
  * Phase 3 Round B's compact "part of a collection" teaser — poster thumbnail + collection name,
- * tappable through to a new full-screen [com.ahsan.movieapp.ui.detail.CollectionScreen] listing
- * every movie in the franchise. Only rendered when [MovieDetails.collection] is non-null (most
+ * tappable through to a new full-screen com.ahsan.movieapp.ui.detail.CollectionScreen listing
+ * every movie in the franchise. Only rendered when MovieDetails.collection is non-null (most
  * movies aren't part of one). Sits directly below Information, since it's another "key fact" about
  * the movie, and above Similar/Recommendations.
  */
@@ -407,7 +407,7 @@ private fun CollectionTeaser(collection: CollectionSummary, onClick: () -> Unit)
 
 /**
  * Layout for the "More Like This" shelf (Review-queue item 2 → option A): a heading followed by a
- * uniform horizontal poster row at 144dp, reusing [MoviePosterCard] like every other carousel in
+ * uniform horizontal poster row at 144dp, reusing MoviePosterCard like every other carousel in
  * the app. Option B (spotlight + queue) was tried here but Ahsan's intent was the Person screen's
  * filmography — this shelf stays in the app's standard row language. The shelf shows
  * Recommendations only (Similar dropped 2026-09-20: not relevant enough); title unchanged from
@@ -435,8 +435,8 @@ private fun PosterRowSection(movies: List<Movie>, onMovieClick: (Movie) -> Unit)
 
 /**
  * Phase 3 Round A's cast/crew section — sits directly below the Overview. A "view all" arrow next
- * to the heading opens [com.ahsan.movieapp.ui.detail.CastCrewListScreen] with the full cast (this
- * row only shows the first [CAST_ROW_LIMIT]). Cast only on the detail itself — the director is
+ * to the heading opens com.ahsan.movieapp.ui.detail.CastCrewListScreen with the full cast (this
+ * row only shows the first CAST_ROW_LIMIT). Cast only on the detail itself — the director is
  * deliberately not duplicated here since the cast & crew list (where the director is shown) is one
  * arrow-tap away.
  */

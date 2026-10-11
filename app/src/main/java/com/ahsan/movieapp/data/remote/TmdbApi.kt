@@ -84,7 +84,9 @@ interface TmdbApi {
      */
     @GET("3/discover/tv")
     suspend fun discoverTvByGenres(
-        @Query("with_genres") genreIds: String,
+        // Nullable: the search screen's first-screen filters (genre optional) also use this call to
+        // fill the filter results' TV Shows row; Retrofit omits a null query param.
+        @Query("with_genres") genreIds: String?,
         @Query("first_air_date_year") year: Int? = null,
         @Query("with_original_language") language: String? = null,
         @Query("vote_average.gte") minRating: Float? = null,
@@ -127,6 +129,10 @@ interface TmdbApi {
      */
     @GET("3/movie/{id}/watch/providers")
     suspend fun getWatchProviders(@Path("id") movieId: Int): WatchProvidersResponseDto
+
+    /** TV counterpart of [getWatchProviders] — same response shape, backs the TV detail screen's "Where to watch". */
+    @GET("3/tv/{id}/watch/providers")
+    suspend fun getTvWatchProviders(@Path("id") tvId: Int): WatchProvidersResponseDto
 
     /**
      * Single call covering movies, TV, and people — replaces the old separate

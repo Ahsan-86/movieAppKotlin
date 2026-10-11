@@ -12,8 +12,10 @@ import com.ahsan.movieapp.domain.model.MovieDetails
 import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.PersonCredits
 import com.ahsan.movieapp.domain.model.PersonDetails
+import com.ahsan.movieapp.domain.model.Photo
 import com.ahsan.movieapp.domain.model.SeasonDetails
 import com.ahsan.movieapp.domain.model.TvCategory
+import com.ahsan.movieapp.domain.model.TvDiscoverResult
 import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.domain.model.WatchProviders
 import com.ahsan.movieapp.util.Resource
@@ -98,6 +100,10 @@ interface MovieRepository {
      */
     suspend fun getWatchProviders(movieId: Int): Result<WatchProviders>
 
+    /** TV counterpart of [getWatchProviders] — the TV detail screen's "Where to watch". Same one-shot,
+     *  network-only convention; one call covers every region. */
+    suspend fun getTvWatchProviders(tvId: Int): Result<WatchProviders>
+
     /**
      * Phase 4 (pagination) Round 4 — the search screen's movie results, infinite-scroll over TMDB
      * `/search/multi` filtered to movies. Network-only, no [androidx.paging.RemoteMediator] (same
@@ -129,6 +135,14 @@ interface MovieRepository {
      * and the search screen re-stamps their hearts against a live favorites set at render time.
      */
     suspend fun searchTvShows(query: String): Result<List<Movie>>
+
+    /**
+     * The TV half of the search screen's first-screen filter results — TMDB `/discover/tv` for the same
+     * year / language / minimum-rating (and genre, via [tvGenreId], the TV id of the chosen movie genre;
+     * null for "any genre") the movie side is filtered by. One-shot, capped, NOT paginated and
+     * network-only, same convention as [searchTvShows]: it fills the "TV Shows" row above the movies.
+     */
+    suspend fun discoverTvShows(filters: DiscoverFilters, tvGenreId: Int?): Result<TvDiscoverResult>
 
     /** Bio, photo, and primary role for the person screen's header. */
     suspend fun getPersonDetails(personId: Int): Result<PersonDetails>
@@ -281,4 +295,17 @@ interface MovieRepository {
      * Seasons section. One-shot, network-only, no Room cache — same convention as [getTvDetails].
      */
     suspend fun getSeasonDetails(tvId: Int, seasonNumber: Int): Result<SeasonDetails>
+
+    /**
+     * Phase 5 Photos gallery — real frames from the movie, up to 20: auto-generated frames of its
+     * YouTube Trailer / Teaser / Clip videos, de-duplicated and screened for black-bar/fade frames
+     * (TMDB's own `backdrops` are mostly promo art, so they are not used — see [GalleryPhotoLoader]).
+     * One-shot, network-only (no Room table — same convention as [getMovieCredits]); the impl keeps the
+     * last few results in memory so the detail row, the "See all" grid and the fullscreen viewer share one
+     * fetch instead of each re-requesting it. Empty when the movie has no usable videos.
+     */
+    suspend fun getMovieImages(movieId: Int): Result<List<Photo>>
+
+    /** TV counterpart of [getMovieImages], built from episode stills sampled across the show's seasons. */
+    suspend fun getTvImages(tvId: Int): Result<List<Photo>>
 }

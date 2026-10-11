@@ -16,6 +16,9 @@ import javax.inject.Inject
 
 data class SeasonEpisodesUiState(
     val seasonName: String,
+    // TMDB's short description of the whole season (blank for many long-running shows); shown above the
+    // episode list, like the Collection screen's overview paragraph.
+    val overview: String = "",
     val episodes: List<Episode> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null
@@ -47,7 +50,7 @@ class SeasonEpisodesViewModel @Inject constructor(
         viewModelScope.launch {
             repository.getSeasonDetails(tvId, seasonNumber)
                 .onSuccess { season ->
-                    _uiState.update { it.copy(episodes = season.episodes, isLoading = false, errorMessage = null) }
+                    _uiState.update { it.copy(overview = season.overview, episodes = season.episodes, isLoading = false, errorMessage = null) }
                 }
                 .onFailure { throwable ->
                     _uiState.update { it.copy(isLoading = false, errorMessage = throwable.message) }

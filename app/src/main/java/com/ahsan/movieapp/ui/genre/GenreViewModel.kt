@@ -7,6 +7,8 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.ahsan.movieapp.data.repository.MovieRepository
 import com.ahsan.movieapp.domain.model.DiscoverFilters
+import com.ahsan.movieapp.domain.model.FilterField
+import com.ahsan.movieapp.domain.model.without
 import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.ui.person.MediaTab
@@ -152,8 +154,17 @@ class GenreViewModel @Inject constructor(
 
     // --- Collapsible filter panel (year/language/min rating — no genre, this screen pins it) ---
 
+    /** Opens/closes the panel. Closing it while editing already-applied filters abandons the unsaved
+     *  draft (it snaps back to what is actually applied), so the summary + count come back unchanged. */
     fun onToggleFilterPanel() {
-        _uiState.update { it.copy(isFilterPanelExpanded = !it.isFilterPanelExpanded) }
+        _uiState.update { state ->
+            val closing = state.isFilterPanelExpanded
+            val restoreApplied = closing && state.isFilterApplied
+            state.copy(
+                isFilterPanelExpanded = !closing,
+                filters = if (restoreApplied) appliedFiltersFlow.value ?: state.filters else state.filters
+            )
+        }
     }
 
     fun onYearFilterSelected(year: Int?) {
@@ -182,14 +193,28 @@ class GenreViewModel @Inject constructor(
         appliedFiltersFlow.value = filters
     }
 
-    /** Summaries' "Edit" — back to the expanded panel (draft kept) instead of the applied view. */
+    /** Summary's "Edit" — opens the panel in place. The applied filters (and so the results and their
+     *  count) stay in effect until a new set is applied or cleared; collapsing without applying
+     *  returns to the summary. */
     fun onEditFilters() {
-        _uiState.update { it.copy(isFilterApplied = false, isFilterPanelExpanded = true) }
+        _uiState.update { it.copy(isFilterPanelExpanded = true) }
+    }
+
+    /** A filter chip's ✕: drops that one criterion and re-applies the rest, or clears everything when
+     *  it was the last one. */
+    fun onRemoveFilter(field: FilterField) {
+        val remaining = (appliedFiltersFlow.value ?: _uiState.value.filters).without(field)
+        if (remaining.isEmpty) {
+            onClearFilters()
+            return
+        }
+        _uiState.update { it.copy(filters = remaining) }
+        onApplyFilters()
     }
 
     fun onClearFilters() {
         appliedFiltersFlow.value = null
         tvTotal.value = null
-        _uiState.update { it.copy(filters = DiscoverFilters(), isFilterApplied = false) }
+        _uiState.update { it.copy(filters = DiscoverFilters(), isFilterApplied = false, isFilterPanelExpanded = false) }
     }
 }

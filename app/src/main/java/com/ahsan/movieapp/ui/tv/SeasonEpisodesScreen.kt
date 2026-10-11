@@ -4,6 +4,7 @@ import com.ahsan.movieapp.R
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +36,7 @@ import com.ahsan.movieapp.domain.model.Episode
 import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.EpisodeListSkeleton
+import com.ahsan.movieapp.ui.components.ShimmerLine
 
 /**
  * Phase 2.6 Session 2 — one season's full episode list (image + description per episode), opened
@@ -67,12 +69,33 @@ fun SeasonEpisodesScreen(
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
-                state.isLoading -> EpisodeListSkeleton()
+                state.isLoading -> Column(modifier = Modifier.fillMaxSize()) {
+                    // Same spot as the real description paragraph, so the episodes don't jump when it lands.
+                    Column(
+                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ShimmerLine(height = 12.dp)
+                        ShimmerLine(widthFraction = 0.9f, height = 12.dp)
+                        ShimmerLine(widthFraction = 0.6f, height = 12.dp)
+                    }
+                    EpisodeListSkeleton(modifier = Modifier.weight(1f))
+                }
                 state.episodes.isEmpty() && state.errorMessage != null ->
                     FullScreenError(message = state.errorMessage ?: stringResource(R.string.season_couldnt_load))
                 state.episodes.isEmpty() ->
                     EmptyState(title = stringResource(R.string.season_empty_title), body = stringResource(R.string.season_empty_body))
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    if (state.overview.isNotBlank()) {
+                        item(key = "overview") {
+                            Text(
+                                text = state.overview,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 16.dp)
+                            )
+                        }
+                    }
                     items(state.episodes, key = { it.episodeNumber }) { episode ->
                         EpisodeRow(episode = episode)
                     }

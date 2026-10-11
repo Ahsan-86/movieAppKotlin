@@ -77,7 +77,7 @@ class SearchMoviesPagingSource(
             }
             val favoriteIds = favoriteDao.observeFavoriteMovies().first().map { it.id }.toSet()
             LoadResult.Page(
-                data = movieDtos.map { it.toEntity(now).toDomain(isFavorite = it.id in favoriteIds) },
+                data = movieDtos.map { it.toEntity(now).toDomain(isFavorite = it.id in favoriteIds).copy(originalLanguage = it.originalLanguage) },
                 prevKey = null,
                 nextKey = (page + 1).takeIf { page < response.totalPages }
             )

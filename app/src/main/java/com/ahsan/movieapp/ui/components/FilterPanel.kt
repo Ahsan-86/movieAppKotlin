@@ -3,6 +3,8 @@ package com.ahsan.movieapp.ui.components
 import com.ahsan.movieapp.R
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,12 +13,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ahsan.movieapp.domain.model.DiscoverFilters
+import com.ahsan.movieapp.domain.model.FilterField
 import com.ahsan.movieapp.domain.model.GenreChip
 import java.util.Calendar
 import java.util.Locale
@@ -163,34 +170,85 @@ fun FilterSummaryBar(
     onEdit: () -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
-    resultCount: Int? = null
+    resultCount: Int? = null,
+    // Overrides the plain "N results found" line when the caller needs different wording (the search
+    // screen's filter results span movies + TV).
+    resultCountText: String? = null,
+    // Genre names for the genre chip's label (the genre filter holds only an id); empty = no genre chip
+    // text available, which only matters on screens that can have a genre filter at all.
+    genres: List<GenreChip> = emptyList(),
+    // Tapping a chip's ✕ removes just that one filter (the caller re-applies what's left, or clears when
+    // none remain). Null makes the chips plain, non-removable labels.
+    onRemoveFilter: ((FilterField) -> Unit)? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = stringResource(R.string.filter_filtered_filters, filters.activeCount),
-                style = MaterialTheme.typography.titleMedium
-            )
-            Row {
-                TextButton(onClick = onEdit) { Text(stringResource(R.string.filter_edit)) }
-                TextButton(onClick = onClear) { Text(stringResource(R.string.filter_clear)) }
+            // The active filters as chips ("2022", "English", "★ 7.0+" …) instead of a bare "N filters", so
+            // it is clear what is applied. They scroll sideways if there are too many to fit beside the buttons.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                filters.genreId?.let { genreId ->
+                    val genreName = genres.firstOrNull { it.movieGenreId == genreId }?.name ?: stringResource(R.string.filter_genre)
+                    ActiveFilterChip(label = genreName, onRemove = onRemoveFilter?.let { { it(FilterField.GENRE) } })
+                }
+                filters.year?.let { year ->
+                    ActiveFilterChip(label = year.toString(), onRemove = onRemoveFilter?.let { { it(FilterField.YEAR) } })
+                }
+                filters.language?.let { code ->
+                    val languageRes = FILTER_LANGUAGES.firstOrNull { it.first == code }?.second
+                    ActiveFilterChip(
+                        label = languageRes?.let { stringResource(it) } ?: code.uppercase(Locale.ROOT),
+                        onRemove = onRemoveFilter?.let { { it(FilterField.LANGUAGE) } }
+                    )
+                }
+                filters.minRating?.let { rating ->
+                    ActiveFilterChip(
+                        label = stringResource(R.string.filter_chip_rating, String.format(Locale.US, "%.1f", rating)),
+                        onRemove = onRemoveFilter?.let { { it(FilterField.MIN_RATING) } }
+                    )
+                }
             }
+            TextButton(onClick = onEdit) { Text(stringResource(R.string.filter_edit)) }
+            TextButton(onClick = onClear) { Text(stringResource(R.string.filter_clear)) }
         }
-        if (resultCount != null) {
+        if (resultCountText != null || resultCount != null) {
             Text(
-                text = stringResource(R.string.filter_results_found, resultCount),
+                text = resultCountText ?: stringResource(R.string.filter_results_found, resultCount!!),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
             )
         }
     }
+}
+
+/** One applied filter as a chip; with an [onRemove] it carries a ✕ that drops just that filter. */
+@Composable
+private fun ActiveFilterChip(label: String, onRemove: (() -> Unit)?) {
+    AssistChip(
+        onClick = { onRemove?.invoke() },
+        enabled = onRemove != null,
+        label = { Text(label) },
+        trailingIcon = if (onRemove != null) {
+            {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.filter_remove_chip, label),
+                    modifier = Modifier.size(AssistChipDefaults.IconSize)
+                )
+            }
+        } else null
+    )
 }
 
 /**

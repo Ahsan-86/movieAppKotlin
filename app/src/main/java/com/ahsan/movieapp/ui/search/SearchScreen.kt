@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,6 +78,7 @@ import com.ahsan.movieapp.domain.model.DiscoverFilters
 import com.ahsan.movieapp.domain.model.GenreChip
 import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
+import com.ahsan.movieapp.domain.model.matches
 import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.ui.components.EmptyState
 import com.ahsan.movieapp.ui.components.FilterPanelSection
@@ -135,7 +137,10 @@ fun SearchScreen(
     // (that was the "full-screen loader while typing on the first search" bug — the never-loaded
     // flow reported refresh Loading, and typing alone was enough to enter that branch).
     val hasActiveTextResults = state.committedQuery.isNotBlank() && state.query.isNotBlank()
-    val hasActiveFilterResults = state.isFilterApplied && state.query.isBlank()
+    // Keyed off the COMMITTED query, not the field text: with filters applied, typing a not-yet-submitted
+    // query must not bounce you off the filtered results back to the first screen. They only give way to
+    // text results once you actually submit (hasActiveTextResults), and return when the field is cleared.
+    val hasActiveFilterResults = state.isFilterApplied && state.committedQuery.isBlank()
 
     LaunchedEffect(scrollToTopEvents) {
         scrollToTopEvents?.collect {
@@ -197,41 +202,76 @@ fun SearchScreen(
 
         when {
             hasActiveFilterResults -> Column(modifier = Modifier.fillMaxSize()) {
-                FilterSummaryBar(
-                    filters = state.filters,
-                    onEdit = viewModel::onEditFilters,
-                    onClear = viewModel::onClearFilters,
-                    resultCount = filteredResultCount
-                )
+                // Edit opens the full panel right here above the results (the applied results and their
+                // count stay put); collapsing it without applying returns to the summary.
+                if (state.isFilterPanelExpanded) {
+                    FilterPanelSection(
+                        filters = state.filters,
+                        isExpanded = true,
+                        onToggleExpanded = viewModel::onToggleFilterPanel,
+                        onYearSelected = viewModel::onYearFilterSelected,
+                        onLanguageSelected = viewModel::onLanguageFilterSelected,
+                        onMinRatingChanged = viewModel::onMinRatingFilterChanged,
+                        onApply = viewModel::onApplyFilters,
+                        onReset = {
+                            viewModel.onGenreFilterSelected(null)
+                            viewModel.onYearFilterSelected(null)
+                            viewModel.onLanguageFilterSelected(null)
+                            viewModel.onMinRatingFilterChanged(null)
+                        },
+                        genres = state.genreChips,
+                        onGenreSelected = viewModel::onGenreFilterSelected
+                    )
+                } else {
+                    FilterSummaryBar(
+                        filters = state.filters,
+                        onEdit = viewModel::onEditFilters,
+                        onClear = viewModel::onClearFilters,
+                        genres = state.genreChips,
+                        onRemoveFilter = viewModel::onRemoveFilter,
+                        // Movies (paged Discover total) + TV (its /discover/tv total) — one combined count,
+                        // like the text-search line, but labelled for just the two kinds Discover returns.
+                        resultCountText = filteredResultCount?.let {
+                            stringResource(R.string.search_filter_results_found, it + (state.filterTvTotal ?: 0))
+                        }
+                    )
+                }
                 val refreshState = pagedFilteredMovies.loadState.refresh
+                // Same shape as the text-search results: a TV Shows row on top (here from /discover/tv for the
+                // same filters), then the Movies section — so a result set can be TV-only or movies-only.
+                val filterTvShows = state.filterTvShows
                 when {
-                    refreshState is LoadState.Loading && pagedFilteredMovies.itemCount == 0 -> SearchLoadingSkeleton(state.viewMode)
-                    refreshState is LoadState.Error && pagedFilteredMovies.itemCount == 0 -> FullScreenError(
+                    refreshState is LoadState.Loading && pagedFilteredMovies.itemCount == 0 && filterTvShows.isEmpty() ->
+                        SearchLoadingSkeleton(state.viewMode)
+                    refreshState is LoadState.Error && pagedFilteredMovies.itemCount == 0 && filterTvShows.isEmpty() -> FullScreenError(
                         message = refreshState.error.message ?: stringResource(R.string.search_couldnt_load_results),
                         onRetry = { pagedFilteredMovies.retry() }
                     )
-                    pagedFilteredMovies.itemCount == 0 -> EmptyState(
+                    pagedFilteredMovies.itemCount == 0 && filterTvShows.isEmpty() && !state.isLoadingFilterTv -> EmptyState(
                         title = stringResource(R.string.search_no_matches),
                         body = stringResource(R.string.search_no_matches_body)
                     )
                     else -> {
-                        ViewModeRow(selected = state.viewMode, onSelected = viewModel::onViewModeSelected)
                         when (state.viewMode) {
                             SearchViewMode.LIST -> SearchResultsList(
                                 movies = pagedFilteredMovies,
                                 people = emptyList(),
-                                tvShows = emptyList(),
+                                tvShows = filterTvShows,
+                                isLoadingTv = state.isLoadingFilterTv,
                                 onMovieClick = onMovieClick,
                                 onTvClick = onTvClick,
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 listState = resultsListState,
-                                favoriteIds = favoriteIds
+                                favoriteIds = favoriteIds,
+                                viewMode = state.viewMode,
+                                onViewModeSelected = viewModel::onViewModeSelected
                             )
                             else -> SearchResultsGrid(
                                 movies = pagedFilteredMovies,
                                 people = emptyList(),
-                                tvShows = emptyList(),
+                                tvShows = filterTvShows,
+                                isLoadingTv = state.isLoadingFilterTv,
                                 columns = if (state.viewMode == SearchViewMode.GRID_DENSE) GridCells.Fixed(4) else GridCells.Adaptive(minSize = 128.dp),
                                 posterWidth = null,
                                 onMovieClick = onMovieClick,
@@ -239,20 +279,49 @@ fun SearchScreen(
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 gridState = resultsGridState,
-                                favoriteIds = favoriteIds
+                                favoriteIds = favoriteIds,
+                                viewMode = state.viewMode,
+                                onViewModeSelected = viewModel::onViewModeSelected
                             )
                         }
                     }
                 }
             }
-            hasActiveTextResults -> {
+            hasActiveTextResults -> Column(modifier = Modifier.fillMaxSize()) {
                 val moviesRefresh = pagedSearchMovies.loadState.refresh
-                val nothingLoadedYet = pagedSearchMovies.itemCount == 0 && state.people.isEmpty() && state.tvShows.isEmpty()
+                // The TV Shows row obeys the same Year / Language / Rating filter as the movies.
+                val visibleTvShows = remember(state.tvShows, state.appliedSearchFilters) {
+                    val tvGenreId = state.genreChips.firstOrNull { it.movieGenreId == state.appliedSearchFilters.genreId }?.tvGenreId
+                    state.tvShows.filter { it.matches(state.appliedSearchFilters, tvGenreId) }
+                }
+                val nothingLoadedYet = pagedSearchMovies.itemCount == 0 && state.people.isEmpty() && visibleTvShows.isEmpty()
+                val filtersApplied = !state.appliedSearchFilters.isEmpty
+
+                // Year / Language / Rating for the movie results. TMDB's search can't filter, so these
+                // narrow the loaded results on the phone (see SearchViewModel.pagedSearchMovies); it
+                // sits above the results and stays visible in every state below, including "no matches".
+                FilterPanelSection(
+                    filters = state.searchFilters,
+                    isExpanded = state.isSearchFilterPanelExpanded,
+                    onToggleExpanded = viewModel::onToggleSearchFilterPanel,
+                    genres = state.genreChips,
+                    onGenreSelected = viewModel::onSearchGenreFilterSelected,
+                    onYearSelected = viewModel::onSearchYearFilterSelected,
+                    onLanguageSelected = viewModel::onSearchLanguageFilterSelected,
+                    onMinRatingChanged = viewModel::onSearchMinRatingFilterChanged,
+                    onApply = viewModel::onApplySearchFilters,
+                    onReset = viewModel::onResetSearchFilters
+                )
+
                 when {
                     nothingLoadedYet && (moviesRefresh is LoadState.Loading || state.isSearchingPeople || state.isSearchingTv) -> SearchLoadingSkeleton(state.viewMode)
                     nothingLoadedYet && moviesRefresh is LoadState.Error -> FullScreenError(
                         message = moviesRefresh.error.message ?: stringResource(R.string.search_failed),
                         onRetry = { pagedSearchMovies.retry() }
+                    )
+                    nothingLoadedYet && filtersApplied -> EmptyState(
+                        title = stringResource(R.string.search_no_filter_matches),
+                        body = stringResource(R.string.search_no_filter_matches_body, state.query)
                     )
                     nothingLoadedYet -> EmptyState(
                         title = stringResource(R.string.search_no_results),
@@ -262,21 +331,32 @@ fun SearchScreen(
                         // The view-mode toggle only makes sense once there's something to lay out —
                         // it used to sit above the search field permanently, which showed it even on
                         // the blank first-open screen with no results to switch the layout of.
+                        // TMDB's total always counts the *unfiltered* results, so while a filter is on the
+                        // line also says how many of the movies loaded so far pass it (more load as you scroll).
                         if (searchResultCount != null) {
                             val count = searchResultCount
+                            val matchedSoFar = pagedSearchMovies.itemCount + visibleTvShows.size
                             Text(
-                                text = stringResource(R.string.filter_results_found, count!!),
+                                text = stringResource(R.string.search_total_results_found, count!!) +
+                                    if (filtersApplied && matchedSoFar > 0) " · " + stringResource(R.string.search_filtered_matches_so_far, matchedSoFar) else "",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 12.dp)
+                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
                             )
                         }
-                        ViewModeRow(selected = state.viewMode, onSelected = viewModel::onViewModeSelected)
+                        if (filtersApplied && pagedSearchMovies.itemCount == 0 && moviesRefresh !is LoadState.Loading) {
+                            Text(
+                                text = stringResource(R.string.search_no_movies_match_filters),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                            )
+                        }
                         when (state.viewMode) {
                             SearchViewMode.LIST -> SearchResultsList(
                                 movies = pagedSearchMovies,
                                 people = state.people,
-                                tvShows = state.tvShows,
+                                tvShows = visibleTvShows,
                                 isLoadingPeople = state.isSearchingPeople,
                                 isLoadingTv = state.isSearchingTv,
                                 onMovieClick = onMovieClick,
@@ -284,12 +364,14 @@ fun SearchScreen(
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 listState = resultsListState,
-                                favoriteIds = favoriteIds
+                                favoriteIds = favoriteIds,
+                                viewMode = state.viewMode,
+                                onViewModeSelected = viewModel::onViewModeSelected
                             )
                             SearchViewMode.GRID -> SearchResultsGrid(
                                 movies = pagedSearchMovies,
                                 people = state.people,
-                                tvShows = state.tvShows,
+                                tvShows = visibleTvShows,
                                 isLoadingPeople = state.isSearchingPeople,
                                 isLoadingTv = state.isSearchingTv,
                                 columns = GridCells.Adaptive(minSize = 128.dp),
@@ -299,12 +381,14 @@ fun SearchScreen(
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 gridState = resultsGridState,
-                                favoriteIds = favoriteIds
+                                favoriteIds = favoriteIds,
+                                viewMode = state.viewMode,
+                                onViewModeSelected = viewModel::onViewModeSelected
                             )
                             SearchViewMode.GRID_DENSE -> SearchResultsGrid(
                                 movies = pagedSearchMovies,
                                 people = state.people,
-                                tvShows = state.tvShows,
+                                tvShows = visibleTvShows,
                                 isLoadingPeople = state.isSearchingPeople,
                                 isLoadingTv = state.isSearchingTv,
                                 columns = GridCells.Fixed(4),
@@ -314,7 +398,9 @@ fun SearchScreen(
                                 onPersonClick = onPersonClick,
                                 onToggleFavorite = viewModel::toggleFavorite,
                                 gridState = resultsGridState,
-                                favoriteIds = favoriteIds
+                                favoriteIds = favoriteIds,
+                                viewMode = state.viewMode,
+                                onViewModeSelected = viewModel::onViewModeSelected
                             )
                         }
                     }
@@ -384,14 +470,20 @@ private fun SearchLoadingSkeleton(viewMode: SearchViewMode) {
     }
 }
 
+/** The Movies-section header: an optional [title] on the left, the three layout toggles on the right. */
 @Composable
-private fun ViewModeRow(selected: SearchViewMode, onSelected: (SearchViewMode) -> Unit) {
+private fun ViewModeRow(selected: SearchViewMode, onSelected: (SearchViewMode) -> Unit, title: String? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 4.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.End
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        if (title != null) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
         ViewModeButton(icon = Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.search_list_view), isSelected = selected == SearchViewMode.LIST) {
             onSelected(SearchViewMode.LIST)
         }
@@ -644,7 +736,9 @@ private fun SearchResultsGrid(
     // Live favorites set — the paged Movie snapshot's isFavorite goes stale after a toggle in
     // this screen, so each item re-stamps itself against this set at render time. See
     // SearchViewModel.favoriteIds for why.
-    favoriteIds: Set<Pair<Int, MediaType>>
+    favoriteIds: Set<Pair<Int, MediaType>>,
+    viewMode: SearchViewMode,
+    onViewModeSelected: (SearchViewMode) -> Unit
 ) {
     LazyVerticalGrid(
         columns = columns,
@@ -669,14 +763,14 @@ private fun SearchResultsGrid(
             item(span = { GridItemSpan(maxLineSpan) }) { TvShowsResultsRowSkeleton() }
         }
         if (movies.itemCount > 0) {
-            if (people.isNotEmpty() || tvShows.isNotEmpty() || isLoadingPeople || isLoadingTv) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text = stringResource(R.string.movies),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
-                }
+            // The list/grid/dense toggle belongs to the movie results, so it heads the Movies section
+            // (right-aligned; the "Movies" title beside it only when People/TV rows sit above it).
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                ViewModeRow(
+                    selected = viewMode,
+                    onSelected = onViewModeSelected,
+                    title = if (people.isNotEmpty() || tvShows.isNotEmpty() || isLoadingPeople || isLoadingTv) stringResource(R.string.movies) else null
+                )
             }
             items(count = movies.itemCount, key = movies.itemKey { it.id }) { index ->
                 val movie = movies[index] ?: return@items
@@ -708,7 +802,9 @@ private fun SearchResultsList(
     listState: LazyListState,
     isLoadingPeople: Boolean = false,
     isLoadingTv: Boolean = false,
-    favoriteIds: Set<Pair<Int, MediaType>>
+    favoriteIds: Set<Pair<Int, MediaType>>,
+    viewMode: SearchViewMode,
+    onViewModeSelected: (SearchViewMode) -> Unit
 ) {
     LazyColumn(
         state = listState,
@@ -726,14 +822,13 @@ private fun SearchResultsList(
             item { TvShowsResultsRowSkeleton() }
         }
         if (movies.itemCount > 0) {
-            if (people.isNotEmpty() || tvShows.isNotEmpty() || isLoadingPeople || isLoadingTv) {
-                item {
-                    Text(
-                        text = stringResource(R.string.movies),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
-                }
+            // Same Movies-section header as the grid: toggle on the right, "Movies" title when People/TV rows precede it.
+            item {
+                ViewModeRow(
+                    selected = viewMode,
+                    onSelected = onViewModeSelected,
+                    title = if (people.isNotEmpty() || tvShows.isNotEmpty() || isLoadingPeople || isLoadingTv) stringResource(R.string.movies) else null
+                )
             }
             items(count = movies.itemCount, key = movies.itemKey { it.id }) { index ->
                 val movie = movies[index] ?: return@items

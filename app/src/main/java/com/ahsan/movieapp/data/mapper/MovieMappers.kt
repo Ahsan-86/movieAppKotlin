@@ -288,7 +288,8 @@ fun MultiSearchResultDto.toMovieDto(): MovieDto = MovieDto(
     voteAverage = voteAverage,
     voteCount = voteCount,
     genreIds = genreIds,
-    mediaType = mediaType
+    mediaType = mediaType,
+    originalLanguage = originalLanguage
 )
 
 /**

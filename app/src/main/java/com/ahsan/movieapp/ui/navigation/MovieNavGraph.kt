@@ -40,6 +40,9 @@ import com.ahsan.movieapp.ui.favorites.FavoritesScreen
 import com.ahsan.movieapp.ui.genre.GenreScreen
 import com.ahsan.movieapp.ui.home.HomeScreen
 import com.ahsan.movieapp.ui.person.PersonScreen
+import com.ahsan.movieapp.ui.photos.PhotoViewerScreen
+import com.ahsan.movieapp.ui.photos.PhotosGridScreen
+import com.ahsan.movieapp.ui.photos.PhotosViewModel
 import com.ahsan.movieapp.ui.search.SearchScreen
 import com.ahsan.movieapp.ui.components.TrailerPlayerScreen
 import com.ahsan.movieapp.ui.trending.TrendingScreen
@@ -162,7 +165,9 @@ private fun MainNavHost() {
                     onCollectionClick = { collectionId, collectionName ->
                         navController.navigateToCollection(collectionId, collectionName)
                     },
-                    onWatchTrailer = { videoId -> navController.navigateToTrailer(videoId) }
+                    onWatchTrailer = { videoId -> navController.navigateToTrailer(videoId) },
+                    onPhotoClick = { movieId, index -> navController.navigateToPhotoViewer(PhotosViewModel.MEDIA_MOVIE, movieId, index) },
+                    onSeeAllPhotos = { movieId -> navController.navigateToPhotosGrid(PhotosViewModel.MEDIA_MOVIE, movieId) }
                 )
             }
             composable(
@@ -183,7 +188,9 @@ private fun MainNavHost() {
                     // Same arrow next to "Cast & Crew" as MovieDetailScreen — the full list plus
                     // director, fetched by tvId on the media-agnostic CastCrewListScreen.
                     onViewAllCastCrew = { tvId -> navController.navigate(Destination.TvCastCrewList.createRoute(tvId)) },
-                    onWatchTrailer = { videoId -> navController.navigateToTrailer(videoId) }
+                    onWatchTrailer = { videoId -> navController.navigateToTrailer(videoId) },
+                    onPhotoClick = { tvId, index -> navController.navigateToPhotoViewer(PhotosViewModel.MEDIA_TV, tvId, index) },
+                    onSeeAllPhotos = { tvId -> navController.navigateToPhotosGrid(PhotosViewModel.MEDIA_TV, tvId) }
                 )
             }
             composable(
@@ -202,6 +209,30 @@ private fun MainNavHost() {
             ) { backStackEntry ->
                 val videoId = backStackEntry.arguments?.getString("videoId").orEmpty()
                 TrailerPlayerScreen(videoId = videoId, onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Destination.PhotosGrid.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument("mediaType") { type = androidx.navigation.NavType.StringType },
+                    androidx.navigation.navArgument("mediaId") { type = androidx.navigation.NavType.IntType }
+                )
+            ) { backStackEntry ->
+                val mediaType = backStackEntry.arguments?.getString("mediaType").orEmpty()
+                val mediaId = backStackEntry.arguments?.getInt("mediaId") ?: 0
+                PhotosGridScreen(
+                    onBack = { navController.popBackStack() },
+                    onPhotoClick = { index -> navController.navigateToPhotoViewer(mediaType, mediaId, index) }
+                )
+            }
+            composable(
+                route = Destination.PhotoViewer.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument("mediaType") { type = androidx.navigation.NavType.StringType },
+                    androidx.navigation.navArgument("mediaId") { type = androidx.navigation.NavType.IntType },
+                    androidx.navigation.navArgument("startIndex") { type = androidx.navigation.NavType.IntType }
+                )
+            ) {
+                PhotoViewerScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Destination.CastCrewList.route,
@@ -296,6 +327,16 @@ private fun NavHostController.navigateToGenre(genre: GenreChip) {
 /** Detail screen's collection teaser (Phase 3 Round B) -> the full franchise list. */
 private fun NavHostController.navigateToCollection(collectionId: Int, collectionName: String) {
     navigate(Destination.CollectionDetail.createRoute(collectionId, collectionName))
+}
+
+/** Phase 5 Photos gallery — a detail screen's Photos row arrow -> the full grid of stills. */
+private fun NavHostController.navigateToPhotosGrid(mediaType: String, mediaId: Int) {
+    navigate(Destination.PhotosGrid.createRoute(mediaType, mediaId))
+}
+
+/** Phase 5 Photos gallery — a tapped still -> the fullscreen viewer at that photo. */
+private fun NavHostController.navigateToPhotoViewer(mediaType: String, mediaId: Int, startIndex: Int) {
+    navigate(Destination.PhotoViewer.createRoute(mediaType, mediaId, startIndex))
 }
 
 /** Phase 2.6 Session 2 post-ship — "Watch Trailer" -> the trailer's own full-screen destination

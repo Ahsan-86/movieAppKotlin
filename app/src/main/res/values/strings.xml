@@ -90,6 +90,12 @@
     <string name="search_failed">Search failed</string>
     <string name="search_no_results">No results</string>
     <string name="search_no_results_body">Nothing matched \"%1$s\" — no movies, TV shows, or people.</string>
+    <string name="search_no_filter_matches">No matches</string>
+    <string name="search_no_filter_matches_body">Nothing for \"%1$s\" matches these filters. Try loosening them or tap Reset.</string>
+    <string name="search_no_movies_match_filters">No movies match these filters.</string>
+    <string name="search_filter_results_found">%1$,d results found (movies &amp; TV)</string>
+    <string name="search_total_results_found">%1$,d results found (movies, TV &amp; people)</string>
+    <string name="search_filtered_matches_so_far">%1$,d match your filters so far</string>
     <string name="search_list_view">List view</string>
     <string name="search_grid_view">Grid view</string>
     <string name="search_dense_grid_view">Dense grid view</string>
@@ -118,8 +124,9 @@
     <string name="filter_show_results">Show results</string>
     <string name="filter_edit">Edit</string>
     <string name="filter_clear">Clear</string>
-    <string name="filter_filtered_filters">Filtered · %1$d filters</string>
-    <string name="filter_results_found">%1$d results found</string>
+    <string name="filter_results_found">%1$,d results found</string>
+    <string name="filter_chip_rating">★ %1$s+</string>
+    <string name="filter_remove_chip">Remove filter: %1$s</string>
     <string name="filter_minimum_rating">Minimum rating: %1$s</string>
     <string name="filter_english">English</string>
     <string name="filter_spanish">Spanish</string>
@@ -187,6 +194,16 @@
     <string name="castcrew_couldnt_load">Couldn\'t load cast &amp; crew</string>
     <string name="castcrew_empty_body">No cast or crew information available.</string>
     <string name="castcrew_director">Director</string>
+
+    <!-- Photos gallery (Phase 5) -->
+    <string name="photos_movie_gallery">Movie Gallery</string>
+    <string name="photos_tv_gallery">TV Show Gallery</string>
+    <string name="photos_see_all">See all photos</string>
+    <string name="photos_couldnt_load">Couldn\'t load photos</string>
+    <string name="photos_empty_title">No photos</string>
+    <string name="photos_empty_body">There are no photos available for this title.</string>
+    <string name="photos_counter">%1$d / %2$d</string>
+    <string name="photos_photo_description">Photo %1$d of %2$d</string>
 
     <!-- Collection -->
     <string name="collection_couldnt_load">Couldn\'t load this collection</string>

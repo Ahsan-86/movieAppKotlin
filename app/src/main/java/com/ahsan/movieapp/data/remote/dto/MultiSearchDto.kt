@@ -24,5 +24,6 @@ data class MultiSearchResultDto(
     @SerializedName("vote_average") val voteAverage: Double?,
     @SerializedName("vote_count") val voteCount: Int?,
     @SerializedName("genre_ids") val genreIds: List<Int>?,
-    @SerializedName("known_for_department") val knownForDepartment: String? // person
+    @SerializedName("known_for_department") val knownForDepartment: String?, // person
+    @SerializedName("original_language") val originalLanguage: String? = null
 )

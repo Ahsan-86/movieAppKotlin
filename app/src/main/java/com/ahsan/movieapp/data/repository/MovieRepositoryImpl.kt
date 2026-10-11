@@ -45,8 +45,10 @@ import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.PersonCredits
 import com.ahsan.movieapp.data.mapper.bestYoutubeTrailerKey
 import com.ahsan.movieapp.domain.model.PersonDetails
+import com.ahsan.movieapp.domain.model.Photo
 import com.ahsan.movieapp.domain.model.SeasonDetails
 import com.ahsan.movieapp.domain.model.TvCategory
+import com.ahsan.movieapp.domain.model.TvDiscoverResult
 import com.ahsan.movieapp.domain.model.TvShowDetails
 import com.ahsan.movieapp.domain.model.WatchProviders
 import com.ahsan.movieapp.domain.model.comboKey
@@ -68,7 +70,8 @@ class MovieRepositoryImpl @Inject constructor(
     private val movieDao: MovieDao,
     private val favoriteDao: FavoriteDao,
     private val searchHistoryDao: SearchHistoryDao,
-    private val tvShowDao: TvShowDao
+    private val tvShowDao: TvShowDao,
+    private val galleryPhotoLoader: GalleryPhotoLoader
 ) : MovieRepository {
 
     override fun getCategory(category: MovieCategory): Flow<Resource<List<Movie>>> =
@@ -149,11 +152,24 @@ class MovieRepositoryImpl @Inject constructor(
      * could clobber a same-numbered movie), and search queries have no cache table of their own,
      * so TV search rows always come back `isFavorite = false`.
      */
+    override suspend fun discoverTvShows(filters: DiscoverFilters, tvGenreId: Int?): Result<TvDiscoverResult> = runCatching {
+        val response = api.discoverTvByGenres(
+            genreIds = tvGenreId?.toString(),
+            year = filters.year,
+            language = filters.language,
+            minRating = filters.minRating
+        )
+        TvDiscoverResult(
+            shows = response.results.take(MAX_TV_SEARCH_RESULTS).map { it.toMovie() },
+            totalResults = response.totalResults
+        )
+    }
+
     override suspend fun searchTvShows(query: String): Result<List<Movie>> = runCatching {
         api.searchMulti(query).results
             .filter { it.mediaType == "tv" }
             .take(MAX_TV_SEARCH_RESULTS)
-            .map { it.toTvShowDto().toMovie() }
+            .map { it.toTvShowDto().toMovie().copy(originalLanguage = it.originalLanguage) }
     }
 
     /**
@@ -315,6 +331,10 @@ class MovieRepositoryImpl @Inject constructor(
      */
     override suspend fun getWatchProviders(movieId: Int): Result<WatchProviders> = runCatching {
         api.getWatchProviders(movieId).toDomain()
+    }
+
+    override suspend fun getTvWatchProviders(tvId: Int): Result<WatchProviders> = runCatching {
+        api.getTvWatchProviders(tvId).toDomain()
     }
 
     override suspend fun getPersonDetails(personId: Int): Result<PersonDetails> = runCatching {
@@ -530,6 +550,25 @@ class MovieRepositoryImpl @Inject constructor(
         api.getTvVideos(tvId).bestYoutubeTrailerKey()
     }
 
+    /** Photos gallery — see the interface doc. */
+    override suspend fun getMovieImages(movieId: Int): Result<List<Photo>> =
+        cachedPhotos("movie:$movieId") { galleryPhotoLoader.loadMovieFrames(movieId) }
+
+    override suspend fun getTvImages(tvId: Int): Result<List<Photo>> =
+        cachedPhotos("tv:$tvId") { galleryPhotoLoader.loadTvStills(tvId) }
+
+    // Small in-memory LRU of recent Photos results (successes only), so opening the grid or the
+    // fullscreen viewer from a detail screen reuses the row's fetch. Lives for the process; a failure
+    // is never cached, so reopening retries.
+    private val photoCache = object : LinkedHashMap<String, List<Photo>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Photo>>?) = size > PHOTO_CACHE_SIZE
+    }
+
+    private suspend fun cachedPhotos(key: String, load: suspend () -> List<Photo>): Result<List<Photo>> {
+        synchronized(photoCache) { photoCache[key] }?.let { return Result.success(it) }
+        return runCatching { load() }.onSuccess { photos -> synchronized(photoCache) { photoCache[key] = photos } }
+    }
+
     /** TV detail screen's Seasons section drill-down — see the interface doc. */
     override suspend fun getSeasonDetails(tvId: Int, seasonNumber: Int): Result<SeasonDetails> = runCatching {
         api.getSeasonDetails(tvId, seasonNumber).toDomain()
@@ -695,6 +734,9 @@ class MovieRepositoryImpl @Inject constructor(
         // Combo space is small (curated genres × years × languages × rating steps) so 8 covers a
         // realistic mix of filter panels the user cycles through while keeping the tables bounded.
         private const val DISCOVER_COMBO_KEEP = 8
+
+        // Phase 5 Photos gallery — how many recent titles keep their image list in memory.
+        private const val PHOTO_CACHE_SIZE = 8
 
         // Curated first-open genre chips. Most genres share the same id between movie and TV;
         // a few don't exist for one media type at all (Horror/Romance/Thriller have no TV

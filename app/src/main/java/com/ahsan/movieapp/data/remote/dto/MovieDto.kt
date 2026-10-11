@@ -13,7 +13,8 @@ data class MovieDto(
     @SerializedName("vote_average") val voteAverage: Double?,
     @SerializedName("vote_count") val voteCount: Int?,
     @SerializedName("genre_ids") val genreIds: List<Int>?,
-    @SerializedName("media_type") val mediaType: String?
+    @SerializedName("media_type") val mediaType: String?,
+    @SerializedName("original_language") val originalLanguage: String? = null
 ) {
     val displayTitle: String get() = title ?: name ?: "Untitled"
 }

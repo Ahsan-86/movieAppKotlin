@@ -10,6 +10,7 @@ import com.ahsan.movieapp.domain.model.MovieDetails
 import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.WatchProviderRegion
 import com.ahsan.movieapp.domain.model.WatchProviders
+import com.ahsan.movieapp.ui.components.PhotosState
 import com.ahsan.movieapp.util.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,9 @@ data class MovieDetailUiState(
     // Phase 2.6 Session 2 — Watch Trailer button. Null means either still loading or TMDB has no
     // YouTube trailer for this movie; either way the button just doesn't render.
     val trailerKey: String? = null,
+    // Phase 5 — Photos gallery row. Loading until its own lazy fetch lands; None if TMDB has no
+    // stills or the fetch failed (the row then simply doesn't render).
+    val photos: PhotosState = PhotosState.Loading,
     val isLoading: Boolean = true,
     val errorMessage: String? = null
 )
@@ -90,6 +94,8 @@ class MovieDetailViewModel @Inject constructor(
     // Phase 2.6 Session 2 — Watch Trailer button. Fetched separately (own launch, no onFailure),
     // same failure-tolerant, separately-fetched convention as creditsState/watchState above.
     private val trailerKeyState = MutableStateFlow<String?>(null)
+    // Phase 5 — Photos gallery row, fetched lazily on its own so it never delays the main content.
+    private val photosState = MutableStateFlow<PhotosState>(PhotosState.Loading)
 
     private val baseState: Flow<MovieDetailUiState> = combine(
         repository.getMovieDetails(movieId),
@@ -119,8 +125,8 @@ class MovieDetailViewModel @Inject constructor(
     // trailerKeyState is combined in as a second layer rather than folded into the 5-flow combine()
     // above — kotlinx.coroutines' combine() only has named-lambda overloads up to 5 flows, and a
     // 6th flow would need the array-based vararg overload instead; nesting is simpler here.
-    val uiState: StateFlow<MovieDetailUiState> = combine(baseState, trailerKeyState) { state, trailerKey ->
-        state.copy(trailerKey = trailerKey)
+    val uiState: StateFlow<MovieDetailUiState> = combine(baseState, trailerKeyState, photosState) { state, trailerKey, photos ->
+        state.copy(trailerKey = trailerKey, photos = photos)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MovieDetailUiState(selectedRegion = defaultRegionCode()))
 
     init {
@@ -151,6 +157,11 @@ class MovieDetailViewModel @Inject constructor(
             repository.getMovieTrailerKey(movieId)
                 .onSuccess { key -> trailerKeyState.value = key }
             // Deliberately no onFailure handling — see the comment on trailerKeyState above.
+        }
+        viewModelScope.launch {
+            // Failure or no photos both resolve to None (row hidden) — supplementary, like the above.
+            val photos = repository.getMovieImages(movieId).getOrNull().orEmpty()
+            photosState.value = if (photos.isEmpty()) PhotosState.None else PhotosState.Loaded(photos)
         }
     }
 

@@ -17,7 +17,10 @@ data class Movie(
     val voteCount: Int,
     val genreIds: List<Int> = emptyList(),
     val isFavorite: Boolean = false,
-    val mediaType: MediaType = MediaType.MOVIE
+    val mediaType: MediaType = MediaType.MOVIE,
+    // ISO 639-1 code (e.g. "en"). Only populated for text-search results, where the search screen's
+    // client-side Language filter needs it; null everywhere else (not stored in Room).
+    val originalLanguage: String? = null
 ) {
     val releaseYear: String get() = releaseDate.take(4).ifBlank { "—" }
     val ratingOutOfTen: String get() = String.format(Locale.US, "%.1f", voteAverage)

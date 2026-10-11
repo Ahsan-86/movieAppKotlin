@@ -100,6 +100,19 @@ sealed class Destination(val route: String) {
     data object TrailerPlayer : Destination("trailer/{videoId}") {
         fun createRoute(videoId: String) = "trailer/$videoId"
     }
+
+    /**
+     * Phase 5 Photos gallery — the "See all" grid of a movie's or show's stills. mediaType is
+     * `"movie"` or `"tv"` (TMDB ids of the two share a numeric range, so the type travels with the id).
+     */
+    data object PhotosGrid : Destination("photos/{mediaType}/{mediaId}") {
+        fun createRoute(mediaType: String, mediaId: Int) = "photos/$mediaType/$mediaId"
+    }
+
+    /** Phase 5 Photos gallery — the fullscreen pager/zoom viewer, opened at `startIndex`. */
+    data object PhotoViewer : Destination("photo-viewer/{mediaType}/{mediaId}/{startIndex}") {
+        fun createRoute(mediaType: String, mediaId: Int, startIndex: Int) = "photo-viewer/$mediaType/$mediaId/$startIndex"
+    }
 }
 
 data class BottomNavItem(

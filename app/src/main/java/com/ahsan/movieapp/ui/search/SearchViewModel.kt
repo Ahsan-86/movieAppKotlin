@@ -4,13 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.paging.filter
 import com.ahsan.movieapp.data.repository.MovieRepository
 import com.ahsan.movieapp.data.repository.PreferencesRepository
 import com.ahsan.movieapp.data.repository.SearchViewMode
 import com.ahsan.movieapp.domain.model.DiscoverFilters
+import com.ahsan.movieapp.domain.model.FilterField
+import com.ahsan.movieapp.domain.model.without
 import com.ahsan.movieapp.domain.model.GenreChip
 import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
+import com.ahsan.movieapp.domain.model.matches
 import com.ahsan.movieapp.domain.model.Person
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
@@ -60,7 +65,19 @@ data class SearchUiState(
     // draft; pagedFilteredMovies below only re-pages once `onApplyFilters()` commits it.
     val filters: DiscoverFilters = DiscoverFilters(),
     val isFilterPanelExpanded: Boolean = false,
-    val isFilterApplied: Boolean = false
+    val isFilterApplied: Boolean = false,
+    // The first-screen filter results' "TV Shows" row (capped first page of /discover/tv for the same
+    // filters) and TMDB's total for it — the movie side is the paged flow, this is the one-shot half,
+    // like [tvShows] is for text search.
+    val filterTvShows: List<Movie> = emptyList(),
+    val filterTvTotal: Int? = null,
+    val isLoadingFilterTv: Boolean = false,
+    // Text-search results get their own Year / Language / Rating filter (separate from the blank-state
+    // Discover panel above). TMDB search can't filter, so these narrow the loaded results on the phone.
+    // `searchFilters` is the panel's draft; `appliedSearchFilters` is what the results are filtered by.
+    val searchFilters: DiscoverFilters = DiscoverFilters(),
+    val appliedSearchFilters: DiscoverFilters = DiscoverFilters(),
+    val isSearchFilterPanelExpanded: Boolean = false
 )
 
 /**
@@ -111,6 +128,7 @@ class SearchViewModel @Inject constructor(
     private val appliedFiltersFlow = MutableStateFlow<DiscoverFilters?>(null)
     private var peopleJob: Job? = null
     private var tvJob: Job? = null
+    private var filterTvJob: Job? = null
 
     // Clear the committed text query only; the discover filter flow is cleared separately.
     // No longer a MutableStateFlow-bound filtered total — the "N results found" line for the
@@ -138,9 +156,21 @@ class SearchViewModel @Inject constructor(
         .map { favorites -> favorites.mapTo(mutableSetOf()) { it.id to it.mediaType } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
-    val pagedSearchMovies: Flow<PagingData<Movie>> = queryFlow
-        .flatMapLatest { query ->
-            if (query.isBlank()) flowOf(PagingData.empty()) else repository.getPagedSearchMovies(query, searchTotal)
+    // The Year / Language / Rating filter applied to text-search results (see SearchUiState.searchFilters).
+    // It is folded into the pager's flatMapLatest *before* cachedIn() — a filter change builds a fresh
+    // pager (page 1 is answered by the OkHttp cache) whose PagingData is `.filter{}`ed, never a
+    // combine() of a live side flow against an already-created PagingData (see the class doc).
+    private val appliedSearchFiltersFlow = MutableStateFlow(DiscoverFilters())
+
+    val pagedSearchMovies: Flow<PagingData<Movie>> = combine(queryFlow, appliedSearchFiltersFlow) { query, filters -> query to filters }
+        .flatMapLatest { (query, filters) ->
+            if (query.isBlank()) {
+                flowOf(PagingData.empty())
+            } else {
+                repository.getPagedSearchMovies(query, searchTotal).map { data ->
+                    if (filters.isEmpty) data else data.filter { movie -> movie.matches(filters) }
+                }
+            }
         }
         .cachedIn(viewModelScope)
 
@@ -183,6 +213,12 @@ class SearchViewModel @Inject constructor(
         _uiState.update {
             it.copy(query = query, committedQuery = if (query.isBlank()) "" else it.committedQuery)
         }
+        // Emptying the field leaves the results screen, so its filters go with it (they'd otherwise
+        // silently narrow the next, unrelated search).
+        if (query.isBlank()) {
+            textSearchSessionActive = false
+            onResetSearchFilters()
+        }
     }
 
     /** The user explicitly committed a search (IME search action / trailing button). The ONLY place
@@ -207,7 +243,28 @@ class SearchViewModel @Inject constructor(
      *  pager, and clearing the total then would leave the count line blank until the next new query. */
     private fun commitQuery(query: String) {
         if (queryFlow.value != query) searchTotal.value = null
+        // Carry the first-screen filters over only when a text search *begins* — not on every later
+        // submit, which would overwrite whatever the user has since changed in the results' own panel.
+        // The session ends when the field is cleared (see onQueryInput).
+        if (!textSearchSessionActive) {
+            textSearchSessionActive = true
+            carryAppliedFiltersIntoSearch()
+        }
         queryFlow.value = query
+    }
+
+    // True from the first submitted text search until the field is cleared; see commitQuery.
+    private var textSearchSessionActive = false
+
+    /** If first-screen (Discover) filters are applied when a text search begins, the search
+     *  continues *within* them: they become the results' filters (visible and editable in the panel
+     *  above the results). Set before the query so the pager starts once, already filtered. */
+    private fun carryAppliedFiltersIntoSearch() {
+        val applied = appliedFiltersFlow.value ?: return
+        appliedSearchFiltersFlow.value = applied
+        _uiState.update {
+            it.copy(searchFilters = applied, appliedSearchFilters = applied, isSearchFilterPanelExpanded = false)
+        }
     }
 
     fun clearSearchHistory() {
@@ -234,8 +291,17 @@ class SearchViewModel @Inject constructor(
 
     // --- Phase 2.5: collapsible filter panel (genre/year/language/min rating) ---
 
+    /** Opens/closes the panel. Closing it while editing already-applied filters abandons the unsaved
+     *  draft (it snaps back to what is actually applied), so the summary + count come back unchanged. */
     fun onToggleFilterPanel() {
-        _uiState.update { it.copy(isFilterPanelExpanded = !it.isFilterPanelExpanded) }
+        _uiState.update { state ->
+            val closing = state.isFilterPanelExpanded
+            val restoreApplied = closing && state.isFilterApplied
+            state.copy(
+                isFilterPanelExpanded = !closing,
+                filters = if (restoreApplied) appliedFiltersFlow.value ?: state.filters else state.filters
+            )
+        }
     }
 
     fun onGenreFilterSelected(genreId: Int?) {
@@ -258,18 +324,112 @@ class SearchViewModel @Inject constructor(
     fun onApplyFilters() {
         val filters = _uiState.value.filters
         if (filters.isEmpty) return
-        _uiState.update { it.copy(isFilterApplied = true) }
+        _uiState.update { it.copy(isFilterApplied = true, isFilterPanelExpanded = false) }
         appliedFiltersFlow.value = filters
+        loadFilterTvShows(filters)
     }
 
-    /** Back to the filter panel (expanded, criteria kept) instead of the plain blank state. */
+    /** Fills the filter results' TV Shows row. The panel's genre is a *movie* genre id, so it is mapped
+     *  to that genre's TV id through the genre chips; a genre with no TV counterpart (Horror, Romance,
+     *  Thriller) means the TV row is simply empty rather than a request that ignores the genre. */
+    private fun loadFilterTvShows(filters: DiscoverFilters) {
+        filterTvJob?.cancel()
+        val tvGenreId = filters.genreId?.let { movieGenreId ->
+            _uiState.value.genreChips.firstOrNull { it.movieGenreId == movieGenreId }?.tvGenreId
+        }
+        if (filters.genreId != null && tvGenreId == null) {
+            _uiState.update { it.copy(filterTvShows = emptyList(), filterTvTotal = 0, isLoadingFilterTv = false) }
+            return
+        }
+        filterTvJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingFilterTv = true) }
+            repository.discoverTvShows(filters, tvGenreId)
+                .onSuccess { result ->
+                    _uiState.update { it.copy(filterTvShows = result.shows, filterTvTotal = result.totalResults, isLoadingFilterTv = false) }
+                }
+                .onFailure {
+                    // Supplementary, like the people/TV rows of a text search: the movie results stand alone.
+                    _uiState.update { it.copy(filterTvShows = emptyList(), filterTvTotal = null, isLoadingFilterTv = false) }
+                }
+        }
+    }
+
+    /** Summary's "Edit" — opens the panel in place above the results instead of bouncing back to the
+     *  first screen. The applied filters (and so the results and their count) stay in effect until a
+     *  new set is applied or cleared; collapsing without applying returns to the summary. */
     fun onEditFilters() {
-        _uiState.update { it.copy(isFilterApplied = false, isFilterPanelExpanded = true) }
+        _uiState.update { it.copy(isFilterPanelExpanded = true) }
     }
 
+    /** A filter chip's ✕ on the filter results: drops that one criterion and re-applies the rest, or
+     *  clears everything when it was the last one. */
+    fun onRemoveFilter(field: FilterField) {
+        val remaining = (appliedFiltersFlow.value ?: _uiState.value.filters).without(field)
+        if (remaining.isEmpty) {
+            onClearFilters()
+            return
+        }
+        _uiState.update { it.copy(filters = remaining) }
+        onApplyFilters()
+    }
+
+    /** Drops every filter; with no query and no filters there is nothing to list, so the screen goes
+     *  back to the first (blank) state. */
     fun onClearFilters() {
         appliedFiltersFlow.value = null
-        _uiState.update { it.copy(filters = DiscoverFilters(), isFilterApplied = false) }
+        filterTvJob?.cancel()
+        _uiState.update {
+            it.copy(
+                filters = DiscoverFilters(),
+                isFilterApplied = false,
+                isFilterPanelExpanded = false,
+                filterTvShows = emptyList(),
+                filterTvTotal = null,
+                isLoadingFilterTv = false
+            )
+        }
+    }
+
+    // --- Text-search results filter (Year / Language / Rating, applied on the phone) ---
+
+    fun onToggleSearchFilterPanel() {
+        _uiState.update { it.copy(isSearchFilterPanelExpanded = !it.isSearchFilterPanelExpanded) }
+    }
+
+    fun onSearchGenreFilterSelected(genreId: Int?) {
+        _uiState.update { it.copy(searchFilters = it.searchFilters.copy(genreId = genreId)) }
+    }
+
+    fun onSearchYearFilterSelected(year: Int?) {
+        _uiState.update { it.copy(searchFilters = it.searchFilters.copy(year = year)) }
+    }
+
+    fun onSearchLanguageFilterSelected(language: String?) {
+        _uiState.update { it.copy(searchFilters = it.searchFilters.copy(language = language)) }
+    }
+
+    fun onSearchMinRatingFilterChanged(minRating: Float?) {
+        _uiState.update { it.copy(searchFilters = it.searchFilters.copy(minRating = minRating)) }
+    }
+
+    /** Narrows the current text-search results by the panel's draft and folds the panel away. */
+    fun onApplySearchFilters() {
+        val filters = _uiState.value.searchFilters
+        if (filters.isEmpty) return
+        appliedSearchFiltersFlow.value = filters
+        _uiState.update { it.copy(appliedSearchFilters = filters, isSearchFilterPanelExpanded = false) }
+    }
+
+    /** Clears both the draft and the applied filters, restoring the full result list. */
+    fun onResetSearchFilters() {
+        appliedSearchFiltersFlow.value = DiscoverFilters()
+        _uiState.update {
+            it.copy(
+                searchFilters = DiscoverFilters(),
+                appliedSearchFilters = DiscoverFilters(),
+                isSearchFilterPanelExpanded = false
+            )
+        }
     }
 
     private fun loadPeople(query: String) {

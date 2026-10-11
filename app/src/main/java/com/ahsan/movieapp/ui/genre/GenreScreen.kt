@@ -116,11 +116,12 @@ fun GenreScreen(
             // screen pins its genre): year/language/minimum-rating, applying to whichever tab is
             // showing. Once applied, a FilterSummaryBar replaces the panel the same way Search
             // does, with Edit (back to the panel, draft kept) / Clear.
-            if (state.isFilterApplied) {
+            if (state.isFilterApplied && !state.isFilterPanelExpanded) {
                 FilterSummaryBar(
                     filters = state.filters,
                     onEdit = viewModel::onEditFilters,
                     onClear = viewModel::onClearFilters,
+                    onRemoveFilter = viewModel::onRemoveFilter,
                     modifier = Modifier.padding(horizontal = 16.dp),
                     resultCount = activeFilteredTotal
                 )

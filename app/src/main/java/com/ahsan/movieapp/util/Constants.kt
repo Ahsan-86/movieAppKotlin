@@ -8,6 +8,8 @@ object Constants {
     const val POSTER_WIDTH = "w500"
     const val POSTER_WIDTH_SMALL = "w185"
     const val BACKDROP_WIDTH = "w780"
+    // The Photos gallery viewer's full-size still — sharper than the w780 thumbnails when zoomed.
+    const val BACKDROP_WIDTH_LARGE = "w1280"
     const val PROFILE_WIDTH = "w185"
     // Fixed-height, larger profile image for the person screen's header photo.
     const val PROFILE_WIDTH_LARGE = "h632"

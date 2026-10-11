@@ -74,6 +74,8 @@ import com.ahsan.movieapp.ui.components.DetailHeroCaption
 import com.ahsan.movieapp.ui.components.FullScreenError
 import com.ahsan.movieapp.ui.components.DetailScreenSkeleton
 import com.ahsan.movieapp.ui.components.MoviePosterCard
+import com.ahsan.movieapp.ui.components.PhotosSection
+import com.ahsan.movieapp.ui.components.WatchProvidersSection
 import com.ahsan.movieapp.ui.components.TrailerShareRow
 import com.ahsan.movieapp.ui.components.UrlAutoSizeText
 import com.ahsan.movieapp.ui.components.backgroundSwatch
@@ -126,6 +128,8 @@ fun TvDetailScreen(
     onSeasonClick: (tvId: Int, seasonNumber: Int, seasonName: String) -> Unit,
     onViewAllCastCrew: (tvId: Int) -> Unit,
     onWatchTrailer: (videoId: String) -> Unit,
+    onPhotoClick: (tvId: Int, index: Int) -> Unit,
+    onSeeAllPhotos: (tvId: Int) -> Unit,
     viewModel: TvDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -271,6 +275,17 @@ fun TvDetailScreen(
                             )
                         }
 
+                        PhotosSection(
+                            state = state.photos,
+                            title = stringResource(R.string.photos_tv_gallery),
+                            onPhotoClick = { index -> onPhotoClick(details.id, index) },
+                            onSeeAll = { onSeeAllPhotos(details.id) }
+                        )
+
+                        TvInformationSection(details)
+
+                        // Seasons sits below Information (Ahsan, 2026-10-11), then "Where to watch" like the
+                        // Movie screen's order (Information -> [Collection] -> Where to watch -> More like this).
                         if (details.seasons.isNotEmpty()) {
                             TvSeasonsSection(
                                 seasons = details.seasons,
@@ -278,7 +293,14 @@ fun TvDetailScreen(
                             )
                         }
 
-                        TvInformationSection(details)
+                        if (state.watchRegions.isNotEmpty()) {
+                            WatchProvidersSection(
+                                region = state.watchProviders,
+                                availableRegions = state.watchRegions,
+                                selectedRegion = state.selectedRegion,
+                                onRegionChange = { viewModel.setWatchRegion(it) }
+                            )
+                        }
 
                         if (state.moreLikeThis.isNotEmpty()) {
                             TvPosterRowSection(shows = state.moreLikeThis, onTvClick = onTvClick)

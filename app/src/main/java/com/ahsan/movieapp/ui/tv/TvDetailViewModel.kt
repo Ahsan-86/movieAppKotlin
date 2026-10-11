@@ -10,6 +10,9 @@ import com.ahsan.movieapp.domain.model.MediaType
 import com.ahsan.movieapp.domain.model.Movie
 import com.ahsan.movieapp.domain.model.Person
 import com.ahsan.movieapp.domain.model.TvShowDetails
+import com.ahsan.movieapp.domain.model.WatchProviderRegion
+import com.ahsan.movieapp.domain.model.WatchProviders
+import com.ahsan.movieapp.ui.components.PhotosState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 data class TvDetailUiState(
@@ -30,6 +34,15 @@ data class TvDetailUiState(
     // Phase 2.6 Session 2 — Watch Trailer button. Null means either still loading or TMDB has no
     // YouTube trailer for this show; either way the button just doesn't render.
     val trailerKey: String? = null,
+    // Phase 5 — Photos gallery row. Loading until its own lazy fetch lands; None if TMDB has no
+    // stills or the fetch failed (the row then simply doesn't render).
+    val photos: PhotosState = PhotosState.Loading,
+    // "Where to watch" — same shape as MovieDetailUiState: watchProviders is the SELECTED region's
+    // Stream/Rent/Buy lists (null while loading, or if TMDB has none for that region), watchRegions
+    // every region TMDB returned data for (the dropdown), selectedRegion drives both.
+    val watchProviders: WatchProviderRegion? = null,
+    val watchRegions: List<String> = emptyList(),
+    val selectedRegion: String = defaultRegionCode(),
     // Session 6 — this show's favorite state (keyed by (tvId, TV)) for the FloatingActionButton,
     // consumed live off the Favorites table exactly like MovieDetailScreen does.
     val isFavorite: Boolean = false,
@@ -98,6 +111,45 @@ class TvDetailViewModel @Inject constructor(
                 .onSuccess { key -> _uiState.update { it.copy(trailerKey = key) } }
             // Deliberately no onFailure handling — see the class doc above.
         }
+        viewModelScope.launch {
+            repository.getTvWatchProviders(tvId)
+                .onSuccess { providers ->
+                    allWatchProviders = providers
+                    _uiState.update { current ->
+                        // Prefer the device-locale region if TMDB has data for it; else the US; else leave the
+                        // locale default selected (the section then says "not available" there, which is
+                        // honest — same resolution as MovieDetailViewModel).
+                        val region = when {
+                            current.selectedRegion in providers.regionsAvailable -> current.selectedRegion
+                            "US" in providers.regionsAvailable -> "US"
+                            else -> current.selectedRegion
+                        }
+                        current.copy(
+                            watchRegions = providers.regionsAvailable,
+                            selectedRegion = region,
+                            watchProviders = providers.forRegion(region)
+                        )
+                    }
+                }
+            // Deliberately no onFailure handling — see the class doc above (section just doesn't render).
+        }
+        // Phase 5 — Photos gallery: its own lazy, network-only fetch so the stills never delay the
+        // rest of the screen. Failure or no photos both resolve to None (row hidden).
+        viewModelScope.launch {
+            val photos = repository.getTvImages(tvId).getOrNull().orEmpty()
+            _uiState.update {
+                it.copy(photos = if (photos.isEmpty()) PhotosState.None else PhotosState.Loaded(photos))
+            }
+        }
+    }
+
+    // Every region TMDB returned in the one /watch/providers call — switching the dropdown is a pure
+    // client-side lookup into this, never a re-fetch (same as MovieDetailViewModel).
+    private var allWatchProviders: WatchProviders? = null
+
+    /** Backs the region dropdown of "Where to watch" — instant, local. */
+    fun setWatchRegion(regionCode: String) {
+        _uiState.update { it.copy(selectedRegion = regionCode, watchProviders = allWatchProviders?.forRegion(regionCode)) }
     }
 
     /** Session 6 — favorite/un-favorite this show via the composite-key Favorites table. The FAB's
@@ -110,3 +162,7 @@ class TvDetailViewModel @Inject constructor(
         }
     }
 }
+
+/** The device's own region as an ISO 3166-1 country code (e.g. "US", "GB"), "US" when the locale has none —
+ *  same default as the Movie detail's "Where to watch". */
+private fun defaultRegionCode(): String = Locale.getDefault().country.takeIf { it.isNotBlank() } ?: "US"

@@ -4,7 +4,12 @@ An offline-first Android app for browsing movies and TV shows, built with Kotlin
 
 > Originally a small MVVM + Retrofit demo, the app has since been rewritten from scratch in Jetpack Compose with a Room-backed offline cache, Paging 3, Hilt and a full TV Shows experience.
 
-<!-- Add 3-4 screenshots here (Explore, Movie detail, Search with filters, Trailer) -->
+<p align="center">
+ <img src="docs/screenshots/explore.png" width="23%" />
+ <img src="docs/screenshots/detail.png" width="23%" />
+ <img src="docs/screenshots/search.png" width="23%" />
+ <img src="docs/screenshots/tv.png" width="23%" />
+</p>
 
 ## Features
 
